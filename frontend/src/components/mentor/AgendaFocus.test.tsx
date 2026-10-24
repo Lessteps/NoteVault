@@ -223,13 +223,15 @@ describe("proyectos diario, semanal y mensual al final del día", () => {
     expect(dayTopics.some((t) => connected.includes(t.replace(/^[\d.\s]+/, "")))).toBe(true);
   });
 
-  it("marcar el proyecto diario guarda su estado con el id del entregable y los proyectos cuentan como entregables del día", async () => {
+  it("el proyecto diario no se marca a mano: solo muestra su estado derivado y los proyectos cuentan como entregables del día", async () => {
     const d = focusDay();
     const upd = vi.spyOn(api, "mentorPlanUpdateDeliverable").mockResolvedValue(areasPlan());
     await openDay(d);
     expect(byTest("agenda-day-counts").textContent).toMatch(/\d+ entregables?/);
-    await click(button(/Marcar en curso: /, byTest("agenda-project-daily")));
-    expect(upd).toHaveBeenCalledWith({ id: PID, deliverableId: `dp:${d}`, status: "en_curso" });
+    const card = byTest("agenda-project-daily");
+    expect(card.textContent).not.toMatch(/Marcar en curso|Marcar hecho|Reabrir|por definir/);
+    expect(card.querySelector("button[aria-label^='Marcar']")).toBeNull();
+    expect(upd).not.toHaveBeenCalled();
   });
 });
 

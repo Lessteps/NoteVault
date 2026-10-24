@@ -1,5 +1,5 @@
 // Mentor — Planeación: UNA página del plan, al estilo de un documento: la Vista general (todo el plan), la de cada ÁREA o la de Bases.
-// Cabecera (emoji, título grande, bloque de propiedades y la nota de práctica con el Mentor) y pestañas «Semana N · Calendario · Temas/Por área ·
+// Cabecera (título grande, bloque de propiedades y la nota de práctica con el Mentor) y pestañas «Semana N · Calendario · Temas/Por área ·
 // Proyectos». La semana, el mes, el calendario y el detalle de un día son las piezas de siempre de la Agenda, filtradas por el alcance de la página.
 //
 // Las claves guardadas son las de siempre: el área elegida (`mentor.agendaArea.<plan>`), la vista Semana|Mes (`mentor.agendaView.<plan>`) y la fecha
@@ -22,6 +22,7 @@ import { DayDetail, MonthDetail, WeekDetail } from "./AgendaViews";
 import { AreaDot, DeliverablesPendingNote } from "./AreaViews";
 import { activeAreas, areaState, normalizePageTab, scopeDates, scopeInfo, scopeKey, scopeProgress, type PageScope } from "./mentorAreas";
 import { hasBasesRoute, PAGE_BASES, pageAreaId, PLAN_NAV_PREFIX } from "./mentorNav";
+import { MonthlyDeliverables } from "./MonthlyDeliverables";
 import { DeliverableLine, useAgendaModel, type AgendaModel } from "./agendaKit";
 import { AreaWeek } from "./PlanAreaWeek";
 import { PhaseMonthTable } from "./PlanMonths";
@@ -301,7 +302,7 @@ export function PlanScopePage(props: PlanScopePageProps) {
                 {scope.kind === "all" && summary0 && (
                   <details open data-testid="agenda-phases" className="mt-4 rounded-2xl border border-line bg-card p-4">
                     <summary className="inline-flex min-h-9 cursor-pointer items-center text-[15px] font-semibold">Fases del plan, mes a mes</summary>
-                    <p className="mb-3 mt-1 text-[13.5px] text-dim">Qué trabaja cada área en cada mes: temas, horas y semanas activas. Pulsa un mes para verlo arriba.</p>
+                    <p className="mb-3 mt-1 text-[13.5px] text-dim">Qué trabaja cada área en cada mes: temas y semanas activas. Pulsa un mes para verlo arriba.</p>
                     <PhaseMonthTable data={data} plan={plan} onOpenMonth={(_month, firstDay) => { setAnchor(firstDay); setStoredView("mes"); }} />
                     <details className="mt-3" data-testid="agenda-phases-bars">
                       <summary className="inline-flex min-h-8 cursor-pointer items-center text-[14px] text-accent-text">Ver las fases por semanas</summary>
@@ -354,7 +355,7 @@ export function PlanScopePage(props: PlanScopePageProps) {
       )}
 
       <TabPanel prefix={PREFIX} id="proyectos" active={tab === "proyectos"} className="pt-0">
-        <>{tab === "proyectos" && <ProjectsTab m={m} scope={scope} week={week} month={month} period={period} onChanged={onChanged} headingId={`${uid}-p`} />}</>
+        <>{tab === "proyectos" && <ProjectsTab data={data} m={m} scope={scope} week={week} month={month} period={period} onChanged={onChanged} headingId={`${uid}-p`} />}</>
       </TabPanel>
 
       {scope.kind === "all" && (
@@ -394,20 +395,24 @@ function AreaCards({ plan, m, onOpenPage, showBases }: { plan: MentorPlan; m: Ag
 }
 
 /** «Proyectos»: los proyectos semanales y mensuales del periodo y los entregables de la página. */
-function ProjectsTab({ m, scope, week, month, period, onChanged, headingId }: { m: AgendaModel; scope: PageScope; week: number; month: string; period: "semana" | "mes"; onChanged: (p: MentorPlan) => void; headingId: string }) {
+function ProjectsTab({ data, m, scope, week, month, period, onChanged, headingId }: { data: Loaded; m: AgendaModel; scope: PageScope; week: number; month: string; period: "semana" | "mes"; onChanged: (p: MentorPlan) => void; headingId: string }) {
   const areaId = scope.kind === "area" ? m.plan.subplans.find((s) => s.id === scope.subplanId)?.areaId : undefined;
+  // planes por áreas: la cadena día → semana → mes (con su avance derivado) ya contiene los proyectos diarios, semanales y mensuales
+  const chained = m.plan.structure === "areas" && scope.kind !== "bases";
   const list = m.deliverables
     .filter((d) => d.kind !== "kata" && d.kind !== "daily_project")
+    .filter((d) => !chained || (d.kind !== "weekly_project" && d.kind !== "monthly_project"))
     .filter((d) => scope.kind === "all" || (areaId ? deliverableInArea(d, areaId) : false))
     .filter((d) => scope.kind !== "all" || (period === "mes" ? d.dueDate.startsWith(month) : weekRange(m, week, d.dueDate)));
   return (
     <div className="space-y-5" data-testid="plan-projects">
-      {m.schedule.mode === "focus" && (period === "mes" ? <MonthProjects m={m} month={month} headingId={`${headingId}-m`} onChanged={onChanged} /> : <WeekProjects m={m} week={week} headingId={`${headingId}-w`} onChanged={onChanged} />)}
-      <section aria-labelledby={`${headingId}-d`} data-testid="plan-projects-deliverables">
+      {chained && <MonthlyDeliverables data={data} {...(areaId ? { areaId } : {})} />}
+      {!chained && m.schedule.mode === "focus" && (period === "mes" ? <MonthProjects m={m} month={month} headingId={`${headingId}-m`} onChanged={onChanged} /> : <WeekProjects m={m} week={week} headingId={`${headingId}-w`} onChanged={onChanged} />)}
+      {!(chained && list.length === 0) && <section aria-labelledby={`${headingId}-d`} data-testid="plan-projects-deliverables">
         <h3 id={`${headingId}-d`} className={cn(SECTION, "mb-2")}>
           {scope.kind === "all" ? `Entregables ${period === "mes" ? "del mes" : "de la semana"}` : scope.kind === "bases" ? "Entregables de Bases" : "Entregables del área"} <span className="font-normal normal-case tracking-normal text-dim">({deliverablesText(list.length)})</span>
         </h3>
-        {!m.deliverablesDefined ? (
+        {!m.deliverablesDefined && m.plan.structure !== "areas" ? (
           <DeliverablesPendingNote />
         ) : list.length === 0 ? (
           <p className="text-[14px] text-dim">{scope.kind === "bases" ? "Bases no tiene entregables propios: sus temas se trabajan dentro de las áreas." : "Sin entregables en esta página."}</p>
@@ -416,7 +421,7 @@ function ProjectsTab({ m, scope, week, month, period, onChanged, headingId }: { 
             {list.map((d) => <DeliverableLine key={d.id} d={d} showDate={dateLabel(d.dueDate)} onOpenPractice={openPractice} />)}
           </ul>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

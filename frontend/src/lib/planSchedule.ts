@@ -563,8 +563,8 @@ function areaProjectStatus(areaId: string | undefined, chain: { months: Readonly
 
 /**
  * Todos los entregables del plan: los de PRÁCTICA derivados de la pista (un archivo de kata por día con kata, un proyecto por semana,
- * uno por bloque mensual), los de ÁREA (`Subplan.deliverable`) y los guardados a mano. El estado de cada derivado es lo mejor entre
- * lo que dice la práctica (`practice`) y lo anotado a mano (`Plan.deliverables` con el mismo `id`).
+ * uno por bloque mensual), los de ÁREA (`Subplan.deliverable`) y los guardados a mano. El ESTADO de cada derivado sale de lo que el
+ * estudiante completa (`practice` y las carpetas de proyecto): `Plan.deliverables` solo aporta sus archivos, nunca el estado.
  */
 export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike | null, schedule?: PlanSchedule): PlanDeliverable[] {
   const out: PlanDeliverable[] = [];
@@ -573,9 +573,9 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
   const push = (d: PlanDeliverable): void => {
     const man = stored.get(d.id);
     used.add(d.id);
-    // el proyecto diario se deriva siempre del reparto actual: del guardado solo se conservan los archivos; se preserva lo completado
+    // el proyecto diario se deriva siempre del reparto actual: del guardado solo se conservan los archivos; el ESTADO nunca se anota a mano (se deriva de lo que el estudiante completa)
     if (!man) return void out.push(d);
-    const merged: PlanDeliverable = { ...d, ...man, status: bestStatus(d.status, man.status), kind: d.kind, source: d.source, ...(d.kind === "daily_project" || d.kind === "topic_project" ? { title: d.title, description: d.description, dueDate: d.dueDate, criteria: d.criteria } : {}) };
+    const merged: PlanDeliverable = { ...d, ...man, status: d.status, kind: d.kind, source: d.source, ...(d.kind === "daily_project" || d.kind === "topic_project" ? { title: d.title, description: d.description, dueDate: d.dueDate, criteria: d.criteria } : {}) };
     // el área sale siempre de lo derivado (lo anotado a mano no la fija)
     if (d.areaId) merged.areaId = d.areaId;
     else delete merged.areaId;
@@ -698,7 +698,7 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
       dueDate: ranges[toWeek - 1]?.end ?? plan.end,
       criteria: d.criteria,
       // el proyecto de área también se deriva: hecho cuando lo están los meses en que participa el área
-      status: bestStatus(d.status ?? "pendiente", areaProjectStatus(sub.areaId, chainModel)),
+      status: areaProjectStatus(sub.areaId, chainModel),
       source: "ai",
     });
   }

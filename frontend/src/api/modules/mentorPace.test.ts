@@ -187,3 +187,30 @@ describe("mentor_plan_topic_candidates", () => {
     expect(fs.readFileSync(file, "utf-8")).not.toBe(before); // solo por el alta del extra
   });
 });
+
+describe("mentor_plan_topic_candidates (upcoming)", () => {
+  it("devuelve los próximos temas por área en orden de ruta, con semana y bloqueo, y sin temas de la vault", () => {
+    const { id, sa } = writePlan();
+    const r: any = api().mentor_plan_topic_candidates({ id, upcoming: true, area: sa, horizon: 12 });
+    expect(r.vault).toEqual([]);
+    expect(r.ahead.every((c: any) => c.subplanId === sa && typeof c.week === "number")).toBe(true);
+    expect(r.ahead.map((c: any) => c.position)).toEqual([...r.ahead.map((c: any) => c.position)].sort((a: number, b: number) => a - b));
+    // el primero no tiene bloqueo; los que van detrás de un tema aún no planeado para ese día sí
+    const blocked = r.ahead.filter((c: any) => c.blockedBy);
+    for (const c of blocked) expect(c.onDay).toBe(false);
+    const free = r.ahead.filter((c: any) => !c.blockedBy && !c.onDay);
+    expect(free.length).toBeLessThanOrEqual(1);
+    expect(Object.keys(r.weeks).length).toBeGreaterThan(0);
+  });
+});
+
+describe("mentor_plan_extra_practice_add: práctica ligada", () => {
+  it("guarda rel y kataDate y no repite la misma práctica en el día", () => {
+    const { id, sa } = writePlan();
+    const a = api() as any;
+    const p: any = a.mentor_plan_extra_practice_add({ id, title: "Kata 3", kind: "kata", area: sa, kataDate: addDays(START, 5), rel: "programming_practice/x/katas/3.md" });
+    expect(p.extraPractice[0]).toMatchObject({ kind: "kata", kataDate: addDays(START, 5), rel: "programming_practice/x/katas/3.md" });
+    expect(() => a.mentor_plan_extra_practice_add({ id, title: "Kata 3", kind: "kata", area: sa, kataDate: addDays(START, 5) })).toThrow(/ya está añadida/);
+    expect(() => a.mentor_plan_extra_practice_add({ id, title: "x", kataDate: "ayer" })).toThrow(/Fecha de kata/);
+  });
+});

@@ -6,13 +6,16 @@
 // «Cómo voy» (ver `AreaPracticeBlock.tsx`), no aquí.
 
 import { CheckCircle2 } from "lucide-react";
+import { useMemo } from "react";
+import { chainSignalsOf, planChain } from "../../lib/planChain";
 import { clampToPlan } from "../../lib/planSchedule";
-import { monthlyBlocksOf, shortOf, weeklyProjectOf, type MonthlyBlock } from "../../lib/planCurriculum";
+import { shortOf, weeklyProjectOf } from "../../lib/planCurriculum";
 import { weeklyBreakdown, type ProjectSection } from "../../lib/planAreaPractice";
 import type { MentorPlan } from "../../lib/types";
 import { Chip } from "../common/forms";
 import { cn } from "../ui";
 import { DSTATUS_COLOUR, DSTATUS_LABEL, focusColour, plural, type AgendaModel } from "./agendaKit";
+import { MonthCard } from "./MonthlyDeliverables";
 import { ProgressBar } from "./parts";
 import { ProjectFolder } from "./ProjectFolder";
 import { ProjectsHub } from "./ProjectsHub";
@@ -55,14 +58,14 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
   const day = m.schedule.byDate.get(date);
   const weekly = day ? weeklyProjectOf(plan, m.schedule, day.week) : null;
   const track = plan.programmingPractice;
-  const months = monthlyBlocksOf(plan, m.schedule);
-  const currentMonth = day ? months.find((b: MonthlyBlock) => day.week >= b.fromWeek && day.week <= b.toWeek) ?? months[0] : months[0];
+  // el entregable del mes en curso: UN proyecto mensual por mes del plan, hecho de los semanales y estos de las piezas diarias
+  const chain = useMemo(() => planChain(plan, m.schedule, chainSignalsOf(data.practice, data.dailyProjectDone)), [plan, m.schedule, data.practice, data.dailyProjectDone]);
+  const currentMonth = (day ? chain.months.find((b) => b.weeks.some((w) => w.week === day.week)) : undefined) ?? chain.months[0];
 
   if (!weekly && !track?.weeklyProject && !currentMonth) return null;
   const status = (id: string | undefined) => (id && m.deliverablesDefined ? m.deliverableById.get(id)?.status : undefined);
   const weeklyDone = weekly ? weekly.dailyIds.filter((id) => status(id) === "hecho").length : 0;
   const weeklyStatus = status(weekly?.id);
-  const monthlyStatus = currentMonth ? status(currentMonth.id) : undefined;
 
   const planAreas = [...new Set(plan.subplans.map((s) => s.areaId).filter((x): x is string => !!x))];
   const areaIds = planAreas.length ? planAreas : weekly?.areaIds ?? [];
@@ -84,7 +87,7 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
             <p className="text-[14.5px] text-dim">{weekly.description}</p>
             <p className="text-[14px]"><span className="font-medium">Progreso semanal:</span> <span className="text-dim">{weeklyDone} de {plural(weekly.dailyIds.length, "pieza", "piezas")} hechas</span></p>
             <ProgressBar pct={weekly.dailyIds.length ? (weeklyDone / weekly.dailyIds.length) * 100 : 0} label={`Avance del proyecto semanal ${weekly.week}`} />
-            {weeklyStatus ? <Chip large colour={DSTATUS_COLOUR[weeklyStatus]}>{DSTATUS_LABEL[weeklyStatus]}</Chip> : <Chip large colour="var(--nv-faint)">Entregable por definir</Chip>}
+            {weeklyStatus ? <Chip large colour={DSTATUS_COLOUR[weeklyStatus]}>{DSTATUS_LABEL[weeklyStatus]}</Chip> : <Chip large colour="var(--nv-faint)">Pendiente</Chip>}
             <AreaSections sections={weeklySections} testid="weekly-areas" />
             <ProjectFolder
               planId={plan.id}
@@ -106,21 +109,18 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
       </SectionCard>
 
       {currentMonth && (
-        <SectionCard labelledBy="run-monthly-h" testid="run-project-monthly" className="space-y-1.5">
-          <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Proyecto mensual{currentMonth.month ? ` · ${currentMonth.month}` : ""}</p>
-          <h3 id="run-monthly-h" className="text-[18px] font-semibold leading-snug">{currentMonth.title}</h3>
-          <p className="text-[14.5px] text-dim">{currentMonth.description}</p>
-          <p className="flex flex-wrap items-center gap-2 text-[14px] text-dim">
-            <span>Semanas {currentMonth.fromWeek} a {currentMonth.toWeek}</span>
-            {monthlyStatus ? <Chip large colour={DSTATUS_COLOUR[monthlyStatus]}>{DSTATUS_LABEL[monthlyStatus]}</Chip> : <Chip large colour="var(--nv-faint)">Entregable mensual</Chip>}
-          </p>
+        <div className="space-y-2" data-testid="run-project-monthly">
+          <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Entregable del mes</p>
+          <ul className="space-y-2">
+            <MonthCard month={currentMonth} planId={plan.id} />
+          </ul>
           <ProjectFolder
             planId={plan.id}
             areaKeys={allKeys}
             testid="monthly-project-folder"
-            project={{ kind: "monthly", title: currentMonth.title, description: currentMonth.description, ...(currentMonth.month ? { month: currentMonth.month } : {}), topics: [], sections: [] }}
+            project={{ kind: "monthly", title: currentMonth.title, description: currentMonth.goal, month: currentMonth.month, topics: currentMonth.topics.slice(0, 8), sections: [] }}
           />
-        </SectionCard>
+        </div>
       )}
     </section>
   );

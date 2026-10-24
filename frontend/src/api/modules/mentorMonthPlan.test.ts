@@ -275,14 +275,16 @@ describe("mentor_plan_get / update_deliverable", () => {
     expect(got.derived.subplans[0].topics.map((t: any) => [t.state, t.found])).toEqual([["sin_tratar", true], ["sin_tratar", true], ["no_encontrado", false]]);
   });
 
-  it("solo el entregable es editable: estado y proyecto, validados", async () => {
+  it("del entregable solo se edita el proyecto enlazado: su ESTADO se calcula solo y no se puede fijar a mano", async () => {
     const api = await accepted();
     const month = monthNow();
     const sub: any = (api.mentor_plan_get({ month }) as any).plan.subplans[1];
-    const out = api.mentor_plan_update_deliverable({ month, subplanId: sub.id, status: "en_curso", projectId });
-    expect(out.subplans[1]!.deliverable).toMatchObject({ status: "en_curso", projectId });
-    expect(api.mentor_plan_update_deliverable({ month, subplanId: sub.id, status: "hecho" }).subplans[1]!.deliverable).toMatchObject({ status: "hecho", projectId });
-    expect(api.mentor_plan_update_deliverable({ month, subplanId: sub.id, status: "hecho", projectId: null }).subplans[1]!.deliverable!.projectId).toBeUndefined();
+    const out = api.mentor_plan_update_deliverable({ month, subplanId: sub.id, projectId });
+    expect(out.subplans[1]!.deliverable).toMatchObject({ status: "idea", projectId });
+    // marcar «hecho» o «en curso» a mano se rechaza: el estado sale de lo que el estudiante completa
+    expect(() => api.mentor_plan_update_deliverable({ month, subplanId: sub.id, status: "hecho" })).toThrow(/se calcula solo/);
+    expect(() => api.mentor_plan_update_deliverable({ month, subplanId: sub.id, status: "en_curso", projectId })).toThrow(/se calcula solo/);
+    expect(api.mentor_plan_update_deliverable({ month, subplanId: sub.id, projectId: null }).subplans[1]!.deliverable!.projectId).toBeUndefined();
     expect(() => api.mentor_plan_update_deliverable({ month, subplanId: sub.id, status: "raro" })).toThrow(ApiError);
     expect(() => api.mentor_plan_update_deliverable({ month, subplanId: sub.id, status: "idea", projectId: "p-no" })).toThrow(/no existe/);
     expect(() => api.mentor_plan_update_deliverable({ month, subplanId: "zzz", status: "idea" })).toThrow(ApiError);

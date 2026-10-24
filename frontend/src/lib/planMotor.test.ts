@@ -278,7 +278,7 @@ describe("entregables por área, día, semana y mes", () => {
     const names = p.subplans.map((x) => ({ id: x.areaId!, name: x.area }));
     const rows = deliverableAreaRows(all, names);
     expect(rows.reduce((n, r) => n + r.total, 0)).toBe(all.length);
-    expect(rows.find((r) => r.id === "frontend")!.done).toBe(1);
+    expect(rows.find((r) => r.id === "frontend")!.done).toBe(0); // el estado del proyecto de área se deriva de la cadena: un «hecho» guardado a mano no cuenta
     expect(areaRowsText(rows)).toMatch(/Backend \d+ · Frontend \d+/);
   });
 });

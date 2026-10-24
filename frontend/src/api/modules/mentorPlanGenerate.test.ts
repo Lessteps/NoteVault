@@ -378,11 +378,12 @@ describe("aceptar, listar y leer planes de periodo", () => {
     expect(folders).toContain(FUND);
   });
 
-  it("el entregable es editable por id", async () => {
+  it("el entregable se enlaza por id pero su estado no se edita a mano", async () => {
     const { api, out } = await accepted();
     const sub: any = (api.mentor_plan_get({ id: out.id }) as any).plan.subplans[0];
-    const upd = api.mentor_plan_update_deliverable({ id: out.id, subplanId: sub.id, status: "en_curso" });
-    expect(upd.subplans[0]!.deliverable!.status).toBe("en_curso");
+    expect(() => api.mentor_plan_update_deliverable({ id: out.id, subplanId: sub.id, status: "en_curso" })).toThrow(/se calcula solo/);
+    const upd = api.mentor_plan_update_deliverable({ id: out.id, subplanId: sub.id });
+    expect(upd.subplans[0]!.deliverable!.status).toBe("idea");
   });
 });
 

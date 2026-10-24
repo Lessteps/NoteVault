@@ -205,6 +205,8 @@ export function weekAreas(plan: SchedulePlan, week: number, schedule?: PlanSched
 
 /** Lo mínimo del plan que hace falta para saber si hay entregables definidos (cumplen `Plan` y `MentorPlan`). */
 export interface DeliverableStateInput {
+  /** un plan por áreas SIEMPRE tiene entregables: la cadena diario → semanal → mensual sale del propio plan */
+  structure?: string;
   deliverables?: ReadonlyArray<unknown>;
   subplans: ReadonlyArray<{ deliverable?: unknown }>;
   practiceCurriculum?: unknown;
@@ -218,6 +220,7 @@ export interface DeliverableStateInput {
  * tolerancia).
  */
 export function deliverablesDefined(plan: DeliverableStateInput): boolean {
+  if (plan.structure === "areas") return true;
   const p = plan as DeliverableStateInput & { deliverablesDefinedAt?: unknown; executedAt?: unknown; areaPractice?: unknown; practiceSystem?: unknown };
   if ((p.deliverables?.length ?? 0) > 0) return true;
   if (p.subplans.some((s) => !!s.deliverable)) return true;

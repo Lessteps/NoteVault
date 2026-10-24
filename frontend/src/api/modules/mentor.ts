@@ -72,7 +72,7 @@ import {
 } from "../../core/mentor/planChange.js";
 import { generateByParts, PipelineCancel } from "../../core/mentor/planPipeline.js";
 import { canReorganize, reorganizeByAreas } from "../../core/mentor/planReorganize.js";
-import { PLAN_DELIVERABLE_STATUSES, resolveAreaMode, sanitizeGroups, type PlanDeliverableStatus } from "../../lib/planAreas.js";
+import { PLAN_DELIVERABLE_STATUSES, resolveAreaMode, sanitizeGroups } from "../../lib/planAreas.js";
 import { buildSchedule, deliverablesOf, progressPlan } from "../../lib/planSchedule.js";
 import { CurriculumCancel, generateCurriculum } from "../../core/mentor/planCurriculumAi.js";
 import { areaKeyOf, computeCoverage, COVERAGE_DISCLAIMER, MAX_PROFILE_CHARS, parseCoverageReply, sanitizeCriteria } from "../../lib/planCoverage.js";
@@ -139,7 +139,7 @@ import { designsOf } from "./mentorDesign.js";
 import { mentorExecuteApi } from "./mentorExecute.js";
 import { mentorTimeLogApi } from "./mentorTimeLog.js";
 import { mentorRecordsApi } from "./mentorRecords.js";
-import { mentorProjectsApi } from "./mentorProjects.js";
+import { dailyProjectDoneOf, mentorProjectsApi } from "./mentorProjects.js";
 import { mentorAreaPracticeApi } from "./mentorAreaPractice.js";
 import { mentorDayCloseApi } from "./mentorDayClose.js";
 import { DayCloseStore } from "../../core/mentor/dayClose.js";
@@ -1472,6 +1472,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
         items,
         practiceItems,
         practice,
+        dailyProjectDone: dailyProjectDoneOf(app.root, plan),
         months,
         plans: rows,
         aiConfigured,
@@ -1631,11 +1632,13 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const id = String(o.id ?? o.month ?? "");
       if (o.month && !o.id && !MONTH_RE.test(id)) throw new ApiError("Mes inválido (AAAA-MM).");
       if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
-      // dos vocabularios: el del entregable de un área (idea · en_curso · hecho) y el de la agenda (pendiente · en_curso · hecho)
-      const raw = String(o.status);
-      if (!(DELIVERABLE_STATUSES as readonly string[]).includes(raw) && !(PLAN_DELIVERABLE_STATUSES as readonly string[]).includes(raw)) throw new ApiError("Estado de entregable inválido.");
-      const agendaStatus: PlanDeliverableStatus = raw === "idea" ? "pendiente" : (raw as PlanDeliverableStatus);
-      const areaStatus: DeliverableStatus = raw === "pendiente" ? "idea" : (raw as DeliverableStatus);
+      // El ESTADO de un entregable lo calcula la app a partir de lo que el estudiante completa (cadena diario → semanal → mensual): aquí no se
+      // puede fijar. Solo se aceptan archivos y el proyecto enlazado; un `status` que no coincida con el calculado se rechaza.
+      const raw = o.status === undefined || o.status === null ? "" : String(o.status);
+      if (raw && !(DELIVERABLE_STATUSES as readonly string[]).includes(raw) && !(PLAN_DELIVERABLE_STATUSES as readonly string[]).includes(raw)) throw new ApiError("Estado de entregable inválido.");
+      const refuse = (): never => {
+        throw new ApiError("El estado de los entregables se calcula solo según lo que completas: no se puede marcar a mano.");
+      };
       const st = new PlanStore(app.root);
       const plan = st.load(id);
       if (!plan) throw new ApiError("Ese plan ya no existe.");
@@ -1643,11 +1646,12 @@ export function mentorApi(app: AppState, send?: SendFn) {
       // un entregable de la agenda (kata del día, proyecto semanal o mensual, extra) o el de un área por su id `area:<subplan>`
       const subId = deliverableId.startsWith("area:") ? deliverableId.slice(5) : String(o.subplanId ?? "");
       if (deliverableId && !deliverableId.startsWith("area:")) {
-        const derived = deliverablesOf(plan, practiceStatusOf(app, plan, localDate(), log()));
+        const derived = deliverablesOf(plan, { weeks: [], ...(practiceStatusOf(app, plan, localDate(), log()) ?? {}), dailyProjectDone: dailyProjectDoneOf(app.root, plan) });
         const d = derived.find((x) => x.id === deliverableId);
         if (!d) throw new ApiError("Ese entregable ya no existe en el plan.");
+        if (raw && (raw === "idea" ? "pendiente" : raw) !== d.status) refuse();
         const files = Array.isArray(o.files) ? (o.files as any[]).slice(0, 12).map((f) => ({ ...(f?.path ? { path: String(f.path).slice(0, 300) } : {}), note: String(f?.note ?? "").slice(0, 200) })) : d.files;
-        const entry = { ...d, status: agendaStatus, ...(files?.length ? { files } : {}) };
+        const entry = { ...d, ...(files?.length ? { files } : {}) };
         const list = [...(plan.deliverables ?? []).filter((x) => x.id !== deliverableId), entry];
         return st.save({ ...plan, deliverables: list, updatedAt: new Date().toISOString() });
       }
@@ -1660,7 +1664,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
         if (wanted && !app.mgrs().projects.get(wanted)) throw new ApiError("Ese proyecto no existe.");
         projectId = wanted || undefined;
       }
-      sub.deliverable = { ...sub.deliverable, status: areaStatus, ...(projectId ? { projectId } : {}) };
+      if (raw && raw !== sub.deliverable.status && !(raw === "pendiente" && sub.deliverable.status === "idea")) refuse();
+      sub.deliverable = { ...sub.deliverable, ...(projectId ? { projectId } : {}) };
       if (!projectId) delete sub.deliverable.projectId;
       plan.updatedAt = new Date().toISOString();
       return st.save(plan);

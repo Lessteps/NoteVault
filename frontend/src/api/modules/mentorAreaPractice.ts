@@ -62,6 +62,34 @@ export function mentorAreaPracticeApi(app: AppState, hooks: { today: () => strin
       return { items: areaPracticeFor(plan, date).map((d) => ({ areaId: d.areaId, label: d.label, day: d.day, rel: d.rel, title: d.kata.title, skill: d.kata.skillName, level: d.kata.level, minutes: d.kata.minutes })) };
     },
 
+    /**
+     * «Más práctica»: los katas YA PLANEADOS del área (o de todas) que aún no tocan, en orden y con su fecha, hasta `limit` por área (5).
+     * Marca en `addedDates` los días a los que ya se adelantaron. Solo lee.
+     */
+    mentor_area_katas_ahead(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const plan = planOf(o);
+      const only = String(o.area ?? "").trim();
+      const limit = Math.max(1, Math.min(20, Math.round(Number(o.limit)) || 5));
+      const today = hooks.today();
+      const katas: Array<Record<string, unknown>> = [];
+      for (const a of viewOf(plan).areas) {
+        const sub = plan.subplans.find((s) => s.areaId === a.areaId);
+        if (!sub || (only && sub.id !== only)) continue;
+        const dates = areaKataDates(plan, a.areaId);
+        let n = 0;
+        dates.forEach((d, i) => {
+          if (d <= today || n >= limit) return;
+          const k = kataForDay(a.areaId, i + 1, a.level);
+          if (!k) return;
+          n++;
+          const added = (plan.extraPractice ?? []).filter((x) => x.kataDate === d && x.area === sub.id).map((x) => x.date);
+          katas.push({ areaId: a.areaId, subplanId: sub.id, area: a.label, day: i + 1, date: d, title: k.title, skill: k.skillName, level: k.level, minutes: k.minutes, addedDates: added });
+        });
+      }
+      return { katas };
+    },
+
     mentor_area_practice_setup(opts: unknown) {
       const plan = planOf(opts);
       const ppDir = ppAreaDir(app.root);

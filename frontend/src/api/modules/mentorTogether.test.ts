@@ -104,7 +104,8 @@ describe("Poner todas las áreas desde el día 1 (set_area_mode por la API de ca
     expect(hist.at(-1).status).toBe("applied");
     // lo pendiente de entregables se conserva (no se borra nada)
     expect(after.openQuestions).toEqual(before.openQuestions);
-    expect(deliverablesDefined(after)).toBe(false);
+    // un plan por áreas siempre tiene su cadena de entregables (diario → semanal → mensual) definida desde el propio plan
+    expect(deliverablesDefined(after)).toBe(true);
   });
 
   it("no cambia el original hasta aplicarla; aplicarla de nuevo no hace nada y «Deshacer» deja el plan como estaba", async () => {
@@ -161,9 +162,9 @@ describe("Poner todas las áreas desde el día 1 (set_area_mode por la API de ca
     expect(p.areaModeWhy).toContain("desde el día 1");
     expect(p.subplans.filter((s) => s.areaId !== "automation").every((s) => s.phase!.fromWeek === 1)).toBe(true);
     expect(p.subplans.find((s) => s.areaId === "automation")!.phase!.fromWeek).toBeGreaterThan(1);
-    // sin entregables ni pregunta: quedan por definir
+    // sin pregunta de entregables: la cadena diario → semanal → mensual sale del plan
     expect(p.openQuestions).toBeUndefined();
-    expect(deliverablesDefined(p)).toBe(false);
+    expect(deliverablesDefined(p)).toBe(true);
     expect(p.preconditions!.deliverables).toBe("no");
   });
 });

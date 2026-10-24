@@ -163,18 +163,17 @@ describe("propósitos, entregables y pregunta global (API)", () => {
     expect(() => a.mentor_plan_set_purpose({ id, scope: "siglo", key: "1", text: "x" })).toThrow(/no está en el plan/);
   });
 
-  it("el estado de un entregable de la agenda (kata del día, proyecto semanal) se anota y vuelve en el plan; el de un área usa su id", async () => {
+  it("los archivos de un entregable de la agenda se anotan y vuelven en el plan, pero su ESTADO no se puede fijar a mano (se calcula solo)", async () => {
     const { a, id } = await created({ deliverables: "yes" });
     const kata = `kata:${START}`;
-    const p: any = a.mentor_plan_update_deliverable({ id, deliverableId: kata, status: "hecho", files: [{ path: "katas/dia1.py", note: "solución" }] });
-    expect(p.deliverables).toEqual([expect.objectContaining({ id: kata, kind: "kata", status: "hecho", files: [{ path: "katas/dia1.py", note: "solución" }], source: "practice" })]);
-    a.mentor_plan_update_deliverable({ id, deliverableId: "wp:1", status: "en_curso" });
-    expect(((a.mentor_plan_get({ id }) as any).plan.deliverables as any[]).map((d) => d.id).sort()).toEqual([kata, "wp:1"].sort());
-    // el entregable de un área (modo «sí»): estado con su id `area:<subplan>`
+    const p: any = a.mentor_plan_update_deliverable({ id, deliverableId: kata, files: [{ path: "katas/dia1.py", note: "solución" }] });
+    expect(p.deliverables).toEqual([expect.objectContaining({ id: kata, kind: "kata", status: "pendiente", files: [{ path: "katas/dia1.py", note: "solución" }], source: "practice" })]);
+    // marcar a mano (kata, proyecto semanal o de área) se rechaza
+    expect(() => a.mentor_plan_update_deliverable({ id, deliverableId: kata, status: "hecho" })).toThrow(/se calcula solo/);
+    expect(() => a.mentor_plan_update_deliverable({ id, deliverableId: "wp:1", status: "en_curso" })).toThrow(/se calcula solo/);
     const area = (a.mentor_plan_get({ id }) as any).plan.subplans[0];
-    const q: any = a.mentor_plan_update_deliverable({ id, deliverableId: `area:${area.id}`, status: "en_curso" });
-    expect(q.subplans[0].deliverable.status).toBe("en_curso");
-    // vocabulario antiguo (idea) y errores
+    expect(() => a.mentor_plan_update_deliverable({ id, deliverableId: `area:${area.id}`, status: "en_curso" })).toThrow(/se calcula solo/);
+    // el mismo estado que ya tiene (vocabulario antiguo «idea») no cambia nada
     expect((a.mentor_plan_update_deliverable({ id, deliverableId: `area:${area.id}`, status: "idea" }) as any).subplans[0].deliverable.status).toBe("idea");
     expect(() => a.mentor_plan_update_deliverable({ id, deliverableId: "kata:1999-01-01", status: "hecho" })).toThrow(/ya no existe/);
     expect(() => a.mentor_plan_update_deliverable({ id, deliverableId: kata, status: "quizá" })).toThrow(/inválido/);
@@ -193,7 +192,10 @@ describe("propósitos, entregables y pregunta global (API)", () => {
     const again: any = a.mentor_plan_area_deliverable({ id, subplanId: sid, enabled: true });
     expect(again.subplans[1].deliverable.status).toBe("idea");
     // uno ya en marcha no se quita por error
-    a.mentor_plan_update_deliverable({ id, deliverableId: `area:${sid}`, status: "en_curso" });
+    const st = new PlanStore(dir);
+    const live: any = st.load(id);
+    live.subplans.find((s: any) => s.id === sid).deliverable.status = "en_curso";
+    st.save(live);
     expect(() => a.mentor_plan_area_deliverable({ id, subplanId: sid, enabled: false })).toThrow(/ya está en marcha/);
   });
 

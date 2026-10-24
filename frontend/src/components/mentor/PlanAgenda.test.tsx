@@ -451,28 +451,23 @@ describe("pestaña «Entregables»: pregunta global, proyectos de área y agenda
     expect(toggle).toHaveBeenCalledWith({ id: PID, subplanId: expect.stringContaining("databases"), enabled: true });
   });
 
-  it("la agenda de entregables filtra por periodo, tipo y área, cuenta hechos/pendientes y cambia el estado con la API", async () => {
+  it("la pestaña enseña el entregable de cada mes con sus semanas y piezas; los katas hechos salen de la práctica y NADA se marca a mano", async () => {
     const upd = vi.spyOn(api, "mentorPlanUpdateDeliverable").mockResolvedValue(areasPlan());
     await openAgenda(areasPlan(), { practice: { ppReady: true, kata: null, kataDoneDates: ["2026-10-14", "2026-10-13"], weeks: [] } });
     await click(tab("entregables"));
-    const count = byTest("deliverable-count").textContent!;
-    expect(count).toMatch(/\d+ entregables · 2 hechos · \d+ pendientes/); // octubre ya hecho: 2 katas
-    await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Tipo']")!, "kata");
-    expect([...host.querySelectorAll("[data-testid=deliverable-row]")].every((r) => r.textContent!.includes("Kata"))).toBe(true);
-    await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Periodo']")!, "semana");
-    // semana del 12 al 18 oct: 6 katas (lunes a sábado)
-    expect(host.querySelectorAll("[data-testid=deliverable-row]")).toHaveLength(6);
-    expect(byTest("deliverable-count").textContent).toMatch(/^6 entregables · 2 hechos · 4 pendientes/);
-    // el filtro por área deja lo de esa área y los proyectos integradores que la incluyen (los katas no tienen área)
-    await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Tipo']")!, "");
-    await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Periodo']")!, "todo");
-    await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Área']")!, "backend");
-    expect([...host.querySelectorAll("[data-testid=deliverable-row]")].every((r) => !r.textContent!.includes("Kata") && r.textContent!.includes("Proyecto"))).toBe(true);
-    // cambiar el estado de uno
-    await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Área']")!, "");
-    await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Periodo']")!, "semana");
-    const sel = host.querySelector<HTMLSelectElement>("select[aria-label='Estado de Kata del 15 oct']")!;
-    await setValue(sel, "hecho");
-    expect(upd).toHaveBeenCalledWith({ id: PID, deliverableId: "kata:2026-10-15", status: "hecho" });
+    const months = [...host.querySelectorAll("[data-testid=chain-month]")];
+    expect(months.length).toBeGreaterThan(1);
+    expect(months[0]!.textContent).toContain("Mes 1");
+    expect(months[0]!.querySelectorAll("[data-testid=chain-week]").length).toBeGreaterThan(0);
+    expect(months[0]!.querySelectorAll("[data-testid=chain-piece]").length).toBeGreaterThan(0);
+    expect(months[1]!.getAttribute("data-locked")).toBe("true");
+    // los katas hechos salen de la práctica (2) y se leen en «Otros entregables»
+    const katas = [...host.querySelectorAll("[data-testid=deliverable-row]")].filter((r) => r.textContent!.includes("Kata del"));
+    expect(katas.length).toBeGreaterThan(2);
+    expect(katas.filter((r) => r.textContent!.includes("Hecho"))).toHaveLength(2);
+    // sin selectores de estado ni filtros editables: el avance se calcula solo
+    expect(host.querySelector("select[aria-label^='Estado de']")).toBeNull();
+    expect(upd).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("Se completa automáticamente conforme avanzas");
   });
 });

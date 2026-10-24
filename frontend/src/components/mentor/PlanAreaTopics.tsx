@@ -197,11 +197,11 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
           {!only && <TabBar label="Áreas del plan" tabs={areaTabsView(tabs)} active={active.key} onSelect={pickArea} level={1} testid="area-tabs" />}
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="area-summary">
-            <p className="min-w-0 flex-1 basis-72 text-[14.5px]">
+            <div className="min-w-0 flex-1 basis-72 text-[14.5px]">
               <strong>{active.area}</strong> · {active.total} {active.total === 1 ? "tema" : "temas"} · {active.done} completados ·{" "}
               {active.missing > 0 ? <span className="text-warn">{active.missing} por generar</span> : <span className="text-mint">nada por generar</span>}
               <span className="mt-1.5 block max-w-md"><ProgressBar pct={active.total ? Math.round((active.done / active.total) * 100) : 0} label={`Avance de ${active.area}`} /></span>
-            </p>
+            </div>
             {!isBases && <GenerateButton
               planId={plan.id}
               proposed={!!plan.proposed}

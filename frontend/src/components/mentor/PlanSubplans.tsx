@@ -209,7 +209,6 @@ export function SubplanCard({
   colour: string;
   headingLevel?: 3 | 4;
 } & AreaExtras) {
-  const toast = useApp((s) => s.toast);
   const uid = useId();
   const detailId = `${uid}-detail`;
   const [shown, setShown] = useState<Record<string, number>>({});
@@ -227,14 +226,6 @@ export function SubplanCard({
   const areaCov = coverage?.areas.find((a) => a.subplanId === sub.id);
   const areaReview = review?.areas.find((a) => a.key === (sub.areaId || sub.id));
   const warning = byAreas ? basesWarning(sub) : null;
-
-  const setStatus = async (status: MentorDeliverableStatus) => {
-    try {
-      onChanged(await api.mentorPlanUpdateDeliverable({ id: plan.id, subplanId: sub.id, status }));
-    } catch (e) {
-      toast("error", (e as Error).message);
-    }
-  };
 
   const byFolder = new Map(view.topics.map((t) => [t.folder, t]));
   const Heading = headingLevel === 3 ? "h3" : "h4";
@@ -482,7 +473,7 @@ export function SubplanCard({
                     ))}
                   </ul>
                 )}
-                <DeliverableStatus status={d.status} onChange={(st) => void setStatus(st)} />
+                <p className="mt-1 text-[14px] text-dim" data-testid="deliverable-derived-status">Estado: {DELIVERABLE_LABEL[d.status]} · se calcula solo según lo que completas</p>
                 {project ? (
                   <button
                     type="button"

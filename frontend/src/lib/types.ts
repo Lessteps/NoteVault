@@ -1579,6 +1579,19 @@ export interface MentorExerciseCandidate {
   date?: string;
   addedDates: string[];
 }
+/** Un kata planeado del área que aún no toca (`mentor_area_katas_ahead`). */
+export interface MentorKataAhead {
+  areaId: string;
+  subplanId: string;
+  area: string;
+  day: number;
+  date: string;
+  title: string;
+  skill: string;
+  level: number;
+  minutes: number;
+  addedDates: string[];
+}
 export type MentorExerciseCandidates = { loading: true } | { loading: false; exercises: MentorExerciseCandidate[] };
 /** currículo de práctica del plan generado por la IA (ejercicios por semana y proyectos) */
 export type MentorPracticeCurriculum = import("./planCurriculum").PracticeCurriculum;
@@ -1659,6 +1672,8 @@ export type MentorPlanGet =
       goals: Record<string, { name: string; pct: number; items: Record<string, { name: string; pct: number }> }>;
       projects: Record<string, { id: string; name: string; status: string }>;
       items: MentorPlanItem[]; practiceItems?: PracticeItem[]; practice?: MentorPracticeStatus | null;
+      /** por fecha, las áreas con su proyecto diario COMPLETO (la señal de avance de la cadena de entregables) */
+      dailyProjectDone?: Record<string, string[]>;
       months: string[]; plans: MentorPlanRow[]; aiConfigured: boolean;
     };
 export type MentorPlanStatus = "activo" | "futuro" | "terminado" | "propuesto";

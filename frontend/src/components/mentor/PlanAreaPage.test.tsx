@@ -21,7 +21,6 @@ import { MODE_KEY } from "./mentorNav";
 import { navTab, navView } from "./mentorTestNav";
 import { openAgendaAt } from "./planShared";
 import { scheduleOf } from "./agendaKit";
-import { hm } from "./parts";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
@@ -167,9 +166,8 @@ describe("página de un área", () => {
     const { byWeekArea, schedule } = scheduleOf(p, TODAY, []);
     const cell = byWeekArea.weeks[1]!.cells.find((c) => c.subplanId === "s1-backend")!;
     await click(nav("area/s1-backend"));
-    const pending = cell.topics.length - cell.done;
-    expect(byTest("week-stat-pending-value").textContent).toBe(String(pending));
-    expect(byTest("week-stat-theory-value").textContent).toBe(cell.minutes ? hm(cell.minutes).replace(".", ",") : "—");
+    expect(byTest("week-stat-done-value").textContent).toBe(`${cell.done}/${cell.topics.length}`);
+    expect(byTest("agenda-week").textContent).not.toMatch(/\d+(,\d+)? h de /);
     expect(byTest("agenda-week-counts").textContent).toContain(topicsText(cell.topics.length));
     // las filas de los días: 7, en el orden del reparto
     const rows = [...host.querySelectorAll("[data-testid=agenda-week-day]")];
@@ -293,5 +291,62 @@ describe("enlaces profundos y claves antiguas", () => {
     expect(byTest("agenda-calendar")).toBeTruthy();
     expect(navView(host, "calendario").getAttribute("aria-selected")).toBe("true");
     expect(navTab(host, "agenda").getAttribute("aria-current")).toBe("page");
+  });
+});
+
+describe("correcciones de Planeación: sin emojis, propiedades planas, sin horas y semana en orden de ruta", () => {
+  const EMOJI = /\p{Extended_Pictographic}/u;
+
+  it("ni la barra, ni la cabecera, ni la página llevan emojis; las propiedades no son una tarjeta y la barra de progreso ocupa todo el ancho", async () => {
+    await open();
+    await click(nav("area/s1-backend"));
+    expect(byTest("plan-head").textContent).not.toMatch(EMOJI);
+    expect(byTest("plan-agenda").textContent).not.toMatch(EMOJI);
+    expect(nav("general").textContent).not.toMatch(EMOJI);
+    expect(nav("area/s1-backend").textContent).not.toMatch(EMOJI);
+    expect(nav("area/s1-backend").textContent).toContain("Backend");
+    const props = byTest("plan-props");
+    expect(props.className).not.toMatch(/\bbg-card\b|\bborder\b|\brounded/);
+    const bar = byTest("prop-progress").querySelector("[role=progressbar]")!.parentElement!.parentElement!;
+    expect(bar.className).toContain("flex-1");
+    await click(nav("general"));
+    expect(byTest("plan-agenda").textContent).not.toMatch(EMOJI);
+  });
+
+  it("«Ver día» existe hoy y en días futuros, pero no en un día pasado en que no se hizo nada", async () => {
+    await open();
+    await click(nav("area/s1-backend"));
+    const rows = [...host.querySelectorAll<HTMLElement>("[data-testid=agenda-week-day]")];
+    expect(rows).toHaveLength(7);
+    for (const r of rows) {
+      const date = r.getAttribute("data-date")!;
+      const has = [...r.querySelectorAll("button")].some((b) => b.textContent === "Ver día");
+      expect(has, date).toBe(date >= TODAY);
+    }
+    const strip = [...host.querySelectorAll<HTMLButtonElement>("[data-testid=agenda-week-strip-day]")];
+    for (const b of strip) expect(b.disabled).toBe(b.getAttribute("data-date")! < TODAY);
+  });
+
+  it("la semana lista los temas en el orden de la ruta, con su número, y no cuenta horas: tarjetas de cumplimiento", async () => {
+    const p = areasPlan();
+    await open(p);
+    await click(nav("area/s1-backend"));
+    const route = p.subplans[0]!.topics.map((t) => t.folder);
+    const folders = [...host.querySelectorAll("[data-testid=area-topic]")].map((r) => r.getAttribute("data-folder")!);
+    expect(folders.length).toBeGreaterThan(0);
+    expect(folders.map((f) => route.indexOf(f))).toEqual([...folders.map((f) => route.indexOf(f))].sort((a, b) => a - b));
+    expect([...host.querySelectorAll("[data-testid=area-topic-seq]")].map((e) => e.textContent)).toEqual(folders.map((_, i) => String(i + 1)));
+    for (const id of ["done", "theory", "practice"]) expect(byTest(`week-stat-${id}-value`).textContent).toMatch(/^\d+\/\d+$/);
+    expect(byTest("agenda-week").textContent).not.toMatch(/\d(,\d+)? h de /);
+    expect(byTest("agenda-week").textContent).not.toContain("Estudio teórico");
+    // el conmutador «Por día» agrupa por día con el mismo orden de ruta dentro de cada día
+    await click(byTest("week-mode-dia"));
+    const groups = [...host.querySelectorAll("[data-testid=week-day-group]")];
+    expect(groups.length).toBeGreaterThan(0);
+    for (const g of groups) {
+      const idx = [...g.querySelectorAll("[data-testid=area-topic]")].map((r) => route.indexOf(r.getAttribute("data-folder")!));
+      expect(idx).toEqual([...idx].sort((a, b) => a - b));
+    }
+    expect(groups[0]!.querySelector("h4")!.textContent).toMatch(/·\s*\d+ temas?/);
   });
 });

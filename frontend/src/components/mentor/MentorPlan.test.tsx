@@ -208,7 +208,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
     expect(host.querySelector("[data-testid=subplan-detail]")).toBeNull();
   });
 
-  it("solo es editable el estado del entregable", async () => {
+  it("el estado del entregable NO es editable: se calcula solo", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const update = vi.spyOn(api, "mentorPlanUpdateDeliverable").mockResolvedValue(plan());
     await mountEl(<PlanWorkspace planId={PID} />);
@@ -216,13 +216,9 @@ describe("Mentor — sub-interfaz de un plan", () => {
     await click(button("Desarrollo Backend"));
     const detail = host.querySelector("[data-testid=subplan-detail]")!;
     expect(detail.querySelectorAll("input, textarea")).toHaveLength(0);
-    const sel = detail.querySelector<HTMLSelectElement>("select[aria-label='Estado del entregable']")!;
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(sel, "hecho");
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    await flush();
-    expect(update).toHaveBeenCalledWith({ id: PID, subplanId: "s1-programacion", status: "hecho" });
+    expect(detail.querySelectorAll("select")).toHaveLength(0);
+    expect(detail.querySelector("[data-testid=deliverable-derived-status]")!.textContent).toContain("se calcula solo");
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("el subplan sin proyecto lo presenta como propuesta de entregable", async () => {

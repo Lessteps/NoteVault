@@ -51,36 +51,15 @@ export function FocusChip({ id, label }: { id?: string; label: string }) {
 
 const statusOf = (m: AgendaModel, id: string): PlanDeliverableStatus => m.deliverableById.get(id)?.status ?? "pendiente";
 
-/** Un proyecto (diario, semanal o mensual): título, descripción, estado y, si el plan es editable, cambiarlo. */
-function ProjectCard({ m, d, kind, onChanged, children, testid }: { m: AgendaModel; d: PlanDeliverable | undefined; kind: string; onChanged: (p: MentorPlan) => void; children?: React.ReactNode; testid: string }) {
-  const toast = useApp((s) => s.toast);
-  const [busy, setBusy] = useState(false);
+/** Un proyecto (diario, semanal o mensual): título, descripción y su estado, que se DERIVA de lo completado (no se marca a mano). */
+function ProjectCard({ d, kind, children, testid }: { m?: AgendaModel; d: PlanDeliverable | undefined; kind: string; onChanged?: (p: MentorPlan) => void; children?: React.ReactNode; testid: string }) {
   if (!d) return null;
-  const set = async (status: PlanDeliverableStatus) => {
-    setBusy(true);
-    try {
-      onChanged(await api.mentorPlanUpdateDeliverable({ id: m.plan.id, deliverableId: d.id, status }));
-    } catch (e) {
-      toast("error", (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const next: PlanDeliverableStatus | null = d.status === "pendiente" ? "en_curso" : d.status === "en_curso" ? "hecho" : null;
   return (
     <li className="rounded-xl border border-line bg-card p-3.5" data-testid={testid}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <Chip large colour="var(--nv-practice, #c58be0)">{kind}</Chip>
         <span className="min-w-0 flex-1 basis-56 text-[15px] font-semibold">{d.title}</span>
-        {m.deliverablesDefined ? <StatusChip status={d.status} /> : <Chip large colour="var(--nv-faint)">Entregable por definir</Chip>}
-        {m.deliverablesDefined && m.editable && next && (
-          <GhostButton disabled={busy} onClick={() => void set(next)} aria-label={`${next === "hecho" ? "Marcar como hecho" : "Marcar en curso"}: ${d.title}`}>
-            {next === "hecho" ? "Marcar hecho" : "Marcar en curso"}
-          </GhostButton>
-        )}
-        {m.deliverablesDefined && m.editable && d.status === "hecho" && (
-          <GhostButton disabled={busy} onClick={() => void set("pendiente")} aria-label={`Reabrir: ${d.title}`}>Reabrir</GhostButton>
-        )}
+        <StatusChip status={d.status} />
       </div>
       <p className="mt-1 text-[14px] text-dim">{d.description}</p>
       {children}

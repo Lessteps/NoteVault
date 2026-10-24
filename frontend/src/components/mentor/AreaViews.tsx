@@ -42,8 +42,8 @@ const SECTION = "text-[13px] font-semibold uppercase tracking-wider text-faint";
 export const areaColour = (areaId: string | undefined): string => focusColour(areaId);
 
 /** Un cuadradito de color + el texto: el color solo nunca es el único canal. */
-export function AreaDot({ areaId }: { areaId?: string }) {
-  return <span aria-hidden className="inline-block h-2.5 w-2.5 flex-none rounded-sm" style={{ background: areaColour(areaId) }} />;
+export function AreaDot({ areaId, colour }: { areaId?: string; colour?: string }) {
+  return <span aria-hidden className="inline-block h-2.5 w-2.5 flex-none rounded-sm" style={{ background: colour ?? areaColour(areaId) }} />;
 }
 
 // ── Práctica del área (adaptador tolerante) ─────────────────────────────

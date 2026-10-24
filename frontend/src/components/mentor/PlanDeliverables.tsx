@@ -1,63 +1,28 @@
-// Mentor — Plan, pestaña «Entregables»: archivos prácticos que demuestran habilidad. Los de práctica (el kata de cada día, el proyecto semanal y
-// el mensual) nacen del sistema de Programming practice y los proyectos de cada área los propone la IA. Aquí:
-//  · UNA sola pregunta global («¿quieres un entregable por cada área?») con excepciones por área (en planes antiguos, una por subplan);
-//  · los proyectos de área (añadir / quitar uno concreto);
-//  · la AGENDA de entregables con filtros por área, tipo y fecha, su estado (hecho / pendiente, derivado de la práctica o anotado a mano) y
-//    los archivos de cada uno.
-// Las respuestas van a `mentor_plan_answer` y los estados a `mentor_plan_update_deliverable`.
+// Mentor — Plan, pestaña «Entregables»: UN entregable por mes del plan (proyecto mensual) hecho de proyectos semanales que se hacen de piezas
+// diarias (ver `MonthlyDeliverables`). El estado NO se edita aquí: se calcula solo según lo que el estudiante completa. Además:
+//  · los proyectos de área (añadir / quitar uno concreto) y, en planes antiguos, la pregunta pendiente de entregables;
+//  · los otros entregables (katas, proyectos de tema y de área), en solo lectura.
+// Las respuestas van a `mentor_plan_answer`.
 
 import { Check, ExternalLink, Plus, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../../lib/bridge";
-import { addDays, daysBetween } from "../../lib/planTime";
-import { PLAN_DELIVERABLE_STATUSES, type PlanDeliverable, type PlanDeliverableKind, type PlanDeliverableStatus } from "../../lib/planAreas";
-import { countDeliverables, dateLabel, deliverableInArea, deliverablesText } from "../../lib/planSchedule";
+import { type PlanDeliverable } from "../../lib/planAreas";
+import { countDeliverables, dateLabel, deliverablesText } from "../../lib/planSchedule";
 import type { MentorPlan } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
-import { Chip, GhostButton, input, PrimaryButton } from "../common/forms";
-import { cn, confirmAction } from "../ui";
-import { AreaCounts, doneText, DSTATUS_LABEL, plural, KIND_COLOUR, KIND_LABEL, StatusChip, useAgendaModel } from "./agendaKit";
+import { Chip, GhostButton, PrimaryButton } from "../common/forms";
+import { confirmAction } from "../ui";
+import { AreaCounts, doneText, plural, KIND_COLOUR, KIND_LABEL, StatusChip, useAgendaModel } from "./agendaKit";
 import { DELIVERABLES_PENDING_TEXT } from "../../lib/planTopicsByArea";
+import { MonthlyDeliverables } from "./MonthlyDeliverables";
 import { SectionHeading } from "./planKit";
 import { openPractice } from "./PracticeCard";
 import { branchOf, openProjectInProyectos, type Loaded } from "./planShared";
 
 type Answer = "yes" | "no";
 const PAGE = 25;
-const RANGES = [
-  { id: "mes", label: "Este mes" },
-  { id: "semana", label: "Esta semana" },
-  { id: "proximos", label: "Próximos 30 días" },
-  { id: "atrasados", label: "Atrasados" },
-  { id: "todo", label: "Todo el plan" },
-] as const;
-type RangeId = (typeof RANGES)[number]["id"];
-const KINDS: Array<{ id: "" | PlanDeliverableKind; label: string }> = [
-  { id: "", label: "Todos los tipos" },
-  { id: "kata", label: "Katas" },
-  { id: "daily_project", label: "Proyectos diarios" },
-  { id: "topic_project", label: "Proyectos de tema" },
-  { id: "weekly_project", label: "Proyectos semanales" },
-  { id: "monthly_project", label: "Proyectos mensuales" },
-  { id: "area_project", label: "Proyectos de área" },
-];
-
-function rangeBounds(id: RangeId, today: string, plan: { start: string; end: string }): { from: string; to: string } {
-  const t = today < plan.start ? plan.start : today > plan.end ? plan.end : today;
-  if (id === "semana") {
-    const w = Math.floor(daysBetween(plan.start, t) / 7);
-    return { from: addDays(plan.start, w * 7), to: addDays(plan.start, w * 7 + 6) };
-  }
-  if (id === "mes") {
-    const first = `${t.slice(0, 7)}-01`;
-    const last = new Date(Date.UTC(Number(t.slice(0, 4)), Number(t.slice(5, 7)), 0)).getUTCDate();
-    return { from: first, to: `${t.slice(0, 7)}-${String(last).padStart(2, "0")}` };
-  }
-  if (id === "proximos") return { from: t, to: addDays(t, 30) };
-  if (id === "atrasados") return { from: plan.start, to: addDays(today, -1) };
-  return { from: plan.start, to: plan.end };
-}
 
 export function PlanDeliverables({ data, onChanged, announce, goTab }: { data: Loaded; onChanged: (p: MentorPlan) => void; announce: (msg: string) => void; goTab: (tab: "cambios") => void }) {
   const toast = useApp((s) => s.toast);
@@ -245,7 +210,7 @@ export function PlanDeliverables({ data, onChanged, announce, goTab }: { data: L
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="min-w-0 flex-1 text-[13px] font-medium uppercase tracking-wide text-faint">{name}</span>
                   {d ? (
-                    <GhostButton large="md" disabled={!!busy || d.status !== "idea"} title={d.status !== "idea" ? "Ya está en marcha: cambia su estado en la lista de abajo" : undefined} aria-label={`Quitar el entregable de ${name}`} onClick={() => void toggleArea(s.id, false)}>Quitar</GhostButton>
+                    <GhostButton large="md" disabled={!!busy || d.status !== "idea"} title={d.status !== "idea" ? "Ya está en marcha: su estado se calcula solo" : undefined} aria-label={`Quitar el entregable de ${name}`} onClick={() => void toggleArea(s.id, false)}>Quitar</GhostButton>
                   ) : (
                     <GhostButton large="md" disabled={!!busy} aria-label={`Añadir entregable a ${name}`} onClick={() => void toggleArea(s.id, true)}><Plus size={15} aria-hidden /> Añadir proyecto</GhostButton>
                   )}
@@ -285,87 +250,31 @@ export function PlanDeliverables({ data, onChanged, announce, goTab }: { data: L
         )}
       </section>
 
-      <AgendaDeliverables m={m} plan={plan} today={data.today} onChanged={onChanged} announce={announce} />
+      <MonthlyDeliverables data={data} />
+      <OtherDeliverables list={m.deliverables.filter((d) => !["daily_project", "weekly_project", "monthly_project"].includes(d.kind))} />
     </>
   );
 }
 
-/** La agenda de entregables: filtros por área, tipo y fecha; estado editable y archivos. */
-function AgendaDeliverables({ m, plan, today, onChanged, announce }: { m: ReturnType<typeof useAgendaModel>; plan: MentorPlan; today: string; onChanged: (p: MentorPlan) => void; announce: (msg: string) => void }) {
-  const toast = useApp((s) => s.toast);
-  const [range, setRange] = useState<RangeId>("mes");
-  const initial = rangeBounds("mes", today, plan);
-  const [from, setFrom] = useState(initial.from);
-  const [to, setTo] = useState(initial.to);
-  const [kind, setKind] = useState<"" | PlanDeliverableKind>("");
-  const [area, setArea] = useState("");
+/** Otros entregables (katas, proyectos de área y de tema): solo lectura; su estado sale de lo que completas. */
+function OtherDeliverables({ list }: { list: PlanDeliverable[] }) {
   const [shown, setShown] = useState(PAGE);
-  const pickRange = (id: RangeId) => {
-    setRange(id);
-    const b = rangeBounds(id, today, plan);
-    setFrom(b.from);
-    setTo(b.to);
-    setShown(PAGE);
-  };
-  const areas = plan.subplans.filter((s) => s.areaId);
-  const list = useMemo(
-    () => m.deliverables.filter((d) => d.dueDate >= from && d.dueDate <= to && (!kind || d.kind === kind) && (!area || (area === "practice" ? !d.areaId : deliverableInArea(d, area)))),
-    [m.deliverables, from, to, kind, area],
-  );
-  const counts = countDeliverables(list);
-  const update = async (d: PlanDeliverable, status: PlanDeliverableStatus, files?: Array<{ path?: string; note: string }>) => {
-    try {
-      onChanged(await api.mentorPlanUpdateDeliverable({ id: plan.id, deliverableId: d.id, status, ...(files ? { files } : {}) }));
-      announce(`«${d.title}»: ${DSTATUS_LABEL[status].toLowerCase()}.`);
-    } catch (e) {
-      toast("error", (e as Error).message);
-    }
-  };
+  if (!list.length) return null;
   return (
-    <section aria-labelledby="dl-agenda" data-testid="plan-deliverables-agenda">
-      <h3 id="dl-agenda" className="mb-2 text-[16px] font-semibold">Agenda de entregables</h3>
-      <div role="group" aria-label="Filtros de entregables" className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card px-3 py-3" data-testid="deliverable-filters">
-        <label className="text-[14px] text-dim">
-          Periodo
-          <select value={range} onChange={(e) => pickRange(e.target.value as RangeId)} aria-label="Periodo" className="mt-0.5 block min-h-11 rounded-lg border border-line bg-surface px-2.5 text-[14px] text-text">
-            {RANGES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-          </select>
-        </label>
-        <label className="text-[14px] text-dim">
-          Desde
-          <input type="date" value={from} min={plan.start} max={plan.end} onChange={(e) => e.target.value && (setFrom(e.target.value), setShown(PAGE))} aria-label="Desde" className="mt-0.5 block min-h-11 rounded-lg border border-line bg-surface px-2.5 text-[14px] text-text" />
-        </label>
-        <label className="text-[14px] text-dim">
-          Hasta
-          <input type="date" value={to} min={plan.start} max={plan.end} onChange={(e) => e.target.value && (setTo(e.target.value), setShown(PAGE))} aria-label="Hasta" className="mt-0.5 block min-h-11 rounded-lg border border-line bg-surface px-2.5 text-[14px] text-text" />
-        </label>
-        <label className="text-[14px] text-dim">
-          Tipo
-          <select value={kind} onChange={(e) => { setKind(e.target.value as "" | PlanDeliverableKind); setShown(PAGE); }} aria-label="Tipo" className="mt-0.5 block min-h-11 rounded-lg border border-line bg-surface px-2.5 text-[14px] text-text">
-            {KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
-          </select>
-        </label>
-        <label className="text-[14px] text-dim">
-          Área
-          <select value={area} onChange={(e) => { setArea(e.target.value); setShown(PAGE); }} aria-label="Área" className="mt-0.5 block min-h-11 rounded-lg border border-line bg-surface px-2.5 text-[14px] text-text">
-            <option value="">Todas las áreas</option>
-            {areas.map((s) => <option key={s.areaId} value={s.areaId}>{s.area}</option>)}
-            <option value="all">Integradores (varias áreas)</option>
-            <option value="practice">Práctica (katas)</option>
-          </select>
-        </label>
-      </div>
-      <p role="status" aria-live="polite" className="mb-2 text-[14px] text-dim" data-testid="deliverable-count">
-        {deliverablesText(counts.total)} · {doneText(counts.done)} · {plural(counts.pending, "pendiente", "pendientes")}
-        <AreaCounts plan={plan} list={list} testid="area-counts-filtered" />
-      </p>
-      {list.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line p-4 text-[14px] text-dim" data-testid="deliverable-empty">No hay entregables con esos filtros.</p>
-      ) : (
-        <ul className="space-y-2">
-          {list.slice(0, shown).map((d) => <DeliverableRow key={d.id} d={d} onStatus={(s) => void update(d, s)} onFiles={(files) => void update(d, d.status, files)} />)}
-        </ul>
-      )}
+    <section aria-labelledby="dl-others" data-testid="plan-deliverables-agenda">
+      <h3 id="dl-others" className="mb-1 text-[16px] font-semibold">Otros entregables <span className="text-[14px] font-normal text-dim">{list.length}</span></h3>
+      <p className="mb-2 text-[14px] text-dim">Katas, proyectos de tema y de área. Se completan automáticamente conforme avanzas.</p>
+      <ul className="space-y-2">
+        {list.slice(0, shown).map((d) => (
+          <li key={d.id} className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line bg-card p-3.5" data-testid="deliverable-row">
+            <span className="min-w-0 flex-1 basis-56 text-[15px] font-semibold">{d.title}</span>
+            <Chip large colour={KIND_COLOUR[d.kind]}>{KIND_LABEL[d.kind]}</Chip>
+            <span className="text-[13.5px] text-dim">para el {dateLabel(d.dueDate)}</span>
+            <StatusChip status={d.status} />
+            {d.source === "practice" && d.kind === "kata" && <GhostButton onClick={openPractice} aria-label={`Abrir práctica: ${d.title}`}>Abrir práctica</GhostButton>}
+          </li>
+        ))}
+      </ul>
       {list.length > shown && (
         <GhostButton large="md" className="mt-2" onClick={() => setShown((n) => n + PAGE)}>
           Mostrar {Math.min(PAGE, list.length - shown)} más <span className="text-faint">({list.length - shown} sin mostrar)</span>
@@ -374,60 +283,3 @@ function AgendaDeliverables({ m, plan, today, onChanged, announce }: { m: Return
     </section>
   );
 }
-
-function DeliverableRow({ d, onStatus, onFiles }: { d: PlanDeliverable; onStatus: (s: PlanDeliverableStatus) => void; onFiles: (files: Array<{ path?: string; note: string }>) => void }) {
-  const [adding, setAdding] = useState(false);
-  const [note, setNote] = useState("");
-  const [path, setPath] = useState("");
-  const files = d.files ?? [];
-  return (
-    <li className="rounded-xl border border-line bg-card p-3.5" data-testid="deliverable-row">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <span className="min-w-0 flex-1 basis-56 text-[15px] font-semibold">{d.title}</span>
-        <Chip large colour={KIND_COLOUR[d.kind]}>{KIND_LABEL[d.kind]}</Chip>
-        <span className="text-[13.5px] text-dim">para el {dateLabel(d.dueDate)}</span>
-        <StatusChip status={d.status} />
-      </div>
-      {d.description && <p className="mt-1 text-[14px] text-dim">{d.description}</p>}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-[14px] text-dim">
-          Estado
-          <select value={d.status} aria-label={`Estado de ${d.title}`} onChange={(e) => onStatus(e.target.value as PlanDeliverableStatus)} className="min-h-9 rounded-lg border border-line bg-surface px-2.5 py-1 text-[14px] text-text">
-            {PLAN_DELIVERABLE_STATUSES.map((s) => <option key={s} value={s}>{DSTATUS_LABEL[s]}</option>)}
-          </select>
-        </label>
-        {d.source === "practice" && <GhostButton onClick={openPractice} aria-label={`Abrir práctica: ${d.title}`}>Abrir práctica</GhostButton>}
-        <GhostButton onClick={() => setAdding((v) => !v)} aria-expanded={adding} aria-label={`Añadir archivo a ${d.title}`}><Plus size={14} aria-hidden /> Archivo</GhostButton>
-      </div>
-      {files.length > 0 && (
-        <ul className="mt-2 space-y-1 text-[14px]" aria-label={`Archivos de ${d.title}`}>
-          {files.map((f, i) => (
-            <li key={`${f.path ?? ""}${f.note}${i}`} className="flex flex-wrap items-center gap-x-2">
-              <span className="font-medium">{f.path ?? "Archivo"}</span>
-              {f.note && <span className="text-dim">{f.note}</span>}
-              <button type="button" className="ml-auto inline-flex min-h-8 items-center px-2 text-accent-text underline-offset-2 hover:underline" aria-label={`Quitar archivo ${f.path ?? f.note}`} onClick={() => onFiles(files.filter((_, j) => j !== i))}>Quitar</button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {adding && (
-        <form
-          className="mt-2 flex flex-wrap items-end gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!note.trim() && !path.trim()) return;
-            onFiles([...files, { ...(path.trim() ? { path: path.trim() } : {}), note: note.trim() }]);
-            setNote("");
-            setPath("");
-            setAdding(false);
-          }}
-        >
-          <label className="text-[14px] text-dim">Ruta del archivo (opcional)<input value={path} onChange={(e) => setPath(e.target.value)} className={cn(input, "mt-0.5 min-h-10")} /></label>
-          <label className="text-[14px] text-dim">Nota<input value={note} onChange={(e) => setNote(e.target.value)} className={cn(input, "mt-0.5 min-h-10")} /></label>
-          <PrimaryButton type="submit" large>Guardar archivo</PrimaryButton>
-        </form>
-      )}
-    </li>
-  );
-}
-

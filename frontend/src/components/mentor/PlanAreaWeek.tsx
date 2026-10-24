@@ -8,15 +8,13 @@ import { dateLabel, deliverablesText, longDateLabel, topicsText, weekSummary } f
 import type { MentorPlan } from "../../lib/types";
 import { Chip, GhostButton } from "../common/forms";
 import { cn } from "../ui";
-import { plural, PurposeBlock, type AgendaModel } from "./agendaKit";
-import { WeekCategories } from "./AgendaBoards";
-import { dayViewable, scopeDayRow, scopeInfo, scopeOnly, scopeWeekStats, type PageScope } from "./mentorAreas";
-import { hm } from "./parts";
+import { PurposeBlock, type AgendaModel } from "./agendaKit";
+import { RegisteredTime, WeekCategories, WeekStats } from "./AgendaBoards";
+import { dayViewable, scopeDayRow, scopeOnly, scopeWeekStats, type PageScope } from "./mentorAreas";
 import { pagePace } from "./PlanPageSlots";
 import { DAY_LONG, DAY_SHORT } from "./planShared";
 
 const SECTION = "text-[13px] font-semibold uppercase tracking-wider text-faint";
-const hours = (min: number): string => (min ? hm(min).replace(".", ",") : "—");
 
 /** «Ritmo: 3 temas/día · mínimo 2 · termina el 14 nov»: el ritmo manual de la página y su efecto en el final. Nada si es automático. */
 function PaceLine({ m, scope }: { m: AgendaModel; scope: PageScope }) {
@@ -39,28 +37,15 @@ function PaceLine({ m, scope }: { m: AgendaModel; scope: PageScope }) {
   );
 }
 
-/** Las 4 tarjetas de cifras de una semana de un área: pendientes · estudio teórico · práctica del área · proyectos del área. */
+/** Las tarjetas de CUMPLIMIENTO de una semana de un área (temas hechos, teoría, práctica, proyecto diario) y el «Tiempo registrado» si lo hay. */
 export function ScopeWeekCards({ m, scope, week }: { m: AgendaModel; scope: PageScope; week: number }) {
-  const w = weekSummary(m.plan, m.schedule, week, m.deliverablesDefined ? m.deliverables : []);
-  const s = scopeWeekStats(m, scope, week, w);
-  const cards = [
-    { id: "pending", l: "Temas pendientes", v: String(s.pending), h: s.done ? `${s.done} de ${s.topics} hechos` : `de ${plural(s.topics, "tema", "temas")} esta semana` },
-    { id: "theory", l: "Estudio teórico", v: hours(s.theoryMinutes), h: s.topics ? `en ${plural(s.topics, "tema", "temas")}` : "sin temas esta semana" },
-    { id: "practice", l: "Práctica & katas", v: hours(s.practiceMinutes), h: scope.kind === "bases" ? "van dentro de las áreas" : plural(s.practiceBlocks, "bloque", "bloques") },
-    { id: "projects", l: "Proyectos diarios", v: scope.kind === "bases" ? "—" : String(s.projectDays), h: scope.kind === "bases" ? "Bases no tiene proyecto propio" : s.projectDays === 1 ? "día con proyecto del área" : "días con proyecto del área" },
-  ];
+  const w = weekSummary(m.plan, m.schedule, week, []);
+  const areaKey = scope.kind === "area" ? m.plan.subplans.find((s) => s.id === scope.subplanId)?.areaId ?? scope.subplanId : undefined;
   return (
     <>
-    <dl className="grid grid-cols-2 gap-3 @3xl:grid-cols-4" data-testid="agenda-week-stats">
-      {cards.map((x) => (
-        <div key={x.id} className="min-w-0 rounded-2xl border border-line bg-card px-4 py-3.5" data-testid={`week-stat-${x.id}`}>
-          <dt className="mb-1 text-[12.5px] font-semibold uppercase tracking-wider text-faint">{x.l}</dt>
-          <dd className="text-[26px] font-semibold leading-snug" data-testid={`week-stat-${x.id}-value`}>{x.v}</dd>
-          <dd className="mt-0.5 text-[13.5px] text-dim">{x.h}</dd>
-        </div>
-      ))}
-    </dl>
-    <PaceLine m={m} scope={scope} />
+      <WeekStats m={m} week={week} only={scopeOnly(scope)} />
+      {w && <RegisteredTime planId={m.plan.id} from={w.start} to={w.end} {...(areaKey ? { areaKey } : {})} />}
+      <PaceLine m={m} scope={scope} />
     </>
   );
 }
@@ -77,8 +62,8 @@ export function ScopeDayRow({ m, scope, date, onPick, extra }: { m: AgendaModel;
       <span className="w-14 flex-none font-semibold capitalize">{DAY_SHORT[day.dow - 1]} {Number(date.slice(8))}<span className="sr-only"> {DAY_LONG[day.dow - 1]}</span></span>
       <span className={cn("min-w-0 flex-1 basis-56", r.titles.length ? "text-text" : "text-dim")} data-testid="agenda-week-day-text">{text}</span>
       <span className="whitespace-nowrap font-medium" data-testid="agenda-week-day-count">{topicsText(r.count)}</span>
-      {r.theoryMinutes > 0 && <Chip large>Teoría {hm(r.theoryMinutes)}</Chip>}
-      {r.practiceMinutes > 0 && <Chip large colour="var(--nv-practice, #c58be0)">Práctica {hm(r.practiceMinutes)}</Chip>}
+      {r.theoryMinutes > 0 && <Chip large>Teoría</Chip>}
+      {r.practiceMinutes > 0 && <Chip large colour="var(--nv-practice, #c58be0)">Práctica</Chip>}
       {nExtra > 0 && <Chip large colour="var(--nv-accent)">Extra {nExtra}</Chip>}
       {r.project && <Chip large colour="var(--nv-practice, #c58be0)">Proyecto</Chip>}
       {dayViewable(m, day, scopeOnly(scope)) && <GhostButton aria-label={`Ver el día ${longDateLabel(date)}`} onClick={() => onPick(date)}>Ver día</GhostButton>}
@@ -100,7 +85,6 @@ export function AreaWeek({ m, scope, week, onPickDay, onChanged, headingId, dayE
 }) {
   const w = weekSummary(m.plan, m.schedule, week, m.deliverablesDefined ? m.deliverables : []);
   if (!w) return <p className="text-[14px] text-dim">Esa semana no existe en el plan.</p>;
-  const info = scopeInfo(m.plan, scope);
   const stats = scopeWeekStats(m, scope, week, w);
   const days = m.schedule.days.filter((d) => d.week === week);
   const current = m.today >= w.start && m.today <= w.end;
@@ -112,7 +96,7 @@ export function AreaWeek({ m, scope, week, onPickDay, onChanged, headingId, dayE
         {current && <Chip large colour="var(--nv-mint)">Esta semana</Chip>}
       </header>
       <p className="text-[15px] font-medium text-text" data-testid="agenda-week-counts">
-        {topicsText(stats.topics)} · {hours(stats.theoryMinutes)} de {info.name.toLowerCase()} · {del}
+        {topicsText(stats.topics)} · {del}
       </p>
       <PurposeBlock planId={m.plan.id} scope="week" keyName={String(week)} text={w.purpose} auto={w.autoPurpose} manual={!!m.plan.purposes?.week?.[String(week)]} editable={m.editable} onChanged={onChanged} label={`la semana ${week}`} />
       <ScopeWeekCards m={m} scope={scope} week={week} />

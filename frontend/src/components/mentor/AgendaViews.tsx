@@ -298,6 +298,7 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId, only =
         {countsLine(m, [topicsText(s.topics)], s.deliverables.length)} · {plural(s.weeks.length, "semana", "semanas")}
         {m.deliverablesDefined && <AreaCounts plan={m.plan} list={s.deliverables} testid="area-counts-month" />}
       </p>
+      <RegisteredTime planId={m.plan.id} from={s.start} to={s.end} {...(only ? { areaKey: m.plan.subplans.find((x) => x.id === only)?.areaId ?? only } : {})} />
       <PurposeBlock planId={m.plan.id} scope="month" keyName={month} text={s.purpose} auto={s.autoPurpose} manual={manual} editable={m.editable} onChanged={onChanged} label={s.label} />
 
       {m.schedule.mode === "focus" && <FocusStructure days={m.schedule.days.filter((d) => d.date >= s.start && d.date <= s.end)} headingId={`${headingId ?? "mo"}-focus`} label={`de ${s.label}`} />}

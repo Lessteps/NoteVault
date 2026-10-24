@@ -328,8 +328,8 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
 
       {view === "hoy" && plan && subplanId && (
         <div className="flex flex-wrap items-center gap-2" data-testid="work-add-topic">
-          <AddExtraTopic planId={planId} date={today} area={subplanId} minDate={plan.start} maxDate={plan.end} label="Añadir tema" onChanged={bumpPlanVersion} />
-          <span className="text-[13px] text-dim">Un tema de la ruta que está más adelante, o cualquiera de tu vault.</span>
+          <AddExtraTopic planId={planId} date={today} area={subplanId} minDate={plan.start} maxDate={plan.end} label="Próximos temas" onChanged={bumpPlanVersion} />
+          <span className="text-[13px] text-dim">Mira los temas de las próximas semanas y adelanta el siguiente de la ruta.</span>
         </div>
       )}
 

@@ -510,7 +510,8 @@ describe("vista de ejecución", () => {
     expect(byTest("run-next")).toBeNull(); // «Lo que viene» es solo del resumen general
     const projects = byTest("run-projects")!;
     expect(byTest("run-project-weekly")!.textContent).toContain("Proyecto semanal");
-    expect(projects.textContent).toContain("Entregable por definir");
+    expect(projects.textContent).not.toContain("por definir");
+    expect(projects.textContent).toContain("Entregable del mes");
     expect(byTest("weekly-areas")!.textContent).toContain("Resultado real");
     // El proyecto diario está en la pestaña de CADA área (no en «Proyectos»)
     await click(runTab("area:s1"));

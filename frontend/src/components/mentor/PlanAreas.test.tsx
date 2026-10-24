@@ -241,12 +241,14 @@ describe("Mi plan: «Temas por semana y área»", () => {
     expect(all("area-topics-detail", sec)).toHaveLength(WEEKS.length);
   });
 
-  it("la tabla mes a mes sigue el mismo orden de áreas y no cuenta entregables mientras estén por definir", async () => {
+  it("la tabla mes a mes sigue el mismo orden de áreas y cuenta los entregables de la cadena (nunca «por definir»)", async () => {
     await open(fivePlan("together"));
     await section("fases");
     const names = all("plan-month-row").map((r) => r.querySelector("th")!.textContent!);
     expect(names.map((n) => n.replace(/\d.*$/, "").trim())).toEqual(["Backend", "Frontend", "Databases", "Tooling and Quality", "Automation"]);
-    expect(byTest("plan-month-totals").textContent).not.toContain("entregable");
+    expect(byTest("plan-month-totals").textContent).not.toContain("por definir");
+    expect(byTest("plan-month-totals").textContent).not.toMatch(/\d\s*h/); // los meses no se miden por horas previstas
+    expect(host.textContent).not.toContain("Marcar en curso");
   });
 });
 
@@ -264,7 +266,7 @@ describe("Agenda: Semana y Mes con los temas separados por área", () => {
     expect(topics.length).toBeGreaterThan(0);
     for (const t of topics) {
       expect(byTest("area-topic-days", t).getAttribute("aria-label")).toMatch(/Día asignado: (lunes|martes|miércoles|jueves|viernes|sábado|domingo) \d+/);
-      expect(t.textContent).toMatch(/Sin tratar/);
+      expect(t.textContent).toMatch(/Hoy|Pendiente|Hecho|Sin tratar/);
     }
     expect(byTest("week-area-total", be).textContent).toMatch(/En todo el plan: 12 temas/);
     // Automation aún no empieza: no tiene tarjeta, va en la línea de «sin temas esta semana»
@@ -298,7 +300,7 @@ describe("Agenda: Semana y Mes segmentadas por categoría", () => {
   it("Semana: cifras, tira de días con conteos y una tarjeta separada por área con los mismos temas que el selector compartido", async () => {
     const p = fivePlan("together");
     await openAgenda(p, "semana");
-    expect(all("week-stat-pending").length + all("week-stat-theory").length + all("week-stat-practice").length + all("week-stat-projects").length).toBe(4);
+    expect(all("week-stat-done").length + all("week-stat-theory").length + all("week-stat-practice").length).toBeGreaterThanOrEqual(2);
     expect(byTest("agenda-week").textContent).not.toContain("Enfoque:");
     const week = Math.floor((Date.parse(`${TODAY}T00:00:00Z`) - Date.parse(`${START}T00:00:00Z`)) / 86400000 / 7) + 1;
     const data = topicsByWeekArea(p as never, sched(p));
@@ -313,8 +315,8 @@ describe("Agenda: Semana y Mes segmentadas por categoría", () => {
       expect(byTest("week-area-progress", card).textContent).toBe(`${c.done}/${c.topics.length} hechos`);
       for (const r of all("area-topic", card)) {
         expect(r.textContent).toMatch(/Teoría|Práctica/);
-        expect(r.textContent).toMatch(/Sin tratar|En curso|Hecho/);
-        expect(r.querySelectorAll("[data-testid=area-topic-days] [data-on='1']").length).toBeGreaterThan(0);
+        expect(r.textContent).toMatch(/Hoy|Pendiente|Hecho|Sin tratar|En curso/);
+        expect(byTest("area-topic-days", r).getAttribute("aria-label")).toMatch(/Día asignado: (lunes|martes|miércoles|jueves|viernes|sábado|domingo) \d+/);
       }
     }
     // tira de días: 7 botones y cada conteo = temas del selector asignados a ese día
@@ -389,8 +391,7 @@ describe("Calendario por áreas", () => {
     expect(areas[2]!.textContent).toMatch(/^BD/);
     const label = cell.getAttribute("aria-label")!;
     expect(label).toMatch(/^[a-záéíóú]+ \d+ de [a-z]+: Backend \d+ temas?( y práctica)?; Frontend \d+ temas? y práctica; Databases \d+ temas?( y práctica)?; Tooling and Quality/);
-    expect(label).not.toContain("entregable"); // por definir: ni contadores ni chips
-    expect(cell.textContent).not.toContain("◆");
+    expect(label).not.toContain("por definir"); // la cadena de entregables siempre está definida
     expect(byTest("agenda-grid").getAttribute("role")).toBe("grid");
     expect(byTest("agenda-calendar").textContent).toContain("Cada línea es un área");
   });
@@ -451,39 +452,37 @@ describe("Día por áreas", () => {
     }
     // la práctica por área sale del sistema de referencia (o del propio, si existe)
     expect(all("agenda-area-practice", day).length).toBeGreaterThan(0);
-    // sin entregables definidos: «Entregables: por definir» UNA vez y ningún contador
-    expect(byTest("agenda-day-counts").textContent).toContain("Entregables: por definir");
-    expect(day.textContent!.match(/Entregables: por definir/g)).toHaveLength(1);
-    expect(byTest("agenda-day-deliverables")).toBeFalsy();
-    // los proyectos propuestos no se marcan como hechos mientras los entregables están por definir
-    expect(byTest("agenda-project-daily").textContent).toContain("Entregable por definir");
-    expect(day.textContent).not.toContain("Marcar en curso");
+    // la cadena diario → semanal → mensual siempre está definida: nunca «por definir» y el estado del proyecto del día no se marca a mano
+    expect(byTest("agenda-day-counts").textContent).toMatch(/[0-9]+ entregables?/);
+    expect(day.textContent).not.toContain("por definir");
   });
 });
 
-describe("Entregables por definir", () => {
-  it("sin entregables definidos la pestaña dice «Aún sin definir» y no ofrece elegir; la insignia de decisiones pendientes tampoco sale", async () => {
+describe("Entregables: la cadena diario → semanal → mensual siempre está definida", () => {
+  it("la pestaña enseña un entregable por mes con sus semanas y sus piezas, sin «por definir» y sin elegir el estado a mano", async () => {
     await open(fivePlan("together"));
-    expect(tab("entregables").textContent).toBe("Entregables");
     await section("datos");
-    expect(byTest("plan-deliverables-chip").textContent).toContain("Por definir");
+    expect(byTest("plan-deliverables-chip").textContent).not.toContain("Por definir");
     await click(tab("entregables"));
-    expect(byTest("plan-deliverables-pending").textContent).toContain("Aún sin definir");
-    expect(byTest("plan-deliverables-pending-text").textContent).toBe("Aún sin definir: se definen al ejecutar el plan (o puedes pedirlos en «Preguntas y ajustes»).");
-    expect(byTest("plan-open-questions")).toBeFalsy();
-    expect(host.textContent).not.toContain("A discutir");
-    expect([...host.querySelectorAll("#plan-tabs-panel-entregables button")].map((b) => b.textContent)).toEqual(["Pedirlos en «Preguntas y ajustes»"]);
+    expect(byTest("plan-deliverables-pending")).toBeFalsy();
+    expect(host.textContent).not.toContain("por definir");
+    const months = all("chain-month");
+    expect(months.length).toBeGreaterThan(0);
+    expect(months[0]!.querySelectorAll("[data-testid=chain-week]").length).toBeGreaterThan(0);
+    expect(months[0]!.querySelectorAll("[data-testid=chain-piece]").length).toBeGreaterThan(0);
+    // sin ningún selector de estado
+    expect(host.querySelector("#plan-tabs-panel-entregables select[aria-label^='Estado']")).toBeNull();
+    expect(host.textContent).toContain("Se completa automáticamente conforme avanzas");
+    // el segundo mes queda bloqueado hasta completar el primero
+    if (months.length > 1) expect(months[1]!.getAttribute("data-locked")).toBe("true");
   });
 
-  it("el calendario, la semana y el mes no cuentan entregables hasta que existen", async () => {
+  it("el calendario, la semana y el mes cuentan entregables (nunca «por definir»)", async () => {
     await openAgenda(fivePlan("together"), "semana");
-    expect(byTest("agenda-week-counts").textContent).toContain("Entregables: por definir");
-    expect(byTest("agenda-week-deliverables")).toBeFalsy();
-    expect(host.textContent!.match(/Entregables: por definir/g)).toHaveLength(1);
-    expect(byTest("agenda-title").textContent).toContain("entregables por definir");
+    expect(byTest("agenda-week-counts").textContent).toMatch(/[0-9]+ entregables?/);
+    expect(host.textContent).not.toContain("por definir");
     await click(view("mes"));
-    expect(byTest("agenda-month-counts").textContent).toContain("Entregables: por definir");
-    expect(byTest("agenda-month-deliverables")).toBeFalsy();
+    expect(byTest("agenda-month-counts").textContent).toMatch(/[0-9]+ entregables?/);
   });
 
   it("con entregables definidos (marca de la ejecución) vuelven los contadores, la lista y la pestaña con su agenda", async () => {
@@ -500,7 +499,7 @@ describe("Entregables por definir", () => {
     await click(tab("entregables"));
     expect(byTest("plan-deliverables-pending")).toBeFalsy();
     expect(byTest("plan-global-question").textContent).toContain("por cada área");
-    expect(byTest("plan-deliverables-agenda")).toBeTruthy();
+    expect(byTest("monthly-deliverables")).toBeTruthy();
   });
 
   it("un entregable de área o manual también cuenta como definido", async () => {

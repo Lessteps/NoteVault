@@ -279,6 +279,20 @@ export function planChain(plan: SchedulePlan, sch: PlanSchedule, signals?: Chain
   return { months, pieces: months.reduce((n, m) => n + m.total, 0), weeks: months.reduce((n, m) => n + m.weeks.length, 0) };
 }
 
+/** Las señales de avance a partir del estado de la práctica (fases de cada semana) y de las carpetas de proyecto completas. */
+export function chainSignalsOf(practice: { weeks: Array<{ week: number; phases: Record<string, string> }> } | null | undefined, dailyProjectDone?: Record<string, string[]>): ChainSignals {
+  return {
+    ...(dailyProjectDone ? { dailyProjectDone } : {}),
+    weeksDone: new Set((practice?.weeks ?? []).filter((x) => Object.values(x.phases).length > 0 && Object.values(x.phases).every((s) => s === "hecho")).map((x) => x.week)),
+  };
+}
+
+/** El estado de la práctica más la señal de avance de la cadena (lo único que mueve los entregables), listo para `deliverablesOf`. */
+export function practiceWithProgress<P extends { weeks: unknown[] }>(practice: P | null | undefined, dailyProjectDone?: Record<string, string[]>): (P & { dailyProjectDone?: Record<string, string[]> }) | null {
+  if (!practice && !dailyProjectDone) return null;
+  return { weeks: [], ...(practice ?? {}), ...(dailyProjectDone ? { dailyProjectDone } : {}) } as P & { dailyProjectDone?: Record<string, string[]> };
+}
+
 /** Texto de bloqueo: «Bloqueado hasta completar la semana 3». */
 export const lockText = (kind: "week" | "month", by: number): string => (kind === "week" ? `Bloqueada hasta completar la semana ${by}` : `Bloqueado hasta completar el mes ${by}`);
 

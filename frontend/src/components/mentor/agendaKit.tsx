@@ -5,6 +5,7 @@ import { Pencil, RotateCcw } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { type PlanDeliverable, type PlanDeliverableKind, type PlanDeliverableStatus } from "../../lib/planAreas";
+import { practiceWithProgress } from "../../lib/planChain";
 import { areaRowsText, buildSchedule, deliverableAreaRows, deliverablesOf, progressPlan, type PlanSchedule } from "../../lib/planSchedule";
 import type { ExistingExercises } from "../../lib/planCurriculum";
 import { deliverablesDefined, topicsByWeekArea, type TopicsByWeekArea } from "../../lib/planTopicsByArea";
@@ -102,11 +103,11 @@ export function useAgendaModel(data: Loaded, plan: MentorPlan): AgendaModel {
   const liveKey = liveDone.join(",");
   const { schedule, byWeekArea } = useMemo(() => scheduleOf(plan, data.today, liveDone), [plan, data.today, liveKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const del = useMemo(() => {
-    const deliverables = deliverablesOf(plan, practice, schedule);
+    const deliverables = deliverablesOf(plan, practiceWithProgress(practice, data.dailyProjectDone), schedule);
     const dueByDate = new Map<string, PlanDeliverable[]>();
     for (const d of deliverables) dueByDate.set(d.dueDate, [...(dueByDate.get(d.dueDate) ?? []), d]);
     return { deliverables, dueByDate, deliverableById: new Map(deliverables.map((d) => [d.id, d] as const)), deliverablesDefined: deliverablesDefined(plan) };
-  }, [plan, practice, schedule]);
+  }, [plan, practice, schedule, data.dailyProjectDone]);
   // el estado en vivo (`data.derived`) cambia de objeto en cada recarga: solo esto se rehace, no el reparto
   const live = useMemo(() => {
     const topicByFolder = new Map<string, MentorTopicView>();

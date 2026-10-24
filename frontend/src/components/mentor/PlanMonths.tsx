@@ -1,5 +1,5 @@
 // Mentor — Plan, «Mi plan»: las FASES DEL PLAN MES A MES. Una tabla accesible (caption, cabeceras de fila y de columna) con una fila por
-// área y una columna por mes del periodo: temas planificados (y completados), horas, semanas activas de ese mes, grupos internos que se
+// área y una columna por mes del periodo: temas planificados (y completados), semanas activas de ese mes, grupos internos que se
 // trabajan y los primeros títulos. Fila de totales por mes (temas, horas, entregables, áreas activas). El mes actual se resalta y cada mes
 // abre la Agenda en su vista Mes. En un contenedor estrecho la tabla se desplaza DENTRO de su propio contenedor con la primera columna fija.
 // Debajo, una mini-barra por semanas da el contexto de las fases (cuándo empieza y acaba cada área).
@@ -7,25 +7,27 @@
 import { CalendarDays } from "lucide-react";
 import { useId, useMemo } from "react";
 import { phasesByMonth, monthLong, weeksText, type MonthCell } from "../../lib/planMonths";
+import { practiceWithProgress } from "../../lib/planChain";
 import { deliverablesOf } from "../../lib/planSchedule";
 import { areaRank, deliverablesDefined } from "../../lib/planTopicsByArea";
 import type { MentorPlan } from "../../lib/types";
 import { cn } from "../ui";
-import { hm } from "./parts";
+import { LoggedTime } from "./LoggedTime";
+import { useTimeLog } from "./AreaSession";
 import { focusColour } from "./agendaKit";
 import { PALETTE, type Loaded } from "./planShared";
 
-const hours = (min: number): string => (min ? hm(min).replace(".", ",") : "0 h");
 const temas = (n: number): string => `${n} ${n === 1 ? "tema" : "temas"}`;
 
 export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; plan: MentorPlan; /** abre la Agenda (vista Mes) en ese mes */ onOpenMonth: (month: string, firstDay: string) => void }) {
   const uid = useId();
+  const { entries } = useTimeLog(plan.id);
   const model = useMemo(() => {
     const done = new Set((data.derived?.subplans ?? []).flatMap((s) => s.topics.filter((t) => t.state === "completo" || t.completedAt).map((t) => t.folder)));
     let deliverables: Array<{ dueDate: string }> | undefined;
     try {
       // sin entregables definidos no se cuentan en los totales del mes (quedan «por definir»)
-      deliverables = deliverablesDefined(plan) ? deliverablesOf(plan as never, data.practice ?? null) : undefined;
+      deliverables = deliverablesDefined(plan) ? deliverablesOf(plan as never, practiceWithProgress(data.practice, data.dailyProjectDone)) : undefined;
     } catch {
       deliverables = undefined;
     }
@@ -44,7 +46,7 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
   return (
     <div className="space-y-2" data-testid="plan-months">
       <p className="text-[13.5px] text-dim" aria-hidden>
-        Temas planificados (y hechos), horas, semanas activas y grupos de cada área por mes. Pulsa un mes para verlo en la Agenda.
+        Temas planificados (y hechos), semanas activas y grupos de cada área por mes. Pulsa un mes para verlo en la Agenda.
       </p>
       {plan.areaMode && (
         <p className="rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-text" data-testid="plan-months-mode">
@@ -61,7 +63,7 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
       >
         <table className="w-max min-w-full border-separate border-spacing-0 text-left text-[13.5px]" data-testid="plan-months-table">
           <caption id={captionId} className="sr-only">
-            Fases del plan mes a mes: temas planificados y completados, horas, semanas activas y grupos de cada área. Pulsa un mes para verlo en la Agenda.
+            Fases del plan mes a mes: temas planificados y completados, semanas activas y grupos de cada área. Pulsa un mes para verlo en la Agenda.
           </caption>
           <thead>
             <tr>
@@ -130,7 +132,7 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
                     {t.done ? <span className="font-normal text-mint"> · {t.done} hechos</span> : null}
                   </span>
                   <span className="block text-dim">
-                    {hours(t.minutes)} · {t.areas} {t.areas === 1 ? "área" : "áreas"}
+                    {t.areas} {t.areas === 1 ? "área" : "áreas"}
                     {t.areas > 1 ? " a la vez" : ""}
                   </span>
                   {t.areas > 1 && (
@@ -138,6 +140,7 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
                       Simultáneas: {t.areaNames.join(" + ")}
                     </span>
                   )}
+                  <LoggedTime entries={entries} from={`${t.month}-01`} to={`${t.month}-31`} className="block text-[12.5px] text-dim" />
                   {t.deliverables !== null && (
                     <span className="block text-dim">
                       {t.deliverables} {t.deliverables === 1 ? "entregable" : "entregables"}
@@ -150,7 +153,7 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
         </table>
       </div>
       <p className="text-[13px] text-dim">
-        Cada semana del plan cuenta en el mes donde cae la mayor parte de sus días. Las horas son la estimación de los temas (la práctica diaria va aparte).
+        Cada semana del plan cuenta en el mes donde cae la mayor parte de sus días. El avance se mide por temas hechos y entregables; solo se muestra el tiempo que registraste de verdad.
       </p>
     </div>
   );
@@ -172,7 +175,6 @@ function Cell({ c, current }: { c: MonthCell; current: boolean }) {
         <span className="block font-semibold text-text">
           {temas(c.topics)}
           {c.done ? <span className="font-normal text-mint"> · {c.done} hechos</span> : null}
-          <span className="font-normal text-dim"> · {hours(c.minutes)}</span>
         </span>
       ) : (
         <span className="block text-dim">Sin temas nuevos</span>

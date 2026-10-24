@@ -300,15 +300,9 @@ describe("pestaña «Entregables»: acciones masivas", () => {
     expect(card.textContent).toContain("CRUD completo");
     expect(button("Abrir en Proyectos: Inventario", card)).toBeTruthy();
     expect(host.querySelector("[data-testid=plan-open-questions]")).toBeNull();
-    // el estado se edita en la agenda de entregables (todo el plan): hecho / pendiente, con su selector
-    const range = host.querySelector<HTMLSelectElement>("select[aria-label='Periodo']")!;
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(range, "todo");
-      range.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    await flush();
+    // el estado NO se edita: se calcula solo (el proyecto de área sale en «Otros entregables», en solo lectura)
     const row = [...host.querySelectorAll("[data-testid=deliverable-row]")].find((r) => r.textContent?.includes("API de inventario"))!;
-    expect(row.querySelector("select")!.getAttribute("aria-label")).toBe("Estado de API de inventario");
+    expect(row.querySelector("select")).toBeNull();
     expect(row.textContent).toContain("Proyecto de área");
   });
 });

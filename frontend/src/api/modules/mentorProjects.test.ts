@@ -33,6 +33,28 @@ beforeEach(() => {
 });
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
+describe("avance de los entregables (la señal es lo que el estudiante completa)", () => {
+  it("una pieza diaria cuenta como hecha solo cuando TODAS las casillas de su carpeta están marcadas", () => {
+    expect((api().mentor_deliverables_progress({ id }) as any).dailyProjectDone).toEqual({});
+    const r = api().mentor_projects_scaffold({ id, areaKeys: ["backend"], project: daily });
+    const dirRel = r.projects[0]!.dir;
+    expect((api().mentor_deliverables_progress({ id }) as any).dailyProjectDone).toEqual({}); // plantilla recién creada: nada marcado
+    // marcar solo la primera casilla: sigue sin estar hecha
+    const files = fs.readdirSync(path.join(dir, ...dirRel.split("/"))).filter((n) => n.endsWith(".md"));
+    let first = true;
+    for (const f of files) {
+      const file = path.join(dir, ...dirRel.split("/"), f);
+      fs.writeFileSync(file, fs.readFileSync(file, "utf-8").replace(/\[ \]/, (m) => (first ? ((first = false), "[x]") : m)), "utf-8");
+    }
+    expect((api().mentor_deliverables_progress({ id }) as any).dailyProjectDone).toEqual({});
+    for (const f of files) {
+      const file = path.join(dir, ...dirRel.split("/"), f);
+      fs.writeFileSync(file, fs.readFileSync(file, "utf-8").replace(/\[ \]/g, "[x]"), "utf-8");
+    }
+    expect((api().mentor_deliverables_progress({ id }) as any).dailyProjectDone).toEqual({ "2026-10-19": ["backend"] });
+  });
+});
+
 describe("estructura de la ruta", () => {
   it("sin proyecto crea una carpeta por área con sus tres tipos de proyecto y los README; no escribe nada más", () => {
     const r = api().mentor_projects_scaffold({ id });

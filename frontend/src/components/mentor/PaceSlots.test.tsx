@@ -52,13 +52,6 @@ const click = async (el: Element | null | undefined) => {
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   await flush();
 };
-const typeInto = async (el: HTMLElement, value: string) => {
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await flush();
-};
 const byTest = (id: string, within: ParentNode = host) => within.querySelector<HTMLElement>(`[data-testid=${id}]`);
 const all = (id: string, within: ParentNode = host) => [...within.querySelectorAll<HTMLElement>(`[data-testid=${id}]`)];
 const byLabel = (label: string) => document.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
@@ -212,11 +205,11 @@ describe("temas extra: marca «Extra», × y mismo resultado en Agenda y Ejecuci
 });
 
 describe("Ejecución: añadir tema y práctica", () => {
-  it("«Temas de hoy» ofrece «Añadir tema» (hoy, esta área) y «Práctica diaria» ofrece «Añadir práctica» con lista, hecho y quitar", async () => {
+  it("«Temas de hoy» ofrece «Próximos temas» (hoy, esta área) y «Práctica diaria» ofrece «Más práctica» con lista, hecho y quitar", async () => {
     await open("ejecucion");
     await click(runTab("area:s-be"));
     const addT = byTest("work-add-topic")!.querySelector<HTMLElement>("[data-testid=add-extra-topic]")!;
-    expect(addT.textContent).toContain("Añadir tema");
+    expect(addT.textContent).toContain("Próximos temas");
     vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue(candidates("P/Back/T26", "Back 26"));
     const addTopic = vi.spyOn(api, "mentorPlanExtraTopicAdd").mockImplementation(async (o) => (saved = { ...basePlan(), extraTopics: [{ date: o.date!, folder: o.folder, addedAt: "x", source: "manual" }] }));
     await click(addT);
@@ -246,10 +239,10 @@ describe("Ejecución: añadir tema y práctica", () => {
     expect(byTest("extra-practice-row")).toBeNull();
   });
 
-  it("el Hoy general también deja añadir tema y práctica (sin área)", async () => {
+  it("el Hoy general también deja adelantar tema y práctica (sin área)", async () => {
     await open("ejecucion");
     const box = byTest("run-extras")!;
-    expect(box.querySelector("[data-testid=add-extra-topic]")!.textContent).toContain("Añadir tema");
-    expect(box.querySelector("[data-testid=add-extra-practice]")!.textContent).toContain("Añadir práctica");
+    expect(box.querySelector("[data-testid=add-extra-topic]")!.textContent).toContain("Próximos temas");
+    expect(box.querySelector("[data-testid=add-extra-practice]")!.textContent).toContain("Más práctica");
   });
 });

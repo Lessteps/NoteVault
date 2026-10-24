@@ -24,6 +24,40 @@ export interface ProjectResult {
   existed: string[];
 }
 
+/**
+ * LA SEÑAL DEL AVANCE de la cadena diario → semanal → mensual: por fecha, las áreas cuya carpeta de proyecto DIARIO de ese día tiene todas sus
+ * casillas marcadas (el estudiante las marca al completar la pieza). Solo lee; sin carpetas devuelve `{}`.
+ */
+export function dailyProjectDoneOf(root: string, plan: Plan): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  try {
+    const space = plan.subplans.flatMap((s) => s.topics)[0]?.folder.split("/")[0] ?? "Programación";
+    const base = `${space}/Mentor/${routeDirName(plan.name ?? "", plan.id)}`;
+    const abs = path.resolve(root);
+    orderedAreas(plan).forEach((a, i) => {
+      const d = areaDirs(i, a.area);
+      const dir = path.resolve(abs, ...`${base}/${d.dir}/${d.kinds.daily}`.split("/"));
+      if (!dir.startsWith(abs + path.sep) || !fs.existsSync(dir)) return;
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const date = /^(\d{4}-\d{2}-\d{2}) /.exec(e.name)?.[1];
+        if (!e.isDirectory() || !date) continue;
+        let done = 0;
+        let total = 0;
+        for (const f of fs.readdirSync(path.join(dir, e.name)).filter((n) => n.endsWith(".md"))) {
+          for (const m of fs.readFileSync(path.join(dir, e.name, f), "utf-8").matchAll(/^\s*[-*] \[( |x|X)\]/gm)) {
+            total++;
+            if (m[1] !== " ") done++;
+          }
+        }
+        if (total > 0 && done >= total) (out[date] ??= []).push(a.areaId ?? a.subplanId);
+      }
+    });
+  } catch {
+    /* sin carpetas legibles: no hay avance */
+  }
+  return out;
+}
+
 export function mentorProjectsApi(app: AppState) {
   const planOf = (opts: unknown): Plan => {
     const id = String(((opts && typeof opts === "object" ? opts : {}) as Record<string, any>).id ?? "");
@@ -91,6 +125,11 @@ export function mentorProjectsApi(app: AppState) {
         return { areaKey: a.key, area: a.name, dir: `${base}/${d.dir}`, kinds };
       });
       return { route: base, exists, areas: out };
+    },
+
+    /** Las piezas diarias que el estudiante ya completó (la única señal de avance de los entregables). No escribe nada. */
+    mentor_deliverables_progress(opts: unknown) {
+      return { dailyProjectDone: dailyProjectDoneOf(app.root, planOf(opts)) };
     },
 
     mentor_projects_scaffold(opts: unknown) {

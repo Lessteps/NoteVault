@@ -333,7 +333,7 @@ export function PlanView({ planId, source }: { planId: string; source: PlanSourc
                     {plan.auto && <Chip large colour="var(--nv-warn)">Plan automático</Chip>}
                   </>
                 ) : (
-                  "El plan por áreas elementales. El estado sale de tu práctica; los propósitos y los estados de los entregables se editan aquí."
+                  "El plan por áreas elementales. El estado sale de tu práctica; los propósitos se editan aquí y los entregables se completan solos conforme avanzas."
                 )}
               </p>
             </div>

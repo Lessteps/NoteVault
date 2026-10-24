@@ -230,7 +230,7 @@ describe("propósito por plantillas y entregables", () => {
     expect(monthSummary(plan1, s, "2026-10", dl)!.deliverables).toHaveLength(dl.length);
   });
 
-  it("el estado sale de la práctica (kata hecho, fases del proyecto) y se combina con lo anotado a mano: gana lo más avanzado", () => {
+  it("el estado sale de la práctica (kata hecho, fases del proyecto) y lo anotado a mano NO cambia el estado (solo aporta archivos)", () => {
     const plan1 = p();
     const status = {
       kataDoneDates: ["2026-10-05"],
@@ -243,7 +243,7 @@ describe("propósito por plantillas y entregables", () => {
     expect(dl.find((d) => d.id === "wp:2")!.status).toBe("pendiente");
     const manual = deliverablesOf({ ...plan1, deliverables: [{ id: "kata:2026-10-06", kind: "kata", title: "x", description: "", dueDate: "2026-10-06", criteria: [], status: "hecho", source: "practice", files: [{ note: "kata.py" }] }] }, status);
     const k = manual.find((d) => d.id === "kata:2026-10-06")!;
-    expect(k.status).toBe("hecho");
+    expect(k.status).toBe("pendiente");
     expect(k.files).toEqual([{ note: "kata.py" }]);
     // un entregable extra guardado aparece aunque no se derive de nada
     const extra = deliverablesOf({ ...plan1, deliverables: [{ id: "x:1", kind: "area_project", title: "Extra", description: "", dueDate: "2026-10-20", criteria: [], status: "pendiente", source: "ai" }] });

@@ -1,4 +1,4 @@
-// Mentor — «Más práctica» / «Adelantar práctica»: enseña QUÉ EJERCICIOS VIENEN (los ya planificados de los temas de la ruta que aún no
+// Mentor — «Más práctica»: enseña QUÉ PRÁCTICA VIENE (los katas del área ya planeados y los ejercicios de los temas de la ruta que aún no
 // tienen intentos) y deja ADELANTAR uno a un día (hoy por defecto). Ya no pide qué practicar ni inventa títulos: ofrece adelantar las
 // notas de ejercicio ya programadas en la ruta.
 // Botón + diálogo; guarda con `mentor_plan_extra_practice_add`. Pieza reutilizable por props: quien la monte recoge el plan nuevo en `onChanged`.
@@ -7,7 +7,7 @@ import { ArrowUpRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { dateLabel } from "../../lib/planSchedule";
-import type { MentorExerciseCandidate, MentorPlan } from "../../lib/types";
+import type { MentorExerciseCandidate, MentorKataAhead, MentorPlan } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { Chip, Field, GhostButton, input, Modal } from "../common/forms";
 import { cn } from "../ui";
@@ -37,6 +37,31 @@ const fileNameOf = (rel: string): string => rel.split("/").pop() ?? rel;
 
 interface Data {
   exercises: MentorExerciseCandidate[];
+  katas: MentorKataAhead[];
+}
+
+async function openFile(rel: string): Promise<void> {
+  try {
+    await useApp.getState().openNote(rel);
+  } catch (e) {
+    useApp.getState().toast("error", (e as Error).message);
+  }
+}
+
+function KataRow({ k, day, busy, onAdd, onOpen, dayText }: { k: MentorKataAhead; day: string; busy: boolean; onAdd: () => void; onOpen: () => void; dayText: string }) {
+  const here = k.addedDates.includes(day);
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2" data-testid="extra-practice-candidate" data-kind="kata" data-date={k.date}>
+      <span className="min-w-0 flex-1 basis-44">
+        <span className="block text-[14px] font-medium text-text">{k.title}</span>
+        <span className="block text-[13px] text-dim">Kata {k.day} · {k.skill} · {k.minutes} min · Planeado el {dateLabel(k.date)}{here ? ` · Ya adelantado a ${dateLabel(day)}` : ""}</span>
+      </span>
+      <GhostButton aria-label={`Abrir ${k.title}`} onClick={onOpen}>Abrir</GhostButton>
+      <GhostButton aria-label={`Adelantar ${k.title}`} disabled={busy || here} onClick={onAdd}>
+        <ArrowUpRight size={14} aria-hidden /> {dayText}
+      </GhostButton>
+    </li>
+  );
 }
 
 function ExerciseRow({ ex, day, busy, onAdd, dayText }: { ex: MentorExerciseCandidate; day: string; busy: boolean; onAdd: () => void; dayText: string }) {
@@ -54,6 +79,7 @@ function ExerciseRow({ ex, day, busy, onAdd, dayText }: { ex: MentorExerciseCand
         </span>
       </span>
       <Chip large colour={here ? "var(--nv-accent)" : "var(--nv-faint)"}>{here ? "Adelantado" : "Pendiente"}</Chip>
+      <GhostButton aria-label={`Abrir ${ex.title}`} onClick={() => void openFile(ex.rel)}>Abrir</GhostButton>
       <GhostButton aria-label={`Adelantar ${ex.title}`} disabled={busy || here} onClick={onAdd} title={here ? `Ya añadido el ${dateLabel(day)}` : undefined}>
         <ArrowUpRight size={14} aria-hidden /> {dayText}
       </GhostButton>
@@ -78,9 +104,12 @@ export function AddExtraPractice({ planId, date, area, minDate, maxDate, onChang
     setError("");
     try {
       for (let i = 0; i < 40; i++) {
-        const r = await api.mentorPlanExerciseCandidates({ id: planId, ...(scope ? { area: scope } : {}) });
+        const [r, ka] = await Promise.all([
+          api.mentorPlanExerciseCandidates({ id: planId, ...(scope ? { area: scope } : {}) }),
+          api.mentorAreaKatasAhead(planId, scope).catch(() => ({ katas: [] as MentorKataAhead[] })),
+        ]);
         if (seq.current !== mine) return;
-        if (!r.loading) return void setData({ exercises: r.exercises });
+        if (!r.loading) return void setData({ exercises: r.exercises, katas: ka?.katas ?? [] });
         await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
         if (seq.current !== mine) return;
       }
@@ -114,6 +143,27 @@ export function AddExtraPractice({ planId, date, area, minDate, maxDate, onChang
       setBusy(false);
     }
   };
+  const addKata = async (k: MentorKataAhead): Promise<void> => {
+    setBusy(true);
+    try {
+      const plan = await api.mentorPlanExtraPracticeAdd({ id: planId, title: k.title, kind: "kata", date: day, area: k.subplanId, kataDate: k.date, minutes: k.minutes });
+      onChanged(plan);
+      toast("info", `«${k.title}» adelantado al ${day}.`);
+      await load();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const openKata = async (k: MentorKataAhead): Promise<void> => {
+    try {
+      const r = await api.mentorAreaKataOpen(planId, k.areaId, k.date);
+      await useApp.getState().openNote(r.rel);
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
   const close = (): void => {
     setOpen(false);
     setData(null);
@@ -132,6 +182,7 @@ export function AddExtraPractice({ planId, date, area, minDate, maxDate, onChang
     return [...byArea.entries()];
   }, [data]);
 
+  const katas = data?.katas ?? [];
   const dayText = day === localToday() ? "Adelantar a hoy" : `Adelantar al ${dateLabel(day)}`;
 
   return (
@@ -141,7 +192,7 @@ export function AddExtraPractice({ planId, date, area, minDate, maxDate, onChang
       </GhostButton>
       {open && (
         <Modal title="Más práctica planificada" onClose={close} width={760}>
-          <p className="text-[14px] text-dim">Estos son los ejercicios ya planificados de los temas de la ruta que aún no tienen intentos. Puedes adelantarlos al día que elijas.</p>
+          <p className="text-[14px] text-dim">Estos son los katas y ejercicios ya planificados que aún no te tocan. Puedes adelantarlos al día que elijas.</p>
           <div className="grid items-end gap-3 sm:grid-cols-[auto_1fr]">
             <Field label="Día">
               <input type="date" className={input} value={day} min={minDate} max={maxDate} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Día" />
@@ -155,7 +206,13 @@ export function AddExtraPractice({ planId, date, area, minDate, maxDate, onChang
           </div>
           {error && <p role="alert" className="text-[14px] text-danger">{error}</p>}
           {!data && !error && <p className="text-[14px] text-dim" role="status">Buscando los ejercicios planificados…</p>}
-          {data && groups.length === 0 && <p className="text-[14px] text-dim">No quedan ejercicios pendientes en los temas planificados.</p>}
+          {data && groups.length === 0 && katas.length === 0 && <p className="text-[14px] text-dim" data-testid="next-practice-empty">No hay más práctica planificada por ahora.</p>}
+          {data && katas.length > 0 && (
+            <section aria-label="Katas planeados" className="space-y-1.5" data-testid="next-practice-katas">
+              <h4 className="text-[13px] font-semibold uppercase tracking-wider text-faint">Katas planeados</h4>
+              <ul className="space-y-1.5">{katas.map((k) => <KataRow key={`${k.subplanId}:${k.date}`} k={k} day={day} busy={busy} dayText={dayText} onAdd={() => void addKata(k)} onOpen={() => void openKata(k)} />)}</ul>
+            </section>
+          )}
           {data &&
             groups.map(([subId, g]) => (
               <section key={subId} aria-label={g.name} className="space-y-3" data-testid="next-practice-area" data-area={subId}>

@@ -96,11 +96,11 @@ export function AddTopicSlot({ plan, scope, date, onChanged, announce }: DaySlot
       {...(area ? { area } : {})}
       minDate={plan.start}
       maxDate={plan.end}
-      label="Tema"
+      label="Adelantar tema"
       onChanged={(p) => {
         onChanged(p);
         bumpPlanVersion();
-        announce?.("Tema extra añadido.");
+        announce?.("Tema adelantado.");
       }}
     />
   );

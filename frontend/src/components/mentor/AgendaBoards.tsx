@@ -13,13 +13,14 @@ import { useId, useMemo, useState } from "react";
 import { BASES_KEY } from "../../lib/planAreaTopics";
 import { dateLabel, type ScheduleDay, type WeekSummary } from "../../lib/planSchedule";
 import { areaRouteTopics, basesRouteTopics, type TopicsByWeekArea, type WeekAreaCell, type WeekAreaTopic, type WeekAreas } from "../../lib/planTopicsByArea";
-import { minutesBetween, minutesText } from "../../lib/timeLog";
+import { minutesBetween } from "../../lib/timeLog";
 import { usePersistedNav } from "../../store/navState";
 import { Chip, GhostButton } from "../common/forms";
 import { cn } from "../ui";
 import { AreaDot, areaColour } from "./AreaViews";
 import { plural, type AgendaModel } from "./agendaKit";
 import { useTimeLog } from "./AreaSession";
+import { LoggedTime } from "./LoggedTime";
 import { dayViewable, topicKindsByFolder, weekCompletion, weekTopicDone, type Fraction, type TopicKind } from "./mentorAreas";
 import { openTopic } from "./openTopic";
 import { hm, ProgressBar } from "./parts";
@@ -69,12 +70,11 @@ export function WeekStats({ m, week, only = null }: { m: AgendaModel; week: numb
 /** «Tiempo registrado: 1 h 20 min»: SOLO el tiempo que se registró con el Pomodoro (o a mano) en esa semana; sin registro no pinta nada. */
 export function RegisteredTime({ planId, from, to, areaKey }: { planId: string; from: string; to: string; areaKey?: string }) {
   const { entries } = useTimeLog(planId);
-  const min = minutesBetween(entries, from, to, areaKey);
-  if (min <= 0) return null;
+  if (minutesBetween(entries, from, to, areaKey) <= 0) return null;
   return (
-    <p className="text-[14px] text-dim" data-testid="week-registered-time">
-      Tiempo registrado: <strong className="font-semibold text-text">{minutesText(min)}</strong>
-    </p>
+    <div data-testid="week-registered-time">
+      <LoggedTime entries={entries} from={from} to={to} {...(areaKey ? { areaKey } : {})} className="text-[14px] text-dim" />
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 // Mentor — Ejecución: la PRÁCTICA EXTRA de un día (la que el estudiante añade a mano a la «Práctica diaria»): su lista con casilla de hecho y quitar,
-// y el botón «Añadir práctica». Va dentro de la tarjeta «Práctica diaria» del área (o suelta, si el área no tiene práctica propia) y en el Hoy general.
+// y el botón «Más práctica». Va dentro de la tarjeta «Práctica diaria» del área (o suelta, si el área no tiene práctica propia) y en el Hoy general.
 
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -87,7 +87,7 @@ export function ExtraPracticeSection({ plan, date, subplanId, all, topics, stand
           {...(topics ? { topics } : {})}
           minDate={plan.start}
           maxDate={plan.end}
-          label="Añadir práctica"
+          label="Más práctica"
           onChanged={(p) => {
             onChanged?.(p);
             bumpPlanVersion();

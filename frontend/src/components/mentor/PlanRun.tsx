@@ -394,8 +394,8 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
               {isToday && !plan.proposed && !plan.archived && (
                 <div className="space-y-2 border-t border-line pt-3" data-testid="run-extras">
                   <div className="flex flex-wrap items-center gap-2">
-                    <AddExtraTopic planId={plan.id} date={date} minDate={plan.start} maxDate={plan.end} label="Añadir tema" onChanged={bumpPlanVersion} />
-                    <span className="text-[13px] text-dim">Los temas extra salen en «Temas de hoy» y en la Agenda de hoy.</span>
+                    <AddExtraTopic planId={plan.id} date={date} minDate={plan.start} maxDate={plan.end} label="Próximos temas" onChanged={bumpPlanVersion} />
+                    <span className="text-[13px] text-dim">Los temas adelantados salen en «Temas de hoy» y en la Agenda de hoy.</span>
                   </div>
                   <ExtraPracticeSection plan={plan} date={date} all topics={topicsToday.map((t) => ({ folder: t.folder, title: t.title }))} />
                 </div>

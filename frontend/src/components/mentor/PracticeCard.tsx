@@ -247,7 +247,7 @@ export function GeneralCards({ track, status, today, only }: { track: PracticeTr
           {track.monthlyProject.blocks.map((b) => (
             <li key={b.fromWeek}>
               <span className="font-medium">Semanas {b.fromWeek}–{b.toWeek}</span>
-              <div className="text-dim">{b.theme ?? "Un proyecto mayor que integra los semanales (por definir)"}</div>
+              <div className="text-dim">{b.theme ?? `Un proyecto mayor que integra los proyectos semanales de las semanas ${b.fromWeek}–${b.toWeek}; se completa solo al terminar sus semanas`}</div>
             </li>
           ))}
         </ul>
@@ -409,7 +409,7 @@ function AreaMonthly({ area }: { area: AreaPracticeView }) {
               <span aria-hidden className="grid h-6 w-6 flex-none place-items-center rounded-md bg-hover text-[13px] font-semibold">{i + 1}</span>
               <span className="min-w-0">
                 <span className="font-medium">Semanas {b.fromWeek}–{b.toWeek}</span>
-                <span className="block break-words text-dim">{b.theme ?? `Integra los proyectos semanales de ${area.label} (por definir)`}</span>
+                <span className="block break-words text-dim">{b.theme ?? `Integra los proyectos semanales de ${area.label} de las semanas ${b.fromWeek}–${b.toWeek}; se completa solo al terminar sus semanas`}</span>
               </span>
             </li>
           ))}

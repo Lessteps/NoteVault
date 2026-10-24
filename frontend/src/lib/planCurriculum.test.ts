@@ -198,7 +198,7 @@ describe("proyectos diario, semanal y mensual conectados a lo estudiado", () => 
     expect(all.filter((d) => d.kind === "monthly_project").every((d) => d.id.startsWith("mp:"))).toBe(true);
   });
 
-  it("los proyectos son entregables y cuentan por día, semana y mes; el estado anotado a mano se conserva y gana lo más avanzado", () => {
+  it("los proyectos son entregables y cuentan por día, semana y mes; un estado anotado a mano NO cuenta: el estado se deriva de lo completado", () => {
     const p = plan();
     const s = buildSchedule(p);
     const all = deliverablesOf(p, null, s);
@@ -210,10 +210,10 @@ describe("proyectos diario, semanal y mensual conectados a lo estudiado", () => 
     expect(countDeliverables(week1).total).toBe(week1.length);
     const month = deliverablesBetween(all, "2026-10-01", "2026-10-31");
     expect(month.some((d) => d.id === "mm:2026-10")).toBe(true);
-    // estado a mano
+    // un estado guardado a mano se ignora (solo se conservan los archivos)
     const done = deliverablesOf({ ...p, deliverables: [{ ...all.find((d) => d.id === `dp:${START}`)!, title: "viejo", status: "hecho" }] }, null, s);
     const dp = done.find((d) => d.id === `dp:${START}`)!;
-    expect(dp.status).toBe("hecho");
+    expect(dp.status).toBe("pendiente");
     expect(dp.title).not.toBe("viejo"); // el título se deriva siempre del reparto actual
   });
 

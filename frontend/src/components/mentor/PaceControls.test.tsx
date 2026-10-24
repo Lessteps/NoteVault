@@ -37,14 +37,6 @@ const byLabel = (label: string): HTMLElement => {
   if (!el) throw new Error(`sin «${label}»`);
   return el as HTMLElement;
 };
-const typeInto = async (el: HTMLElement, value: string): Promise<void> => {
-  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(el, value);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await flush();
-};
 
 const mkTopics = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => ({ folder: `${prefix}/${i + 1}`, title: `${prefix} ${i + 1}`, estMinutes: 40, targetWeek: 1 }));
 function plan(over: Partial<MentorPlan> = {}): MentorPlan {
@@ -166,6 +158,36 @@ describe("AddExtraTopic", () => {
     expect(list).toHaveBeenLastCalledWith({ id: "p", upcoming: true, date: "2026-10-06" });
   });
 
+  it("agrupa por semana y por área en el orden de la ruta, desactiva los que no son los siguientes y no ofrece temas de la vault", async () => {
+    const row = (folder: string, title: string, subplanId: string, area: string, position: number, week: number, over: Record<string, unknown> = {}) => ({ folder, title, inPlan: true, area, subplanId, position, total: 9, estMinutes: 30, addedDates: [], week, state: "pendiente", ...over });
+    vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue({
+      loading: false,
+      ahead: [
+        row("A/4", "A 4", "s-a", "Alfa", 4, 3),
+        row("A/5", "A 5", "s-a", "Alfa", 5, 3, { blockedBy: "A 4" }),
+        row("B/2", "B 2", "s-b", "Beta", 2, 3),
+        row("A/6", "A 6", "s-a", "Alfa", 6, 4, { blockedBy: "A 4" }),
+      ],
+      vault: [],
+      weeks: { "3": { from: "2026-10-26", to: "2026-11-01" }, "4": { from: "2026-11-02", to: "2026-11-08" } },
+      plannedByArea: { "s-a": 2, "s-b": 0 },
+    } as never);
+    await render(<AddExtraTopic planId="p" date="2026-10-26" onChanged={() => {}} />);
+    await click(document.querySelector('[data-testid="add-extra-topic"]'));
+    const weeks = [...document.querySelectorAll('[data-testid="next-topics-week"]')];
+    expect(weeks.map((w) => w.querySelector("h4")!.textContent)).toEqual(["Semana 3 · 26 oct – 1 nov", "Semana 4 · 2 nov – 8 nov"]);
+    expect([...weeks[0]!.querySelectorAll('[data-testid="next-topics-area"]')].map((a) => a.getAttribute("data-area"))).toEqual(["s-a", "s-b"]);
+    expect([...weeks[0]!.querySelectorAll('[data-testid="extra-topic-candidate"]')].map((r) => r.getAttribute("data-folder"))).toEqual(["A/4", "A/5", "B/2"]);
+    expect((byLabel("Adelantar A 4") as HTMLButtonElement).disabled).toBe(false);
+    const blocked = byLabel("Adelantar A 5") as HTMLButtonElement;
+    expect(blocked.disabled).toBe(true);
+    expect(document.querySelector('[data-folder="A/5"]')!.textContent).toContain("Antes: A 4");
+    expect(document.querySelector('[data-testid="next-topics-planned"]')!.textContent).toContain("Alfa 2");
+    const text = document.querySelector('[role="dialog"]')!.textContent!;
+    expect(text).not.toMatch(/vault/i);
+    expect(document.querySelector('input[type="search"]')).toBeNull();
+  });
+
   it("muestra el error si falla el alta", async () => {
     vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue(cands);
     vi.spyOn(api, "mentorPlanExtraTopicAdd").mockRejectedValue(new Error("Ese tema ya está añadido a ese día."));
@@ -196,6 +218,30 @@ describe("AddExtraPractice", () => {
     await click(byLabel("Adelantar Ejercicios de Variables"));
     expect(add).toHaveBeenCalledWith({ id: "p", title: "Ejercicios de Variables", kind: "exercise", date: "2026-10-06", area: "s-a", folder: "A/1", rel: "A/1/ej1.md" });
     expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("lista los katas planeados del área, los adelanta ligados a su fecha y no tiene formulario de texto libre", async () => {
+    vi.spyOn(api, "mentorPlanExerciseCandidates").mockResolvedValue(cands);
+    const kata = { areaId: "backend", subplanId: "s-a", area: "Alfa", day: 8, date: "2026-10-12", title: "Endpoint design - loans", skill: "Endpoints", level: 1, minutes: 25, addedDates: [] };
+    vi.spyOn(api, "mentorAreaKatasAhead").mockResolvedValue({ katas: [kata] });
+    const add = vi.spyOn(api, "mentorPlanExtraPracticeAdd").mockResolvedValue(plan());
+    await render(<AddExtraPractice planId="p" date="2026-10-06" area="s-a" onChanged={() => {}} />);
+    await click(document.querySelector('[data-testid="add-extra-practice"]'));
+    const dlg = document.querySelector('[role="dialog"]')!;
+    expect(dlg.querySelector("textarea")).toBeNull();
+    expect(dlg.querySelector('input[type="text"], input[type="number"], input[type="search"]')).toBeNull();
+    expect(dlg.querySelector('[data-testid="next-practice-katas"]')!.textContent).toContain("Endpoint design - loans");
+    expect(byLabel("Abrir Endpoint design - loans")).toBeTruthy();
+    await click(byLabel("Adelantar Endpoint design - loans"));
+    expect(add).toHaveBeenCalledWith({ id: "p", title: "Endpoint design - loans", kind: "kata", date: "2026-10-06", area: "s-a", kataDate: "2026-10-12", minutes: 25 });
+  });
+
+  it("si no hay más práctica planificada lo dice", async () => {
+    vi.spyOn(api, "mentorPlanExerciseCandidates").mockResolvedValue({ loading: false, exercises: [] });
+    vi.spyOn(api, "mentorAreaKatasAhead").mockResolvedValue({ katas: [] });
+    await render(<AddExtraPractice planId="p" date="2026-10-06" onChanged={() => {}} />);
+    await click(document.querySelector('[data-testid="add-extra-practice"]'));
+    expect(document.querySelector('[data-testid="next-practice-empty"]')!.textContent).toMatch(/No hay más práctica planificada/);
   });
 
   it("muestra el error si falla el alta", async () => {

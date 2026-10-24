@@ -161,14 +161,14 @@ describe("Agenda: áreas juntas, lenguaje diario, proyecto del tema y entregable
     expect(byTest("agenda-project-topic").textContent).toContain("Calculadora de");
   });
 
-  it("la pestaña Entregables resume por área (Backend · Frontend · Databases · Integradores) y filtra por área", async () => {
+  it("la pestaña Entregables resume por área (Backend · Frontend · Databases · Integradores) y enseña un entregable por mes", async () => {
     await openAgenda(togetherPlan());
     await click(tab("entregables"));
     const sum = byTest("area-counts-plan").textContent!;
     expect(sum).toMatch(/Backend \d+/);
     expect(sum).toMatch(/Frontend \d+/);
     expect(sum).toMatch(/Integradores \d+/);
-    expect(byTest("deliverable-filters").textContent).toContain("Integradores (varias áreas)");
+    expect(byTest("monthly-deliverables").textContent).toContain("Mes 1");
   });
 
   it("Mi plan: la tabla mes a mes dice que las áreas van juntas y marca los meses con varias a la vez", async () => {

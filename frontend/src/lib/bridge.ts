@@ -426,6 +426,7 @@ export const api = {
   /** Crea la nota de refuerzo o la nota puente de una propuesta (nunca sobrescribe); con `preview` solo dice qué crearía. */
   mentorProposalApply: (id: string, proposalId: string, preview = false) => call<{ rel: string; created: boolean; source: "ai" | "rules"; aiCalls?: number }>("mentor_proposal_apply", { id, proposalId, ...(preview ? { preview: true } : {}) }),
   /** Lo que hay en disco bajo la carpeta de la ruta: áreas → tipos → proyectos con su avance. */
+  mentorDeliverablesProgress: (id: string) => call<{ dailyProjectDone: Record<string, string[]> }>("mentor_deliverables_progress", { id }),
   mentorProjectsList: (id: string) => call<import("./projectTemplates").ProjectsListing>("mentor_projects_list", { id }),
   /** Crea la estructura de carpetas de proyectos de la ruta y, si se pasa un proyecto, su carpeta con la plantilla de archivos (nunca sobrescribe). */
   mentorProjectsScaffold: (opts: { id: string; areaKeys?: string[]; project?: Record<string, unknown> }) =>
@@ -435,6 +436,7 @@ export const api = {
   mentorAreaPractice: (id: string) => call<import("./types").MentorAreaPractice>("mentor_area_practice", { id }),
   mentorAreaPracticeOn: (id: string, date: string) => call<{ items: Array<{ areaId: string; label: string; day: number; rel: string; title: string; skill: string; level: number; minutes: number }> }>("mentor_area_practice_on", { id, date }),
   /** Acceso directo al kata de un área: lo crea si falta (nunca sobrescribe) y devuelve su ruta en la vault. */
+  mentorAreaKatasAhead: (id: string, area?: string) => call<{ katas: import("./types").MentorKataAhead[] }>("mentor_area_katas_ahead", { id, ...(area ? { area } : {}) }),
   mentorAreaKataOpen: (id: string, areaId: string, date?: string) => call<{ rel: string; created: boolean; date: string }>("mentor_area_kata_open", { id, areaId, ...(date ? { date } : {}) }),
   /** Deja la carpeta de cada área del plan en programming_practice (README, .practica.md, habilidades…). Nunca sobrescribe. */
   mentorAreaPracticeSetup: (id: string) => call<{ created: string[]; folders: string[]; view: import("./types").MentorAreaPractice }>("mentor_area_practice_setup", { id }),
@@ -477,7 +479,7 @@ export const api = {
   /** Mismo efecto que `mentorPlanDraftDiscard` (nombre corto del contrato). */
   mentorPlanDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_plan_discard", turnId),
   /** Cambia el estado de un entregable: el de un área (`subplanId`) o uno de la agenda (`deliverableId`: kata:<fecha>, wp:<semana>, mp:<semana>, area:<subplan>, x:<n>), con archivos opcionales. */
-  mentorPlanUpdateDeliverable: (opts: { id: string; subplanId?: string; deliverableId?: string; status: import("./types").MentorDeliverableStatus | import("./planAreas").PlanDeliverableStatus; projectId?: string | null; files?: Array<{ path?: string; note: string }> }) =>
+  mentorPlanUpdateDeliverable: (opts: { id: string; subplanId?: string; deliverableId?: string; status?: import("./types").MentorDeliverableStatus | import("./planAreas").PlanDeliverableStatus; projectId?: string | null; files?: Array<{ path?: string; note: string }> }) =>
     call<import("./types").MentorPlan>("mentor_plan_update_deliverable", opts),
   mentorChatsList: () => call<import("./types").MentorChatMeta[]>("mentor_chats_list"),
   mentorChatNew: () => call<import("./types").MentorChatState>("mentor_chat_new"),

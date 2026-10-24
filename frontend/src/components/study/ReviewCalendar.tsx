@@ -8,6 +8,7 @@ import { Bell, CalendarClock, ChevronLeft, ChevronRight, Play } from "lucide-rea
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
 import { api } from "../../lib/bridge";
+import { viewWithConsent } from "./ensureView";
 import type { ReviewItem } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { Modal } from "../common/forms";
@@ -156,8 +157,8 @@ export function ReviewCalendar() {
       return;
     }
     try {
-      const view = await api.studyViewEnsure(item.topicPath);
-      if (view.ok && view.path) {
+      const view = await viewWithConsent(item.topicPath);
+      if (view?.ok && view.path) {
         close(false);
         await openNote(view.path);
         useApp.getState().setMode("read");

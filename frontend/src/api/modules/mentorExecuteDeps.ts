@@ -27,11 +27,10 @@ import type { AppState } from "../appState.js";
 import { clearStudySnapshotCache, reevaluateTopic, studyApi } from "./study.js";
 import { studySpaceApi } from "./studySpace.js";
 import { ppApi } from "./pp.js";
+import { withGenerationLock } from "./generationLock.js";
 
 type SendFn = (cfg: AIConfig, messages: ChatMessage[], opts?: { signal?: AbortSignal; timeoutMs?: number }) => Promise<string>;
 
-/** Una generación de tema a la vez (por vault). */
-let generationLock: Promise<void> = Promise.resolve();
 const MAX_SNAPSHOT_FILES = 3000;
 const MAX_SNAPSHOT_BYTES = 8 * 1024 * 1024;
 const sleep = (ms: number): Promise<void> => new Promise((ok) => setTimeout(ok, ms));
@@ -107,16 +106,8 @@ export function makeExecDeps(app: AppState, planId: string, o: ExecDepsOptions =
 
   /** Genera un tema con `study_topic_generate` (teoría, mapa y, si se pide, matriz) y espera a que termine el trabajo. */
   async function generate(folder: string, steps: { theory: boolean; map: boolean; practice: boolean }, ctx: { signal: AbortSignal; say: (l: string) => void }): Promise<void> {
-    // de una en una: la generación de un tema crea también las vistas que faltan de los temas hermanos, y así cada tarea sabe exactamente qué creó
-    const turn = generationLock.then(() => undefined);
-    let release!: () => void;
-    generationLock = new Promise<void>((ok) => (release = ok));
-    await turn;
-    try {
-      await generateLocked(folder, steps, ctx);
-    } finally {
-      release();
-    }
+    // de una en una (el turno se comparte con «Regenerar»), y así cada tarea sabe exactamente qué creó
+    await withGenerationLock(() => generateLocked(folder, steps, ctx));
   }
 
   async function generateLocked(folder: string, steps: { theory: boolean; map: boolean; practice: boolean }, ctx: { signal: AbortSignal; say: (l: string) => void }): Promise<void> {
@@ -155,16 +146,14 @@ export function makeExecDeps(app: AppState, planId: string, o: ExecDepsOptions =
       fs.mkdirSync(targetAbs, { recursive: true });
     }
     const beforeTopic = snapshot(targetAbs);
-    const beforeArea = snapshot(path.dirname(targetAbs));
     const hadTheory = [...beforeTopic.keys()].some((f) => !f.includes("/") && /\.md$/i.test(f) && !/\.(practica|resumen)\.md$/i.test(f) && !f.startsWith("_"));
     if (task.kind === "theory" && hadTheory) return { created: [], skippedFiles: [target], note: "El tema ya tiene nota de teoría: no se reescribe." };
     ctx.say(`Generando «${path.basename(targetAbs)}»…`);
     await withAiSignal(ctx.signal, () => generate(target, { theory: true, map: true, practice: task.kind === "topic_new" }, ctx));
     caches();
     const { restored, created: own } = restoreAndDiff(targetAbs, beforeTopic);
-    // la generación también crea las vistas que faltan de los temas hermanos (nunca las que existen): se registran, pero no los ejercicios que otra tarea esté creando a la vez
-    const siblings = restoreAndDiff(path.dirname(targetAbs), beforeArea).created.filter((r) => /^[^/]+\/[^/]+\.(practica|resumen)\.md$/i.test(r));
-    const rels = new Set([...own.map((r) => posix(path.relative(app.root, path.join(targetAbs, r)))), ...siblings.map((r) => posix(path.relative(app.root, path.join(path.dirname(targetAbs), r))))]);
+    // la generación de UN tema solo escribe en la carpeta de ese tema (ya no crea vistas de los hermanos), así que solo se registra lo suyo
+    const rels = new Set(own.map((r) => posix(path.relative(app.root, path.join(targetAbs, r)))));
     return {
       created: [...rels],
       warnings: restored.map((r) => `Se restauró «${r}»: la generación intentó modificar un archivo que ya existía.`),
@@ -195,7 +184,7 @@ export function makeExecDeps(app: AppState, planId: string, o: ExecDepsOptions =
     ensureTopicViewFiles(app.root, abs);
     caches();
     ctx.say(`Eligiendo las skills de «${name}»…`);
-    await withAiSignal(ctx.signal, () => reevaluateTopic(app, task.folder!));
+    await withAiSignal(ctx.signal, () => reevaluateTopic(app, task.folder!, { createView: true }));
     caches();
     const { created, restored } = restoreAndDiff(abs, before);
     return { created: created.map((r) => `${task.folder}/${r}`), warnings: restored.map((r) => `Se restauró «${r}».`) };

@@ -21,7 +21,7 @@ mastery:
 
 const posix = (p: string) => p.split(path.sep).join("/");
 
-describe("study_view_ensure", () => {
+describe("study_view_ensure (create = true writes; the default only reads)", () => {
   let tmp: string;
   let app: AppState;
   let api: ReturnType<typeof studyApi>;
@@ -39,8 +39,27 @@ describe("study_view_ensure", () => {
     api = studyApi(app);
   });
 
+  it("opening a topic folder is read-only: it writes no practica, no teorica stub and tags no note", () => {
+    const topic = "Matemáticas/1 Aritmética/1.1 X";
+    const before = fs.readdirSync(path.join(tmp, topic)).sort();
+    const res = api.study_view_ensure(topic);
+    expect(res).toMatchObject({ ok: false, missing: true, kind: "practica", created: [] });
+    expect(posix(res.path)).toBe(`${topic}/1.1 X.practica.md`);
+    expect(fs.readdirSync(path.join(tmp, topic)).sort()).toEqual(before);
+    expect(fs.readFileSync(path.join(tmp, topic, "1.1 X.md"), "utf-8")).not.toContain("type: teorica");
+  });
+
+  it("never writes a placeholder .teorica.md, even when creating the view of a topic with no theory note", () => {
+    const topic = path.join(tmp, "Matemáticas", "1 Aritmética", "1.1 X");
+    fs.rmSync(path.join(topic, "1.1 X.md"));
+    const res = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X", true);
+    expect(res.ok).toBe(true);
+    expect(fs.existsSync(path.join(topic, "1.1 X.teorica.md"))).toBe(false);
+    expect(res.created.map(posix)).toEqual(["Matemáticas/1 Aritmética/1.1 X/1.1 X.practica.md"]);
+  });
+
   it("creates and returns the practice view of a topic folder", () => {
-    const res = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X");
+    const res = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X", true);
     expect(res.kind).toBe("practica");
     expect(res.ok).toBe(true);
     expect(posix(res.path)).toBe("Matemáticas/1 Aritmética/1.1 X/1.1 X.practica.md");
@@ -51,7 +70,7 @@ describe("study_view_ensure", () => {
     expect(fs.existsSync(path.join(tmp, res.path))).toBe(true);
 
     // Idempotent: the second call finds them.
-    const again = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X");
+    const again = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X", true);
     expect((res.tagged ?? []).map(posix)).toEqual(["Matemáticas/1 Aritmética/1.1 X/1.1 X.md"]);
     expect(fs.readFileSync(path.join(tmp, "Matemáticas/1 Aritmética/1.1 X/1.1 X.md"), "utf-8")).toContain("type: teorica");
     expect(again.created).toEqual([]);
@@ -60,7 +79,7 @@ describe("study_view_ensure", () => {
   });
 
   it("gives the subject root only an overview, never practice or theory views", () => {
-    const res = api.study_view_ensure("Matemáticas");
+    const res = api.study_view_ensure("Matemáticas", true);
 
     expect(res.kind).toBe("resumen");
     expect(posix(res.path)).toBe("Matemáticas/Matemáticas.resumen.md");
@@ -69,7 +88,7 @@ describe("study_view_ensure", () => {
   });
 
   it("creates the overview of a grouping folder", () => {
-    const res = api.study_view_ensure("Matemáticas/1 Aritmética");
+    const res = api.study_view_ensure("Matemáticas/1 Aritmética", true);
     expect(res.kind).toBe("resumen");
     expect(res.ok).toBe(true);
     expect(posix(res.path)).toBe("Matemáticas/1 Aritmética/1 Aritmética.resumen.md");
@@ -77,7 +96,7 @@ describe("study_view_ensure", () => {
   });
 
   it("creates the overview of the subject root", () => {
-    const res = api.study_view_ensure("Matemáticas");
+    const res = api.study_view_ensure("Matemáticas", true);
     expect(res.kind).toBe("resumen");
     expect(posix(res.path)).toBe("Matemáticas/Matemáticas.resumen.md");
   });
@@ -89,7 +108,7 @@ describe("study_view_ensure", () => {
   });
 
   it("accepts a file path and uses its folder", () => {
-    const res = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X/1.1 X.md");
+    const res = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X/1.1 X.md", true);
     expect(res.kind).toBe("practica");
     expect(posix(res.path)).toContain("1.1 X.practica.md");
   });
@@ -97,11 +116,11 @@ describe("study_view_ensure", () => {
     const dir = path.join(tmp, "Matemáticas", "1 Aritmética", "1.1 X", "Ejercicios", "solve");
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, "ej1.md"), "---\ntype: exercise\n---\n# uno\n", "utf-8");
-    const res = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X/Ejercicios/solve");
+    const res = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X/Ejercicios/solve", true);
     expect(res.kind).toBe("ejercicios");
     expect(posix(res.path)).toBe("Matemáticas/1 Aritmética/1.1 X/Ejercicios/solve/solve.ejercicios.md");
     expect(fs.readFileSync(path.join(dir, "solve.ejercicios.md"), "utf-8")).toContain("type: ejercicios");
     // A second click reuses the file.
-    expect(api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X/Ejercicios/solve").created).toEqual([]);
+    expect(api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X/Ejercicios/solve", true).created).toEqual([]);
   });
 });

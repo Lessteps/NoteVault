@@ -103,19 +103,33 @@ describe("estado derivado por área", () => {
     expect(b!.kata).toMatchObject({ plannedDays: 4, doneDays: 3, todayPlanned: true, todayDone: true, todayIndex: 4 });
     expect(b!.kata.streak).toBe(1); // hoy (08) está hecho y el 07 no: la racha es solo hoy
     expect(f!.kata).toMatchObject({ doneDays: 1, todayDone: false });
-    // las dos primeras habilidades tienen su kata hecho; la 3.ª (miércoles 7) no
-    expect(b!.skills.slice(0, 4).map((s) => `${s.done}/${s.planned}`)).toEqual(["1/1", "1/1", "0/1", "1/1"]);
+    // se hicieron 3 katas (en las fechas que sean): cuentan los tres primeros, el 4.º (hoy) sigue pendiente
+    expect(b!.skills.slice(0, 4).map((s) => `${s.done}/${s.planned}`)).toEqual(["1/1", "1/1", "1/1", "0/1"]);
     expect(b!.skills[0]!.pct).toBe(100);
-    expect(b!.kata.week.map((d) => d.state)).toEqual(["done", "done", "pending", "done", "pending", "none", "none"]);
+    expect(b!.kata.week.map((d) => d.state)).toEqual(["done", "done", "done", "pending", "pending", "none", "none"]);
     expect(b!.kata.week.find((d) => d.today)!.date).toBe("2026-10-08");
     expect(b!.folderReady).toBe(true);
     expect(f!.folderReady).toBe(false);
     expect(b!.level).toBe(1);
-    // el kata siguiente es el de hoy, con su ruta y su resumen
+    // el kata siguiente es el 4.º (el primero sin hacer), con su ruta y su resumen
     expect(b!.kata.next!.kata.id).toBe("backend-004");
     expect(b!.kata.next!.rel).toBe(`backend/katas/${b!.kata.next!.kata.file}`);
     expect(b!.kata.next!.summary.length).toBeGreaterThan(20);
     expect(b!.kata.next!.fileReady).toBe(false);
+  });
+
+  it("el kata no avanza con el calendario: pasan los días y sigue siendo el primero sin hacer", () => {
+    const none = { ...base, attempts: {} };
+    const day1 = deriveAreaPractice({ ...none, today: "2026-10-05" })[0]!;
+    const week3 = deriveAreaPractice({ ...none, today: "2026-10-23" })[0]!;
+    expect(day1.kata.next!.kata.id).toBe("backend-001");
+    expect(week3.kata.next!.kata.id).toBe("backend-001");
+    expect(week3.kata.doneDays).toBe(0);
+    expect(week3.kata.due.map((k) => k.day)).toEqual([1]);
+    expect(week3.level).toBe(1);
+    // hacer uno (aunque sea fuera de su fecha) lo avanza al siguiente
+    const one = deriveAreaPractice({ ...none, attempts: { b: att("backend", "2026-10-23") }, today: "2026-10-23" })[0]!;
+    expect(one.kata.next!.kata.id).toBe("backend-002");
   });
 
   it("las marcas manuales cuentan, se pueden quitar y se guardan solo en los datos de la app", () => {

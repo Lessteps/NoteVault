@@ -1765,3 +1765,21 @@ export type MentorDayView =
 // ── Alimentación / Nutrición ──────────────────────────────────────────────
 export * from "./nutritionTypes";
 
+
+/** Estado de un trabajo de `study_topic_regenerate` (teoría, práctica o ejercicios de un tema). */
+export interface TopicRegenerateJob {
+  id: string;
+  folder: string;
+  what: "theory" | "practice" | "exercises";
+  log: string[];
+  done: boolean;
+  error: string;
+  finished: number;
+  total: number;
+  /** carpeta de la copia de seguridad (relativa a la vault) */
+  backup: string;
+  /** falló y se devolvió lo anterior */
+  restored: boolean;
+  created: string[];
+  archived: string[];
+}

@@ -443,3 +443,31 @@ describe("English concept notes (programming)", () => {
     expect(JSON.stringify(doc)).not.toMatch(/Requiere|Explicación|se aplica en/);
   });
 });
+
+describe("step-by-step Case (programming)", () => {
+  it("keeps numbered steps and commented code on their own lines", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "nv_kbsteps_"));
+    tmpRoots.push(root);
+    fs.mkdirSync(path.join(root, ".notevault"), { recursive: true });
+    const folder = path.join(root, "Programación", "1 Fundamentals", "1.19 While loops");
+    fs.mkdirSync(folder, { recursive: true });
+    const note = [
+      "# 1.19 While loops", "", "## Requires", "*No prerequisites.*", "",
+      "## Explanation", "", "### What it is", "A loop repeats.", "", "### Mental model", "A tape.", "",
+      "## Examples", "", "### Example 1 — countdown",
+      "- **Context:** A retry counter.",
+      "- **Case:** Steps:",
+      "1. Start with n = 3.",
+      "2. Subtract one each turn.",
+      "```python",
+      "n = 3  # start with three tries",
+      "```",
+      "- **Expected result:** `n` is 0.",
+      "- **Why it works:** the condition is re-checked.", "",
+    ].join("\n");
+    fs.writeFileSync(path.join(folder, "1.19 While loops.md"), note, "utf-8");
+    const text = readConcept(folder, root).examples[0]!.fields.find((f) => f.label === "Case")!.text;
+    expect(text).toContain("Steps:\n1. Start with n = 3.\n2. Subtract one each turn.");
+    expect(text).toContain("# start with three tries");
+  });
+});

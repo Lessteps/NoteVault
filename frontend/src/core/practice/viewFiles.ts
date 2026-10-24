@@ -334,7 +334,7 @@ function writeIfMissing(fileAbs: string, text: string, out: CreateResult, dryRun
   out.created.push(fileAbs);
 }
 
-/** Creates `practica` + `teorica` for a topic folder; never overwrites. */
+/** Creates the `practica` view of a topic folder and tags its existing theory note; never overwrites, never writes a theory stub. */
 export function ensureTopicViewFiles(rootAbs: string, folderAbs: string, dryRun = false): CreateResult {
   const out: CreateResult = { created: [], skipped: [], tagged: [], errors: [] };
   if (isSubjectRoot(rootAbs, folderAbs)) {
@@ -352,21 +352,11 @@ export function ensureTopicViewFiles(rootAbs: string, folderAbs: string, dryRun 
 
   // The theory note the vault already has — the one the maps link by path — *is*
   // the topic's theory view: it gets `type: teorica` in place, and is never
-  // renamed nor duplicated. Only a folder with no theory note at all gets a new
-  // `<name>.teorica.md`, so the topic still has a visible door to its theory.
+  // renamed nor duplicated. A folder with NO theory note gets nothing: no
+  // placeholder `<name>.teorica.md` is written (theory is only created by the
+  // explicit "Regenerar / Generar teoría" actions, never as a side effect of opening).
   const theory = theoryNoteOf(folderAbs);
-  if (theory) {
-    if (markTheoryNote(theory, out, dryRun)) out.tagged.push(theory);
-  } else {
-    const map = mapNoteOf(folderAbs);
-    const mapRel = map ? path.relative(rootAbs, map).split(path.sep).join("/") : null;
-    writeIfMissing(
-      path.join(folderAbs, viewFileName(folderName, "teorica")),
-      theoryFileText(manifest.title, manifest.subject, null, mapRel),
-      out,
-      dryRun,
-    );
-  }
+  if (theory && markTheoryNote(theory, out, dryRun)) out.tagged.push(theory);
   return out;
 }
 

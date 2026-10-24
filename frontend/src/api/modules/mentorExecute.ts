@@ -44,7 +44,11 @@ import { makeExecDeps, type ExecDepsOptions } from "./mentorExecuteDeps.js";
 import { studyIndexCold } from "./study.js";
 
 export interface MentorExecuteHooks extends ExecDepsOptions {
-  /** reanudar sola, al abrir la app, la ejecución que quedó «en curso» en disco (por defecto sí; las pruebas lo apagan) */
+  /**
+   * reanudar sola, al abrir la app, la ejecución que quedó «en curso» en disco. POR DEFECTO NO: generar notas sin que la persona lo pida
+   * escribiría en su vault sin permiso. Una ejecución a medias se enseña como «en pausa» (banner «¿reanudar?» en la Ejecución) y solo se
+   * reanuda con el botón. Solo existe para pruebas / uso explícito.
+   */
   autoResume?: boolean;
   autoResumeDelayMs?: number;
   /** reemplaza las dependencias reales (tests con IA simulada) */
@@ -121,9 +125,9 @@ export function mentorExecuteApi(app: AppState, hooks: MentorExecuteHooks = {}) 
   }
 
   /**
-   * Una ejecución que en disco figura «en curso» quedó a medias porque la app se cerró (o el PC se apagó) con la cola trabajando: se REANUDA sola un
-   * momento después de abrir la app, sin que haya que acordarse de pulsar «Reanudar». Una que la persona pausó, o que se paró sola por un límite de
-   * uso, figura «en pausa» y NO se toca.
+   * Una ejecución que en disco figura «en curso» quedó a medias porque la app se cerró (o el PC se apagó) con la cola trabajando. Con `autoResume`
+   * (apagado por defecto) se reanudaría sola; sin él, `current()` la devuelve «en pausa» y la persona decide (Reanudar / Descartar).
+   * Una que la persona pausó, o que se paró sola por un límite de uso, figura «en pausa» y NO se toca.
    */
   function scheduleAutoResume(): void {
     if (AUTO_RESUMED.has(app)) return;
@@ -147,7 +151,7 @@ export function mentorExecuteApi(app: AppState, hooks: MentorExecuteHooks = {}) 
     }, hooks.autoResumeDelayMs ?? 4000);
     (timer as { unref?: () => void }).unref?.();
   }
-  if (hooks.autoResume ?? !process.env.VITEST) scheduleAutoResume();
+  if (hooks.autoResume === true) scheduleAutoResume();
 
   const view = (s: ExecutionState | null) => (s ? { state: s, progress: progressOf(s) } : null);
 

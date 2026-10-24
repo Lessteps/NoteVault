@@ -2,11 +2,14 @@
 // otra sub-barra con sus grupos (Bases, Lenguaje, Conocimientos…) y la tabla de sus temas en el orden de la ruta, con lo que existe de cada uno
 // y el botón «Generar todo». Sustituye a las tarjetas: la información es la misma que la del catálogo, pero ordenada por área.
 //
+// Cada tema se despliega (chevron) en un panel con «Regenerar teoría / práctica / ejercicios» (`TopicRegenerate`): reemplaza lo que existe, con copia
+// de seguridad y confirmación.
+//
 // Los datos salen del plan (áreas, grupos, semanas) y de `mentor_plan_topic_catalog` (lo que existe en la vault); la lógica está en
 // `lib/planAreaTopics.ts`. Solo lectura salvo «Generar», que pasa siempre por el diálogo de confirmación de «Ejecutar plan».
 
-import { Check, X } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { Check, ChevronDown, ChevronRight, X } from "lucide-react";
+import { Fragment, useEffect, useId, useMemo, useState } from "react";
 import { areaTabsOf, areaTopicRows, basesTopicRows, BASES_KEY, groupTabsOf, pendingGenerate, rowsOfGroup, type AreaTab, type GroupTab } from "../../lib/planAreaTopics";
 import { ROUTE_LABEL } from "../../lib/planRoute";
 import { buildSchedule, progressPlan, type PlanSchedule } from "../../lib/planSchedule";
@@ -20,6 +23,7 @@ import { LoadState, ProgressBar } from "./parts";
 import { SectionHeading } from "./planKit";
 import { usePlanTopicCatalog } from "./PlanTopicCatalog";
 import { areaScope, GenerateButton, GenerateTopicButton } from "./TopicGenerate";
+import { RegeneratePanel } from "./TopicRegenerate";
 
 /** Una sub-barra de pestañas (botones con `aria-pressed`) que se desplaza en horizontal en anchos estrechos. */
 function TabBar<T extends { key: string; label: string; hint?: string; hintLabel?: string }>({ label, tabs, active, onSelect, level, testid }: { label: string; tabs: ReadonlyArray<T>; active: string; onSelect: (key: string) => void; level: 1 | 2; testid: string }) {
@@ -93,6 +97,9 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
   const { rows: catalog, error, warming, reload } = usePlanTopicCatalog(plan.id);
   const [areaKey, setAreaKey] = useState("");
   const [groupId, setGroupId] = useState("");
+  // temas desplegados (su panel de «Regenerar»); se recuerdan al cambiar de área
+  const [openRows, setOpenRows] = useState<ReadonlySet<string>>(new Set());
+  const toggleRow = (folder: string): void => setOpenRows((s) => { const n = new Set(s); if (!n.delete(folder)) n.add(folder); return n; });
 
   const cat = catalog ?? [];
   const baseTabs = useMemo(() => areaTabsOf(plan, cat), [plan, cat]);
@@ -155,6 +162,19 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
 
           {groups.length > 1 && <TabBar label={`Grupos de ${active.area}`} tabs={groupTabsView(groups)} active={group.id} onSelect={setGroupId} level={2} testid="group-tabs" />}
 
+          {shown.length > 0 && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-[13px] text-dim hover:bg-hover hover:text-text"
+                data-testid="expand-all"
+                onClick={() => setOpenRows(shown.every((r) => openRows.has(r.folder)) ? new Set() : new Set(shown.map((r) => r.folder)))}
+              >
+                {shown.every((r) => openRows.has(r.folder)) ? "Contraer todo" : "Expandir todo"}
+              </button>
+            </div>
+          )}
+
           {shown.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-empty">Esta sección no tiene temas.</p>
           ) : (
@@ -170,11 +190,26 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
                 </thead>
                 <tbody>
                   {shown.map((r) => (
-                    <tr key={r.folder} className={cn("border-t border-line align-top", r.route === "skipped" && "opacity-60")} data-testid="area-row" data-folder={r.folder}>
+                    <Fragment key={r.folder}>
+                    <tr className={cn("border-t border-line align-top", r.route === "skipped" && "opacity-60")} data-testid="area-row" data-folder={r.folder}>
                       <td className="px-3 py-2 tabular-nums text-dim">{r.week}</td>
                       <th scope="row" className="min-w-0 max-w-[24rem] px-3 py-2 font-normal">
+                        <span className="flex min-w-0 items-start gap-1">
+                        <button
+                          type="button"
+                          className="mt-0.5 inline-grid h-6 w-6 flex-none place-items-center rounded-md text-dim hover:bg-hover hover:text-text"
+                          aria-expanded={openRows.has(r.folder)}
+                          aria-label={`${openRows.has(r.folder) ? "Contraer" : "Desplegar"} las acciones de ${r.title}`}
+                          onClick={() => toggleRow(r.folder)}
+                          data-testid="row-expand"
+                        >
+                          {openRows.has(r.folder) ? <ChevronDown size={15} aria-hidden /> : <ChevronRight size={15} aria-hidden />}
+                        </button>
+                        <span className="min-w-0 flex-1">
                         <TopicMenu folder={r.folder} title={r.title} trigger={<span className="block truncate" title={r.folder} data-testid="area-open">{r.title}</span>} className="font-semibold text-accent-text underline-offset-2 hover:underline" />
                         {!r.exists && <span className="block text-[12.5px] text-faint">Aún no existe en la vault</span>}
+                        </span>
+                        </span>
                       </th>
                       <td className="px-3 py-2"><Ring pct={progress?.get(r.folder) ?? 0} done={r.completed} /></td>
                       <td className="px-3 py-2">{(() => { const t = timeTagOf(times.get(r.folder), r.completed, day, begun); return t && t.status !== "done" ? <TimeChip time={t} /> : <span className="text-dim">—</span>; })()}</td>
@@ -201,6 +236,12 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
                         <GenerateTopicButton planId={plan.id} proposed={!!plan.proposed} folder={r.folder} title={r.title} inPlan={r.route !== "skipped"} incomplete={pendingGenerate({ ...r, completed: false })} />
                       </td>
                     </tr>
+                    {openRows.has(r.folder) && (
+                      <tr className="border-t border-line bg-surface/40" data-testid="area-row-expanded" data-folder={r.folder}>
+                        <td colSpan={10}><RegeneratePanel row={r} /></td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

@@ -33,6 +33,7 @@ import { projectsApi } from "./modules/projects.js";
 import { projectFoldersApi } from "./modules/projectFolders.js";
 import { studyApi, setWarmApp, warmStudyIndex } from "./modules/study.js";
 import { studySpaceApi } from "./modules/studySpace.js";
+import { topicRegenerateApi } from "./modules/topicRegenerate.js";
 import { tasksApi } from "./modules/tasks.js";
 import { vaultsApi } from "./modules/vaults.js";
 import { webApi } from "./modules/web.js";
@@ -69,6 +70,7 @@ export function buildRegistry(app: AppState): Registry {
     ...calendarApi(app),
     ...studyApi(app),
     ...studySpaceApi(app),
+    ...topicRegenerateApi(app),
     ...practiceApi(app),
     ...ladderApi(app),
     ...canvasApi(app),

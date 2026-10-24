@@ -9,6 +9,7 @@
 import { AlertTriangle, ChevronDown, ChevronRight, Play, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
+import { viewWithConsent } from "./ensureView";
 import {
   aggregateArea,
   folderInScope,
@@ -97,11 +98,11 @@ export function ResumenView({ note }: { note: OpenNote }) {
   const title = String(note.frontmatter?.title ?? note.title ?? "");
   const atSubjectRoot = groups.length > 0 && groups.some((g) => !g.isTopic);
 
-  /** A topic's own view file holds its practice; open it (creating it if needed). */
+  /** A topic's own view file holds its practice; open it (si falta, se pide permiso para crearla). */
   const openTopicView = async (item: TopicDashboardItem) => {
     try {
-      const view = await api.studyViewEnsure(item.folder);
-      if (view.ok && view.path) {
+      const view = await viewWithConsent(item.folder);
+      if (view?.ok && view.path) {
         await openNote(view.path);
         return;
       }

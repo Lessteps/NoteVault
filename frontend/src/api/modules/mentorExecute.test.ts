@@ -381,13 +381,26 @@ describe("reanudar sola al abrir la app", () => {
     void app2;
   };
 
-  it("una ejecución que quedó «en curso» en disco (la app se cerró a medias) se reanuda sola y termina", async () => {
+  it("una ejecución que quedó «en curso» en disco NO se reanuda sola al abrir la app: figura en pausa y espera a la persona", async () => {
     savedRunning("running");
     const app2 = new AppState(dir); // la app se vuelve a abrir: no hay ningún runner en memoria
+    const api2 = mentorExecuteApi(app2, { autoResumeDelayMs: 5, retryDelayMs: 1 }); // sin `autoResume`: el valor por defecto
+    await new Promise((ok) => setTimeout(ok, 200));
+    expect(hoisted.chat).not.toHaveBeenCalled();
+    const status = api2.mentor_execution_status({ id }) as { execution: { state: { status: string } } };
+    expect(status.execution.state.status).toBe("paused"); // el banner «¿reanudar?» la ofrece
+    // y solo con la acción explícita de la persona sigue
+    api2.mentor_execution_resume({ id });
+    const done = await untilDone(app2);
+    expect(done.status).toBe("done");
+  }, 40_000);
+
+  it("con `autoResume: true` explícito (ya no es el valor por defecto) sí se reanuda sola", async () => {
+    savedRunning("running");
+    const app2 = new AppState(dir);
     mentorExecuteApi(app2, { autoResume: true, autoResumeDelayMs: 5, retryDelayMs: 1 });
     const done = await untilDone(app2);
     expect(done.status).toBe("done");
-    expect(done.tasks.some((t) => t.status === "done")).toBe(true);
   }, 40_000);
 
   it("una pausada por la persona (o por un límite de uso) NO se toca", async () => {

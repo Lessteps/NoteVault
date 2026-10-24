@@ -116,8 +116,9 @@ describe("mentor_area_kata_mark", () => {
     // 7 de los 10 katas hechos y verificados: ya se puede saltar uno
     for (let i = 0; i < 7; i++) attempt("backend", addDays(START, i + 1));
     expect(view().skip).toMatchObject({ allowed: true, pct: 70 });
-    const r: any = api().mentor_area_kata_mark({ id, areaId: "backend", date: START, status: "skipped" });
-    expect(r.areas.find((a: any) => a.areaId === "backend").kata.due.find((d: any) => d.date === START)).toMatchObject({ state: "skipped" });
+    const r: any = api().mentor_area_kata_mark({ id, areaId: "backend", date: TODAY, status: "skipped" });
+    // saltar no avanza: sigue siendo el siguiente kata sin hacer (el 8.º), solo cambia su estado
+    expect(r.areas.find((a: any) => a.areaId === "backend").kata.due[0]).toMatchObject({ day: 8, date: TODAY, state: "skipped" });
   });
 
   it("marca hecho / saltado, se refleja en el estado y se quita; solo escribe datos de la app", () => {
@@ -171,30 +172,28 @@ describe("mentor_area_kata_open: el acceso directo al kata siempre existe", () =
 });
 
 describe("katas atrasados y carpetas por área", () => {
-  it("lista TODOS los katas que tocaban hasta hoy (hoy primero, luego los atrasados) y un kata hecho sale de la lista", () => {
+  it("solo lista el siguiente kata sin hacer (los días que pasan no apilan atrasados) y hacerlo pasa al siguiente", () => {
     const r: any = api().mentor_area_practice({ id });
     const b = r.areas[0];
     expect(b.kata.plannedDays).toBe(10);
-    expect(b.kata.due).toHaveLength(10);
-    expect(b.kata.due[0]).toMatchObject({ date: TODAY, today: true, state: "pending" });
-    expect(b.kata.due.slice(1).map((d: any) => d.date)).toEqual([...b.kata.due.slice(1)].map((d: any) => d.date).sort());
-    expect(b.kata.due[1].date).toBe(START);
-    expect(b.kata.due[1].title).toBeTruthy();
-    // un día atrasado con un intento verificado sale de la lista
+    expect(b.kata.due).toHaveLength(1);
+    expect(b.kata.due[0]).toMatchObject({ day: 1, date: TODAY, today: true, state: "pending" });
+    expect(b.kata.due[0].title).toBeTruthy();
+    // un intento verificado (en la fecha que sea) lo da por hecho y el siguiente pasa a ser el 2.º
     attempt("backend", START);
-    const after: any = api().mentor_area_kata_mark({ id, areaId: "backend", date: START, status: "done" });
-    const due2 = after.areas[0].kata.due;
-    expect(due2).toHaveLength(9);
-    expect(due2.some((d: any) => d.date === START)).toBe(false);
+    const after: any = api().mentor_area_practice({ id });
+    expect(after.areas[0].kata.doneDays).toBe(1);
+    expect(after.areas[0].kata.due).toHaveLength(1);
+    expect(after.areas[0].kata.due[0]).toMatchObject({ day: 2, state: "pending" });
   });
 
-  it("mentor_area_kata_open con fecha abre (y crea) ese kata atrasado, no el de hoy", () => {
-    const r: any = api().mentor_area_kata_open({ id, areaId: "backend", date: START });
-    expect(r.date).toBe(START);
+  it("mentor_area_kata_open con fecha solo abre el siguiente kata sin hacer, no uno de otro día", () => {
+    const r: any = api().mentor_area_kata_open({ id, areaId: "backend", date: TODAY });
+    expect(r.date).toBe(TODAY);
     expect(r.created).toBe(true);
+    expect(r.rel).toContain("001");
     expect(fs.existsSync(path.join(dir, ...r.rel.split("/")))).toBe(true);
-    const today: any = api().mentor_area_kata_open({ id, areaId: "backend", date: TODAY });
-    expect(today.rel).not.toBe(r.rel);
+    expect(() => api().mentor_area_kata_open({ id, areaId: "backend", date: START })).toThrow(/no tiene kata/);
     expect(() => api().mentor_area_kata_open({ id, areaId: "backend", date: "2020-01-01" })).toThrow(/no tiene kata/);
   });
 

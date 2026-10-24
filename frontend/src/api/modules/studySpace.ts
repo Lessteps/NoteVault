@@ -10,7 +10,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { generateConcept } from "../../../tools/kb_canvas";
 import { AIConfig } from "../../core/aiClient.js";
-import { applyAssistantAction, safeName, subjectIdOf } from "../../core/assistantActions.js";
+import { applyAssistantAction, ensureTopicManifest, safeName, subjectIdOf } from "../../core/assistantActions.js";
 import { buildTenseMapCanvas, buildWordFamilyCanvas, TENSE_MAP_FILE, WORD_FAMILY_MAP_FILE } from "../../core/english/conceptMaps.js";
 import { buildAreaMapCanvas, buildSpaceMapCanvas, type MapTopic, type SpaceMapArea, type TopicDependency } from "../../core/areaMap.js";
 import { ConversationStore, type StoredMessage } from "../../core/conversations.js";
@@ -51,6 +51,8 @@ export interface SpaceRequest {
   conversationId?: string;
   /** Generate only this topic (theory, topic map, competency matrix); skips area and space maps. */
   only?: string;
+  /** With `only`: rewrite the theory even if the note exists (the caller has ALREADY backed the old one up: see `study_topic_regenerate`). */
+  force?: boolean;
 }
 
 export interface SpaceJob {
@@ -290,7 +292,8 @@ export function studySpaceApi(app: AppState) {
         `Subject: ${subjectName}. Area: ${areaName}. Topic: ${topic}.\n` +
         `Earlier topics you may use as prerequisites in "## Requires" (EXACT name between [[ ]]; only these): ${previous.length ? previous.join("; ") : "(none: write *No prerequisites.*)"}.\n\n` +
         `Write the complete note in Markdown WITHOUT frontmatter (the app adds it). Start with "# ${topic}" and end with "## Cards". ` +
-        "Include 3 examples and 4-5 mistakes, each with its four exact fields, and real, runnable code in the examples.",
+        "Include 3 examples and 4-5 mistakes, each with its four exact fields, and real, runnable code in the examples." +
+        " Write for a learner with basic knowledge, in plain language: explain any technical term with an everyday analogy before using it. Explain every example STEP BY STEP (numbered steps inside the Case bullet) and put a plain-words comment on every line or small group of lines of the code. Make each Context a realistic task of the same kind as the exercises of this topic, and close \"Why it works\" with how the learner will apply it in the practice. Keep the headings and the four bullets exactly as the skill says.",
     },
   ] : [
     {
@@ -356,19 +359,36 @@ export function studySpaceApi(app: AppState) {
       .flatMap((a) => a.topics.map((t) => ({ area: a.name, topic: t.name })))
       .filter((t) => !req.only || t.topic === req.only);
 
-    say(`Creando «${folder}»: ${req.areas.length} área(s), ${allTopics.length} tema(s)…`);
-    const made = applyAssistantAction(app.root, {
-      action: "create_syllabus",
-      args: {
-        subject: folder,
-        subject_id: subjectId,
-        map: false,
-        areas: req.areas.map((a) => ({ name: a.name, folder: a.name, topics: a.topics.map((t) => ({ name: t.name, ...(t.level ? { level: t.level } : {}) })) })),
-      },
-    });
-    const skills = ensureDefaultSkills(app.root, folder, [], subjectId);
-    if (domainOfSubject(subjectId) === "english") ensureVocabularyHome(app.root, folder);
-    say(`Carpetas y vistas listas (${made.written.length} archivos); skills por defecto: ${skills.length} nuevas en ${folder}/_skills.`);
+    if (req.only) {
+      // UN solo tema (`study_topic_generate`): su carpeta ya existe y NO se rehace el esqueleto del espacio. `create_syllabus` reescribiría
+      // el temario, las vistas de los temas hermanos, etc. Solo se crea `_skills` (con las skills por defecto) si el espacio aún no la tiene.
+      say(`Generando solo «${req.only}»: no se toca ningún otro tema.`);
+      const own = allTopics[0];
+      if (own) {
+        const level = req.areas.find((a) => a.name === own.area)?.topics.find((t) => t.name === own.topic)?.level;
+        const wrote = ensureTopicManifest(app.root, `${folder}/${own.area}/${own.topic}`, subjectId, level);
+        if (wrote.length) say(`Se creó el archivo de práctica del tema: ${wrote.map((w) => w.split("/").pop()).join(", ")}.`);
+      }
+      if (!fs.existsSync(path.join(app.root, folder, "_skills"))) {
+        const skills = ensureDefaultSkills(app.root, folder, [], subjectId);
+        if (domainOfSubject(subjectId) === "english") ensureVocabularyHome(app.root, folder);
+        say(`El espacio no tenía skills: ${skills.length} skills por defecto creadas en ${folder}/_skills.`);
+      }
+    } else {
+      say(`Creando «${folder}»: ${req.areas.length} área(s), ${allTopics.length} tema(s)…`);
+      const made = applyAssistantAction(app.root, {
+        action: "create_syllabus",
+        args: {
+          subject: folder,
+          subject_id: subjectId,
+          map: false,
+          areas: req.areas.map((a) => ({ name: a.name, folder: a.name, topics: a.topics.map((t) => ({ name: t.name, ...(t.level ? { level: t.level } : {}) })) })),
+        },
+      });
+      const skills = ensureDefaultSkills(app.root, folder, [], subjectId);
+      if (domainOfSubject(subjectId) === "english") ensureVocabularyHome(app.root, folder);
+      say(`Carpetas y vistas listas (${made.written.length} archivos); skills por defecto: ${skills.length} nuevas en ${folder}/_skills.`);
+    }
     chat.note(
       `Espacio «${folder}»: ${req.areas.length} área(s), ${allTopics.length} tema(s). ` +
         `Voy a generar${req.steps.theory ? " la teoría y el mapa de cada tema," : ""}${req.steps.practice ? " la matriz de competencias de cada tema," : ""}${req.steps.map ? " y los mapas de cada área y del espacio" : ""}.`,
@@ -379,7 +399,7 @@ export function studySpaceApi(app: AppState) {
       for (const { area, topic } of allTopics) {
         const topicAbs = path.join(app.root, folder, area, topic);
         const file = path.join(topicAbs, `${topic}.md`);
-        if (fs.existsSync(file) && !isCutDraft(fs.readFileSync(file, "utf-8"))) {
+        if (!(req.only && req.force) && fs.existsSync(file) && !isCutDraft(fs.readFileSync(file, "utf-8"))) {
           say(`Teoría de «${topic}»: ya existe, se deja como está.`);
           tick();
           continue;
@@ -435,7 +455,7 @@ export function studySpaceApi(app: AppState) {
         say(`Eligiendo la matriz de competencias de «${topic}»…`);
         const asked = `Lee la teoría de «${topic}» y decide su tipo y su matriz de competencias (skill × dificultad).`;
         try {
-          const res = await reevaluateTopic(app, `${folder}/${area}/${topic}`);
+          const res = await reevaluateTopic(app, `${folder}/${area}/${topic}`, { createView: true }); // paso pedido explícitamente
           say(`  ✓ ${res.plan.topicType ?? "?"}: ${res.plan.skills.map((s) => s.skill).join(", ")}`);
           chat.exchange(asked, res.reply);
         } catch (e) {
@@ -612,9 +632,11 @@ export function studySpaceApi(app: AppState) {
 
     /**
      * Generates ONE topic from its folder (`Space/Area/Topic`): theory, topic map and the
-     * competency matrix the AI chooses for it. Missing view files are created too.
+     * competency matrix the AI chooses for it. Only this topic is touched: no sibling views and no
+     * skeleton rebuild (`_skills` is created only if the space has none). `force` rewrites an existing theory
+     * (the caller must have backed it up: `study_topic_regenerate`).
      */
-    study_topic_generate(folderRel: string, conversationId = "", steps?: Partial<SpaceSteps>): { jobId: string; conversationId: string } {
+    study_topic_generate(folderRel: string, conversationId = "", steps?: Partial<SpaceSteps>, force = false): { jobId: string; conversationId: string } {
       const parts = String(folderRel ?? "").replace(/\\/g, "/").split("/").filter(Boolean);
       const abs = path.join(app.root, ...parts);
       const dir = fs.existsSync(abs) && fs.statSync(abs).isFile() ? parts.slice(0, -1) : parts;
@@ -643,6 +665,7 @@ export function studySpaceApi(app: AppState) {
           areas: [{ name: area, topics: siblings.map((name) => ({ name })) }],
           steps: { theory: steps?.theory ?? true, practice: steps?.practice ?? true, map: steps?.map ?? true },
           only: topic,
+          ...(force ? { force: true } : {}),
         },
         conversationId || undefined,
       );

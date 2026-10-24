@@ -140,6 +140,27 @@ function topicFiles(root: string, topicRel: string, topicName: string, subject: 
   return [{ kind: "write", rel, content: practiceFileText(manifest), exists: fs.existsSync(absOf(root, rel)) }];
 }
 
+/**
+ * Writes ONLY the topic's own manifest (`<topic>.practica.md`) when it is missing — never a sibling's, never the syllabus, maps or overviews.
+ * Used by the "generate this topic" action. Returns the vault-relative files it wrote.
+ */
+export function ensureTopicManifest(root: string, topicRel: string, subject: string, level?: string): string[] {
+  const topicName = topicRel.split("/").filter(Boolean).pop() ?? topicRel;
+  const written: string[] = [];
+  for (const op of topicFiles(root, topicRel, topicName, subject, undefined, level)) {
+    if (op.kind !== "write" || op.exists || op.content === undefined) continue;
+    const abs = absOf(root, op.rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    try {
+      fs.writeFileSync(abs, op.content, { encoding: "utf-8", flag: "wx" });
+      written.push(op.rel);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    }
+  }
+  return written;
+}
+
 const mkdirOp = (root: string, rel: string): PlannedOp => ({ kind: "mkdir", rel, exists: fs.existsSync(absOf(root, rel)) });
 
 function planSyllabus(root: string, args: Record<string, any>): ActionPlan {

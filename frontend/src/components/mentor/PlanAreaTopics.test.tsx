@@ -118,3 +118,88 @@ describe("PlanAreaTopics", () => {
     expect(titles()).toEqual(["4.2 REST"]);
   });
 });
+
+describe("PlanAreaTopics — panel desplegable «Regenerar»", () => {
+  const job = (over: Record<string, unknown> = {}) => ({ id: "j1", folder: "P/4/4.2 REST", what: "theory", log: ["✓ Teoría regenerada."], done: true, error: "", finished: 3, total: 3, backup: ".trash/regenerar/x_4.2 REST", restored: false, created: [], archived: [], ...over });
+  const ai = (bridge: boolean) => vi.spyOn(api, "aiSettings").mockResolvedValue({ config: { is_bridge: bridge }, providers: [], models: [] } as never);
+
+  it("cada tema se despliega con las tres acciones y lo que existe de cada artefacto; desplegar no llama a nada", async () => {
+    ai(false);
+    const start = vi.spyOn(api, "studyTopicRegenerate");
+    await mount(PLAN);
+    expect(byTest("regen-panel")).toBeNull();
+    await click("row-expand");
+    await flush();
+    expect(byTest("row-expand")!.getAttribute("aria-expanded")).toBe("true");
+    expect(byTest("area-row-expanded")).toBeTruthy();
+    expect(byTest("regen-theory")!.textContent).toContain("con nota");
+    expect(byTest("regen-theory")!.textContent).toContain("sin mapa");
+    expect(byTest("regen-practice")!.textContent).toContain("existe");
+    expect(byTest("regen-exercises")!.textContent).toContain("sin ejercicios");
+    expect(["regen-theory-button", "regen-practice-button", "regen-exercises-button"].map((t) => byTest(t)!.textContent!.trim())).toEqual(["Regenerar teoría", "Regenerar práctica", "Regenerar ejercicios"]);
+    expect(start).not.toHaveBeenCalled();
+    await click("row-expand");
+    expect(byTest("regen-panel")).toBeNull();
+  });
+
+  it("«Expandir todo» abre el panel de todos los temas de la tabla", async () => {
+    ai(false);
+    await mount(PLAN);
+    await click("expand-all");
+    expect(host.querySelectorAll("[data-testid=regen-panel]").length).toBe(1);
+    expect(byTest("expand-all")!.textContent).toBe("Contraer todo");
+  });
+
+  it("pide confirmación diciendo que se reemplaza con copia de seguridad; cancelar no hace nada y confirmar lanza el trabajo", async () => {
+    ai(false);
+    const start = vi.spyOn(api, "studyTopicRegenerate").mockResolvedValue({ jobId: "j1" });
+    const status = vi.spyOn(api, "studyTopicRegenerateStatus").mockResolvedValue(job() as never);
+    await mount(PLAN);
+    await click("row-expand");
+    await flush();
+    await click("regen-theory-button");
+    const text = byTest("regen-dialog")!.textContent!;
+    expect(text).toContain("REEMPLAZAR");
+    expect(text).toContain("copia de seguridad");
+    expect(text).toContain(".nuevo.canvas");
+    await click("regen-cancel");
+    expect(byTest("regen-dialog")).toBeNull();
+    expect(start).not.toHaveBeenCalled();
+    await click("regen-exercises-button");
+    expect(byTest("regen-dialog")!.textContent).toContain("ARCHIVAR");
+    expect(byTest("regen-dialog")!.textContent).toContain("historial de intentos");
+    await click("regen-cancel");
+    await click("regen-practice-button");
+    await click("regen-confirm");
+    await flush(); await flush();
+    expect(start).toHaveBeenCalledWith("P/4/4.2 REST", "practice", true);
+    expect(status).toHaveBeenCalledWith("j1");
+  });
+
+  it("con la IA en modo puente, o en un tema fuera del plan, las acciones están desactivadas con su explicación", async () => {
+    ai(true);
+    await mount(PLAN);
+    await click("row-expand");
+    await flush();
+    for (const w of ["theory", "practice", "exercises"]) {
+      expect((byTest(`regen-${w}-button`) as HTMLButtonElement).disabled).toBe(true);
+      expect(byTest(`regen-${w}-hint`)!.textContent).toContain("modo puente");
+    }
+    // tema fuera del plan
+    const skipped = { ...PLAN, subplans: [sub("s1", "Backend", [topic("P/4/4.2 REST", 2, { route: "skipped" })])] } as unknown as MentorPlan;
+    await mount(skipped);
+    await flush();
+    expect((byTest("regen-theory-button") as HTMLButtonElement | null)?.disabled ?? true).toBe(true);
+  });
+
+  it("sin práctica no se pueden regenerar los ejercicios (de ahí salen las competencias)", async () => {
+    ai(false);
+    vi.mocked(api.mentorPlanTopicCatalog).mockResolvedValue({ loading: false, rows: [row("P/4/4.2 REST", { manifest: false, exercises: 0, complete: false })] });
+    await mount(PLAN);
+    await click("row-expand");
+    await flush();
+    expect((byTest("regen-exercises-button") as HTMLButtonElement).disabled).toBe(true);
+    expect(byTest("regen-exercises-hint")!.textContent).toContain("práctica");
+    expect((byTest("regen-theory-button") as HTMLButtonElement).disabled).toBe(false);
+  });
+});

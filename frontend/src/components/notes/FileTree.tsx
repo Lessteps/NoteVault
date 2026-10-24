@@ -100,16 +100,16 @@ async function trashEntry(entry: TreeEntry) {
 
 /**
  * Notion-style folder click: the folder's *name* opens its view file (the topic's
- * practice view, or the area's overview — created on the spot when missing) **and**
+ * practice view, or the area's overview — only when it already exists: it is never created by a click) **and**
  * expands the folder so its own files render too; the chevron only expands and
  * collapses. Plain folders have no view, so they keep behaving as a plain toggle.
  */
 export async function openFolderView(entry: TreeEntry, toggle: (path: string) => void, isOpen = false) {
   const s = useApp.getState();
   try {
+    // Solo lectura: un clic en una carpeta nunca crea archivos. Sin vista, la carpeta solo se despliega.
     const view = await api.studyViewEnsure(entry.path);
     if (view.ok && view.path) {
-      if (view.created.length) s.toast("info", `Vista creada: ${view.path.split("/").pop()}`);
       s.refreshTree();
       // Expanding is not optional: the children have to render too, and a folder
       // that is already open must not be collapsed by the click.

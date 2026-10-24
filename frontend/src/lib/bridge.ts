@@ -685,10 +685,10 @@ export const api = {
   studyArea: (rel: string) => call<{ subject: string; folder: string; title: string; subject_title: string } | null>("study_area", rel),
   studySnapshot: (rel: string) => call<import("./types").StudySnapshot>("study_snapshot", rel),
   studyTopicGet: (rel: string) => call<import("./types").TopicData>("study_topic_get", rel),
-  /** The view file of a folder (created when missing): practica or resumen. */
 studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic_map", rel),
-    studyViewEnsure: (rel: string) =>
-    call<{ ok: boolean; kind: "practica" | "resumen" | "ejercicios" | "proyectos" | "none"; path: string; created: string[]; tagged?: string[]; errors: string[] }>("study_view_ensure", rel),
+  /** The view file of a folder: practica or resumen. READ-ONLY unless `create` (then it writes the view files; `missing` = it does not exist yet). */
+  studyViewEnsure: (rel: string, create = false) =>
+    call<{ ok: boolean; kind: "practica" | "resumen" | "ejercicios" | "proyectos" | "none"; path: string; missing?: boolean; created: string[]; tagged?: string[]; errors: string[] }>("study_view_ensure", rel, create),
   studyTopicConvert: (folder: string) => call<{ ok: boolean; path: string; manifest: any }>("study_topic_convert", folder),
   studyTopicSessionBuild: (
     folder: string,
@@ -734,6 +734,10 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studyTopicGenerate: (folder: string, conversationId = "") => call<{ jobId: string; conversationId: string }>("study_topic_generate", folder, conversationId),
   studySpaceStatus: (jobId: string) =>
     call<{ id: string; folder: string; log: string[]; done: boolean; error: string; finished: number; total: number; conversationId: string }>("study_space_status", jobId),
+  /** Regenera la teoría / práctica / ejercicios de un tema (respalda antes lo que reemplaza). Exige `confirm: true`. */
+  studyTopicRegenerate: (folder: string, what: "theory" | "practice" | "exercises", confirm: boolean) => call<{ jobId: string }>("study_topic_regenerate", folder, what, confirm),
+  studyTopicRegenerateStatus: (jobId: string) =>
+    call<import("./types").TopicRegenerateJob>("study_topic_regenerate_status", jobId),
   studySpaceList: () => call<string[]>("study_space_list"),
   studySpaceSubject: (rel: string) => call<string>("study_space_subject", rel),
   studyTopicPlan: (folder: string) =>

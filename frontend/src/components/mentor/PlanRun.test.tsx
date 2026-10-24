@@ -404,6 +404,21 @@ describe("vista de ejecución", () => {
     expect(byTest("exec-bar")).toBeNull();
   });
 
+  it("una ejecución a medias (en pausa) NO se reanuda sola: sale un aviso con Reanudar / Descartar y solo el botón reanuda", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    const state = { version: 1, planId: PID, id: "e1", status: "paused", scope: {}, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), tasks: [{ id: "t1", kind: "practice", areaKey: "a", area: "A", title: "T", status: "pending", attempts: 0, created: [], skipped: [], warnings: [], label: "x" }], log: [] };
+    const view = { state, progress: { done: 0, failed: 0, skipped: 0, pending: 1, running: 0, total: 1, pct: 0, created: 0, label: "x" } };
+    vi.spyOn(api, "mentorExecutionStatus").mockResolvedValue({ execution: view, active: false } as never);
+    const resume = vi.spyOn(api, "mentorExecutionResume").mockResolvedValue({ execution: { ...view, state: { ...state, status: "running" } } } as never);
+    await mountEl(<PlanWorkspace planId={PID} />);
+    await flush();
+    expect(byTest("run-resume-banner")!.textContent).toContain("Hay una ejecución a medias: ¿reanudar?");
+    expect(byTest("run-discard")).toBeTruthy();
+    expect(resume).not.toHaveBeenCalled();
+    await click(byTest("run-resume"));
+    expect(resume).toHaveBeenCalledWith(PID);
+  });
+
   it("repaso espaciado: los repasos de los temas del área salen por cajón con su acceso directo a la práctica, y la pestaña avisa", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const item = (topicPath: string, inDays: number) => ({ path: `Programación/Repaso/${topicPath.split("/").pop()}.md`, topic: topicPath.split("/").pop()!, topicPath, subject: "programming", subjectFolder: "Programación", next: "2026-10-12", last: "2026-10-09", level: 1, inDays, skills: ["explain"], practicedDays: 1, upcoming: [] });
@@ -469,12 +484,16 @@ describe("vista de ejecución", () => {
     expect(mark).toHaveBeenCalledWith(PID, "backend", "2026-10-07", "done");
   });
 
-  it("si faltan las carpetas de las áreas en programming_practice las deja preparadas una sola vez", async () => {
+  it("si faltan las carpetas de las áreas NO las crea al montar: avisa y las crea solo al pulsar el botón", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(byArea()));
     const missing = { ...areaView("backend", "Backend", [TODAY]), folderReady: false };
     vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "Programación/programming_practice", areas: [missing] } as never);
-    const setup = vi.spyOn(api, "mentorAreaPracticeSetup").mockResolvedValue({ created: [], folders: [], view: { today: TODAY, ppReady: true, ppBase: "", areas: [missing] } } as never);
+    const setup = vi.spyOn(api, "mentorAreaPracticeSetup").mockResolvedValue({ created: ["backend/README.md"], folders: [], view: { today: TODAY, ppReady: true, ppBase: "", areas: [missing] } } as never);
     await mountEl(<PlanWorkspace planId={PID} />);
+    await flush();
+    expect(setup).not.toHaveBeenCalled();
+    expect(byTest("run-missing-folders")!.textContent).toContain("Faltan carpetas de práctica en 1 área");
+    await click(byTest("run-create-folders"));
     await flush();
     expect(setup).toHaveBeenCalledTimes(1);
     expect(setup).toHaveBeenCalledWith(PID);

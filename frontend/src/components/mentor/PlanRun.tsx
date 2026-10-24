@@ -8,7 +8,7 @@
 // vista de plan (`useAgendaModel`), así que ambas vistas nunca discrepan.
 
 import { CalendarDays, Info, ListPlus, Lock } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { areaSets } from "../../lib/planAreaLists";
 import { planGateByArea } from "../../lib/planGate";
@@ -29,6 +29,7 @@ import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { useTimeLog } from "./AreaSession";
 import { useReviewItems, type UpcomingWeekView, type WeekDayView } from "./AreaWork";
+import { InterruptedRunBanner } from "./ExecutionBar";
 import { openTopic } from "./openTopic";
 import { DeliverableLine, focusColour, plural, useAgendaModel } from "./agendaKit";
 import { hm, ProgressBar } from "./parts";
@@ -83,16 +84,24 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
     const cap = study.length ? Math.round(study.reduce((n, d) => n + d.capacityMinutes, 0) / study.length) : 0;
     return catchUpOf(m.schedule.days.map((d) => ({ date: d.date, study: d.study, topics: d.topics.map((t) => ({ folder: t.folder, title: t.title, minutes: t.minutes, done: t.done, area: t.area })) })), date, plan.end, (f) => m.topicByFolder.get(f)?.state === "completo", cap);
   }, [m.schedule, m.topicByFolder, date, plan.end]);
-  // La práctica diaria de cada área vive en la pestaña de su área. Cada área debe tener su carpeta en programming_practice: si falta, se deja
-  // preparada una sola vez (solo estructura, nunca sobrescribe y sin katas: esos se crean al abrirlos).
+  // La práctica diaria de cada área vive en la pestaña de su área. Cada área debe tener su carpeta en programming_practice: si falta, NO se crea
+  // sola (es escribir notas en la vault): se avisa con una tarjeta y solo se crea (estructura, sin katas, sin sobrescribir) al pulsar el botón.
   const ap = usePlanAreaPractice(plan.id);
-  const setupTried = useRef(false);
-  useEffect(() => {
-    const d = ap.data;
-    if (setupTried.current || !d || !d.ppReady || !d.areas.some((a) => !a.folderReady)) return;
-    setupTried.current = true;
-    void api.mentorAreaPracticeSetup(plan.id).then(() => ap.reload()).catch(() => undefined);
-  }, [ap, plan.id]);
+  const [creatingFolders, setCreatingFolders] = useState(false);
+  const missingFolders = ap.data?.ppReady ? ap.data.areas.filter((a) => !a.folderReady) : [];
+  const createFolders = async (): Promise<void> => {
+    if (creatingFolders) return;
+    setCreatingFolders(true);
+    try {
+      const r = await api.mentorAreaPracticeSetup(plan.id);
+      useApp.getState().toast("info", r.created.length ? `Se crearon ${plural(r.created.length, "archivo", "archivos")} de práctica.` : "Las carpetas de práctica ya estaban creadas.");
+      ap.reload();
+    } catch (e) {
+      useApp.getState().toast("error", (e as Error).message || "No se pudieron crear las carpetas de práctica.");
+    } finally {
+      setCreatingFolders(false);
+    }
+  };
   // Etiqueta de tiempo de cada tema: su ventana de reparto. Nada está pendiente hasta que la ruta empieza y su tiempo pasa.
   const times = useMemo(
     () => topicTimes(m.schedule.days.map((d) => ({ date: d.date, topics: d.topics.map((t) => ({ folder: t.folder, done: t.done || m.topicByFolder.get(t.folder)?.state === "completo" })) }))),
@@ -280,6 +289,16 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
 
   return (
     <div className="space-y-6 pb-4" data-testid="plan-run">
+      <InterruptedRunBanner planId={plan.id} />
+      {missingFolders.length > 0 && (
+        <div role="status" className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card px-4 py-3" data-testid="run-missing-folders">
+          <Info size={15} aria-hidden className="flex-none text-faint" />
+          <p className="min-w-0 flex-1 basis-60 text-[13.5px] text-dim">
+            Faltan carpetas de práctica en {plural(missingFolders.length, "área", "áreas")} ({missingFolders.map((a) => a.label).join(", ")}). Crearlas añade notas a tu vault (README, matriz de práctica y habilidades); nunca sobrescribe.
+          </p>
+          <PrimaryButton onClick={() => void createFolders()} disabled={creatingFolders} data-testid="run-create-folders">Crear carpetas</PrimaryButton>
+        </div>
+      )}
       {tab === "general" && (
         <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]" data-testid="run-general">
           <div className="min-w-0 space-y-6">

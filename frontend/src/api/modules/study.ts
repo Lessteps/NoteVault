@@ -346,8 +346,11 @@ function classifyForTopic(app: AppState, normFolder: string, manifest: TopicMani
 /**
  * Asks the AI which competencies a topic should train and how many exercises per
  * difficulty, and stores the answer in the topic's `.practica.md`.
+ *
+ * It rewrites the plan of an EXISTING `.practica.md`. It only creates a missing practice view when the caller says `createView` — and only the
+ * explicit actions do (the "Re-evaluar" button, "Generar tema", a confirmed "Ejecutar plan"); anything implicit gets a clear error instead.
  */
-export async function reevaluateTopic(app: AppState, folder: string): Promise<{ plan: PracticePlan; path: string; reply: string }> {
+export async function reevaluateTopic(app: AppState, folder: string, opts: { createView?: boolean } = {}): Promise<{ plan: PracticePlan; path: string; reply: string }> {
   const normFolder = app.rel(app.resolve(folder, { allowRoot: true }));
   const found = findTopicManifest(app, normFolder);
   if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
@@ -383,7 +386,10 @@ export async function reevaluateTopic(app: AppState, folder: string): Promise<{ 
   if (cls.domain !== "english") plan.topicType = plan.topicType ?? topicType;
 
   const practicaAbs = path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica"));
-  if (!fs.existsSync(practicaAbs)) ensureTopicViewFiles(app.root, topicAbs);
+  if (!fs.existsSync(practicaAbs)) {
+    if (!opts.createView) throw new ApiError("Este tema aún no tiene su archivo .practica: créalo primero con «Crear vista de práctica» (no se escribe nada sin pedirlo).");
+    ensureTopicViewFiles(app.root, topicAbs);
+  }
   if (!fs.existsSync(practicaAbs)) throw new ApiError("No se pudo crear el archivo .practica del tema.");
   const labels = Object.fromEntries(catalog.map((s) => [s.id, s.label]));
   fs.writeFileSync(practicaAbs, applyPlanToPractica(fs.readFileSync(practicaAbs, "utf-8"), plan, labels), "utf-8");
@@ -734,10 +740,16 @@ export function studyApi(app: AppState) {
 
     /**
      * The view file of a folder: the topic's `practica` file for a topic folder,
-     * the `resumen` overview otherwise. Creates it when it is missing (the
-     * explorer's "open the folder's view" and "create view" action).
+     * the `resumen` overview otherwise.
+     *
+     * READ-ONLY by default: opening a folder or following a link must never write
+     * notes into the vault. Without `create`, a missing view comes back as
+     * `{ ok: false, missing: true, path: <where it would live> }` so the UI can ask the
+     * person ("Crear vista de práctica") and call again with `create = true`.
+     * With `create`, only the view files of that folder are written (never a
+     * placeholder `.teorica.md`; existing theory notes are tagged `type: teorica`).
      */
-    study_view_ensure(rel: string) {
+    study_view_ensure(rel: string, create = false) {
       const abs = app.resolve(rel, { allowRoot: true });
       let stat: fs.Stats;
       try {
@@ -747,14 +759,17 @@ export function studyApi(app: AppState) {
       }
       // A file was passed: use the folder it lives in.
       const folderAbs = stat.isDirectory() ? abs : path.dirname(abs);
+      const posixRel = (p: string) => app.rel(p).split(path.sep).join("/");
       // `Ejercicios` and its per-skill folders open as a navigable set of exercises.
       if (stat.isDirectory() && !isSubjectRoot(app.root, folderAbs) && isExerciseFolder(folderAbs)) {
+        const target = path.join(folderAbs, viewFileName(path.basename(folderAbs), "ejercicios"));
+        if (!create && !fs.existsSync(target)) return { ok: false, kind: "ejercicios", missing: true, path: posixRel(target), created: [], errors: [] };
         const { file, created } = ensureExerciseSetFile(folderAbs);
         if (created) clearExerciseIndexCache();
         return {
           ok: true,
           kind: "ejercicios",
-          path: app.rel(file).split(path.sep).join("/"),
+          path: posixRel(file),
           created: created ? [app.rel(file)] : [],
           errors: [],
         };
@@ -762,8 +777,10 @@ export function studyApi(app: AppState) {
       // programming_practice/projects (and its _specs folder) open the weekly-project workspace.
       const projectsAbs = stat.isDirectory() ? projectsFolderOf(folderAbs) : null;
       if (projectsAbs) {
+        const target = path.join(projectsAbs, viewFileName(path.basename(projectsAbs), "proyectos"));
+        if (!create && !fs.existsSync(target)) return { ok: false, kind: "proyectos", missing: true, path: posixRel(target), created: [], errors: [] };
         const { file, created } = ensureProjectsViewFile(projectsAbs);
-        return { ok: true, kind: "proyectos", path: app.rel(file).split(path.sep).join("/"), created: created ? [app.rel(file)] : [], errors: [] };
+        return { ok: true, kind: "proyectos", path: posixRel(file), created: created ? [app.rel(file)] : [], errors: [] };
       }
       // The subject root groups areas: it gets its overview and nothing else.
       const subjectRoot = isSubjectRoot(app.root, folderAbs);
@@ -771,6 +788,14 @@ export function studyApi(app: AppState) {
       if (!topic && !subjectRoot && !folderHasTopicsBelow(app.root, folderAbs)) {
         // A plain folder has no view: the explorer falls back to expanding it.
         return { ok: false, kind: "none", path: "", created: [], errors: [] };
+      }
+      const kind = topic ? "practica" : "resumen";
+      const fileAbs = topic
+        ? path.join(folderAbs, `${path.basename(folderAbs)}.practica.md`)
+        : path.join(folderAbs, `${path.basename(folderAbs)}.resumen.md`);
+      if (!create) {
+        const exists = fs.existsSync(fileAbs);
+        return { ok: exists, kind, ...(exists ? {} : { missing: true }), path: app.rel(fileAbs), created: [], tagged: [], errors: [] };
       }
       const result = topic
         ? ensureTopicViewFiles(app.root, folderAbs)
@@ -782,10 +807,6 @@ export function studyApi(app: AppState) {
         clearExerciseIndexCache();
         clearStudySnapshotCache();
       }
-      const kind = topic ? "practica" : "resumen";
-      const fileAbs = topic
-        ? path.join(folderAbs, `${path.basename(folderAbs)}.practica.md`)
-        : path.join(folderAbs, `${path.basename(folderAbs)}.resumen.md`);
       return {
         ok: fs.existsSync(fileAbs),
         kind,
@@ -952,7 +973,9 @@ export function studyApi(app: AppState) {
             return null;
           }
         };
-        const plan = readPlan() ?? (await reevaluateTopic(app, normFolder)).plan;
+        // Sin plan NO se llama a la IA por debajo (reescribiría el `.practica.md` sin que la persona lo pida): se avisa con un error claro.
+        const plan = readPlan();
+        if (!plan) throw new ApiError("Este tema aún no tiene un plan de práctica de la IA. Pulsa «Re-evaluar competencias» (o «Regenerar práctica») primero, o elige otra cantidad de ejercicios.");
         aiCount = planCount(plan, skill, diff);
       }
 
@@ -1103,6 +1126,7 @@ export function studyApi(app: AppState) {
       if (domainOfSubject(found.manifest.subject || "") !== "english") throw new ApiError("Solo los temas de inglés se clasifican por rama.");
       const topicAbs = app.resolve(found.manifest.folder || rel, { allowRoot: true });
       const practicaAbs = path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica"));
+      // «Clasificar tema» es una acción explícita cuyo resultado se guarda en el `.practica.md`: solo aquí se crea si falta (tema con marcador antiguo).
       if (!fs.existsSync(practicaAbs)) ensureTopicViewFiles(app.root, topicAbs);
       fs.writeFileSync(practicaAbs, setFrontmatterKey(fs.readFileSync(practicaAbs, "utf-8"), "branch", b), "utf-8");
       resolveUnclassified(app.root, rel);
@@ -1163,7 +1187,7 @@ export function studyApi(app: AppState) {
 
     /** Re-reads the topic's theory with the AI and rewrites its practice plan. */
     async study_topic_reevaluate(folder: string) {
-      const { plan, path: practicePath } = await reevaluateTopic(app, folder);
+      const { plan, path: practicePath } = await reevaluateTopic(app, folder, { createView: true }); // botón explícito
       return { ok: true, plan, path: practicePath };
     },
 

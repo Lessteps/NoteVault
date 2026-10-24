@@ -29,10 +29,10 @@ const KPLAN = { id: PID, start: START, end: END, programmingPractice: track, pre
 const att = (area: string, ...dates: string[]) => ({ note_id: area, note_path: `Programación/programming_practice/${area}/katas/001 x.md`, attempts: dates.map((d) => ({ at: `${d}T10:00:00`, skill: "pp_kata", mode: "pp_kata", verdict: "correct", score: 90 })) });
 
 /** Datos reales derivados (backend con carpeta y katas; frontend sin carpeta). */
-function areaData(over: { marks?: Record<string, Record<string, "done" | "skipped">>; folders?: string[] } = {}): MentorAreaPractice {
+function areaData(over: { marks?: Record<string, Record<string, "done" | "skipped">>; folders?: string[]; backendDays?: string[] } = {}): MentorAreaPractice {
   const folders = new Set(over.folders ?? ["backend"]);
   const files = new Set<string>();
-  const areas = deriveAreaPractice({ plan: KPLAN as never, today: TODAY, attempts: { b: att("backend", "2026-10-05", "2026-10-06") }, marks: over.marks ?? {}, existing: { folders, files } });
+  const areas = deriveAreaPractice({ plan: KPLAN as never, today: TODAY, attempts: { b: att("backend", ...(over.backendDays ?? ["2026-10-05", "2026-10-06"])) }, marks: over.marks ?? {}, existing: { folders, files } });
   // el kata de hoy de Backend ya tiene archivo
   const b = areas.find((a) => a.areaId === "backend")!;
   if (b.kata.next) b.kata.next.fileReady = true;
@@ -156,7 +156,7 @@ describe("vista de un área", () => {
     const open = vi.spyOn(useApp.getState(), "openNote").mockResolvedValue(undefined);
     useApp.setState({ openNote: open });
     await click(kata.querySelector("[data-testid=area-kata-open]"));
-    expect(open).toHaveBeenCalledWith(expect.stringMatching(/^Programación\/programming_practice\/backend\/katas\/004 .+\.md$/));
+    expect(open).toHaveBeenCalledWith(expect.stringMatching(/^Programación\/programming_practice\/backend\/katas\/003 .+\.md$/));
     expect(kata.querySelector("[data-testid=area-folder-ready]")!.textContent).toContain("programming_practice/backend/");
   });
 
@@ -184,14 +184,15 @@ describe("vista de un área", () => {
   });
 
   it("«Marcar hecho» guarda la marca y la vista se actualiza con lo que devuelve la API", async () => {
-    const mark = vi.spyOn(api, "mentorAreaKataMark").mockResolvedValue(areaData({ marks: { backend: { [TODAY]: "done" } } }));
+    const mark = vi.spyOn(api, "mentorAreaKataMark").mockResolvedValue(areaData({ backendDays: ["2026-10-05", "2026-10-06", "2026-10-07"], marks: { backend: { [TODAY]: "done" } } }));
     const view = await openBackend();
     await click(view.querySelector("[data-testid=area-kata-done]"));
     expect(mark).toHaveBeenCalledWith(PID, "backend", TODAY, "done");
     const kata = host.querySelector("[data-testid=area-kata]")!;
     expect(kata.textContent).toContain("Hoy: hecho");
     expect(kata.querySelector("[data-testid=area-kata-done]")).toBeNull();
-    expect(button("Quitar marca", kata)).toBeTruthy();
+    // al estar hecho, el siguiente kata ya no es el de hoy: pasa a «Siguiente», no se adelanta solo
+    expect(kata.querySelector("h3")!.textContent).toContain("Kata siguiente");
   });
 
   it("área sin carpeta: «Carpeta aún no creada: se crea al ejecutar el plan», sin «Abrir kata» y con acceso a «Ejecutar plan»", async () => {
@@ -205,7 +206,7 @@ describe("vista de un área", () => {
     expect(kata.querySelector("[data-testid=area-kata-open]")).toBeNull();
     expect(kata.querySelector("[data-testid=area-kata-nofile]")).toBeTruthy();
     // el kata de hoy sigue visible (se deriva de la plantilla) aunque su archivo aún no exista
-    expect(kata.querySelector("[data-testid=area-kata-today]")!.textContent).toContain("Atomic Design");
+    expect(kata.querySelector("[data-testid=area-kata-today]")!.textContent).toContain("Component composition");
     await click(missing.querySelector("[data-testid=area-open-execution]"));
     expect(executeSpy).toHaveBeenCalledTimes(1);
   });

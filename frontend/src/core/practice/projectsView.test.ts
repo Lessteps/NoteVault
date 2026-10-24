@@ -42,10 +42,10 @@ describe("projects folder view", () => {
   it("study_view_ensure opens the workspace for projects and for _specs, like the kata opens its practice view", () => {
     const root = vault();
     const api = studyApi(new AppState(root));
-    const a = api.study_view_ensure("Programación/programming_practice/projects") as { ok: boolean; kind: string; path: string; created: string[] };
+    const a = api.study_view_ensure("Programación/programming_practice/projects", true) as { ok: boolean; kind: string; path: string; created: string[] };
     expect(a).toMatchObject({ ok: true, kind: "proyectos", path: "Programación/programming_practice/projects/projects.proyectos.md" });
     expect(a.created).toHaveLength(1);
-    const b = api.study_view_ensure("Programación/programming_practice/projects/_specs") as { kind: string; path: string; created: string[] };
+    const b = api.study_view_ensure("Programación/programming_practice/projects/_specs", true) as { kind: string; path: string; created: string[] };
     expect(b).toMatchObject({ kind: "proyectos", path: a.path });
     expect(b.created).toEqual([]);
   });

@@ -216,7 +216,8 @@ function labeledFields(body: string, labels: string[]): Field[] {
         continue;
       }
     }
-    if (last) last.text = `${last.text} ${line}`.trim();
+    // Numbered steps / sub-bullets keep their own line (step-by-step walkthroughs); prose lines are joined.
+    if (last) last.text = `${last.text}${/^(\d+[.)]|[-*])\s/.test(line) ? "\n" : " "}${line}`.trim();
   }
   for (const label of labels) {
     const f = byLabel.get(norm(label));

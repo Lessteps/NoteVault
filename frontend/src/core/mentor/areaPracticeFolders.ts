@@ -1,7 +1,8 @@
 /**
  * Crea las carpetas del Sistema de práctica por área dentro de `Programación/programming_practice/` (ver `lib/areaPracticeSystem.ts`).
  *
- * SOLO se llama desde «Ejecutar plan» (con la confirmación de la persona). NUNCA sobrescribe: un archivo que ya existe se omite (la escritura
+ * SOLO se llama tras una acción explícita de la persona: «Ejecutar plan» (con su confirmación), el botón «Crear carpetas» de la Ejecución o abrir un kata
+ * concreto. Nunca se dispara solo al montar una vista. NUNCA sobrescribe: un archivo que ya existe se omite (la escritura
  * usa `wx`, que falla si existe, así que ni una carrera lo pisa). Con `dryRun` calcula lo que crearía sin tocar el disco (es lo que usa el informe).
  */
 

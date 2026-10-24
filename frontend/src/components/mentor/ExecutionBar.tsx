@@ -119,6 +119,38 @@ export function ExecutionBar({ planId, onOpenPlan }: { planId: string; /** lleva
   );
 }
 
+/**
+ * Aviso de una ejecución a medias (la app se cerró con la cola trabajando, o está en pausa): NUNCA se reanuda sola, porque generar notas escribe
+ * en la vault. Reutiliza `mentor_execution_resume` / `_cancel`.
+ */
+export function InterruptedRunBanner({ planId }: { planId: string }) {
+  const toast = useApp((s) => s.toast);
+  const { exec, setExec } = useExecution(planId);
+  const [busy, setBusy] = useState(false);
+  const st = exec?.state;
+  if (!exec || !st || st.status !== "paused") return null;
+  const p = exec.progress;
+  const act = async (what: "resume" | "cancel"): Promise<void> => {
+    if (what === "cancel" && !(await confirmAction("Descartar la ejecución", "Se descarta lo que falta. Lo que ya se creó se queda en tu vault.", "Descartar", true))) return;
+    setBusy(true);
+    try {
+      const r = what === "resume" ? await api.mentorExecutionResume(planId) : await api.mentorExecutionCancel(planId);
+      setExec(r.execution);
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div role="status" className="flex flex-wrap items-center gap-3 rounded-2xl border border-warn/60 bg-warn-soft px-4 py-3" data-testid="run-resume-banner">
+      <p className="min-w-0 flex-1 basis-60 text-[14px]"><strong>Hay una ejecución a medias: ¿reanudar?</strong> <span className="text-dim">Lleva {p.done}/{p.total} tareas. Al reanudar se seguirán creando notas en tu vault.</span></p>
+      <button type="button" disabled={busy} onClick={() => void act("resume")} data-testid="run-resume" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[13.5px] font-medium hover:bg-hover disabled:opacity-50"><Play size={14} aria-hidden /> Reanudar</button>
+      <button type="button" disabled={busy} onClick={() => void act("cancel")} data-testid="run-discard" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[13.5px] text-dim hover:bg-hover hover:text-text disabled:opacity-50"><Square size={14} aria-hidden /> Descartar</button>
+    </div>
+  );
+}
+
 /** El nombre corto de un archivo creado y su carpeta: «ej_pg_classify_d1_….md · 1.4 From source code to execution/Ejercicios». */
 export function fileLabel(rel: string): { name: string; where: string } {
   const parts = rel.replace(/\\/g, "/").split("/");

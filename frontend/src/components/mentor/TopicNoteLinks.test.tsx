@@ -42,7 +42,7 @@ describe("TopicNoteLinks", () => {
   });
 
   it("Ejercicios abre el archivo de práctica del tema", async () => {
-    vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ path: "Programación/Back/Tema X/Tema X.practica.md" } as never);
+    vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ ok: true, path: "Programación/Back/Tema X/Tema X.practica.md" } as never);
     const openNote = vi.spyOn(useApp.getState(), "openNote").mockResolvedValue(undefined as never);
     act(() => root.render(<TopicNoteLinks folder="Programación/Back/Tema X" title="Tema X" />));
     await click(q("[data-testid=topic-note-practice]"));

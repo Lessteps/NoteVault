@@ -110,49 +110,49 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
     const marks = inp.marks[a.areaId] ?? {};
     const stateOf = (d: string): "done" | "skipped" | "pending" => (attemptDates.has(d) || marks[d] === "done" ? "done" : marks[d] === "skipped" ? "skipped" : "pending");
     const past = dates.filter((d) => d <= today);
+    // El contenido NO avanza con el calendario: el kata que toca es el siguiente a los que de verdad se hicieron (intento verificado o marca «hecho»),
+    // sin importar en qué fecha. Los días de kata solo marcan el ritmo previsto (qué toca «hoy» y cuántos van atrasados).
+    const doneAll = new Set<string>([...attemptDates, ...Object.entries(marks).filter(([, v]) => v === "done").map(([d]) => d)]);
+    const doneCount = doneAll.size;
     const doneDates = past.filter((d) => stateOf(d) === "done");
     const declared = declaredLevelOf(plan.preconditions?.levels, a.areaId);
-    const level = kataLevel(declared, doneDates.length);
-    // racha: katas hechos seguidos hasta hoy (hoy abierto no la corta)
+    const level = kataLevel(declared, doneCount);
+    // racha: días de kata seguidos con kata hecho hasta hoy (hoy abierto no la corta)
     const todayPlanned = dates.includes(today);
     const closed = todayPlanned && stateOf(today) !== "done" ? past.slice(0, -1) : past;
     let streak = 0;
     for (let i = closed.length - 1; i >= 0 && stateOf(closed[i]!) === "done"; i--) streak++;
 
+    // katas hechos por habilidad (el kata nº i usa la habilidad `skillOfDay(i)`) frente a los que tocaban hasta hoy
     const skills: AreaSkillProgress[] = (AREA_SKILLS[a.areaId] ?? []).map((s) => ({ id: s.id, name: s.name, why: s.why, measure: s.measure, levels: s.levels, done: 0, planned: 0, pct: 0 }));
-    past.forEach((d, i) => {
-      const sk = skillOfDay(a.areaId, i + 1);
-      const row = skills.find((s) => s.id === sk?.id);
-      if (!row) return;
-      row.planned++;
-      if (stateOf(d) === "done") row.done++;
-    });
-    for (const s of skills) s.pct = s.planned ? Math.round((s.done / s.planned) * 100) : 0;
+    for (let i = 1; i <= Math.max(past.length, doneCount); i++) {
+      const row = skills.find((s) => s.id === skillOfDay(a.areaId, i)?.id);
+      if (!row) continue;
+      if (i <= past.length) row.planned++;
+      if (i <= doneCount) row.done++;
+    }
+    for (const s of skills) s.pct = s.planned ? Math.min(100, Math.round((s.done / s.planned) * 100)) : 0;
 
-    // el kata de hoy, o el siguiente día de kata
-    const nextDate = todayPlanned ? today : dates.find((d) => d > today);
-    const nextIndex = nextDate ? dates.indexOf(nextDate) + 1 : 0;
+    // el siguiente kata SIN HACER (nº doneCount+1) y la fecha prevista en el calendario
+    const nextIndex = doneCount < dates.length ? doneCount + 1 : 0;
+    const plannedDate = nextIndex ? dates[nextIndex - 1] : undefined;
+    // si ya le tocaba y hoy es día de kata, es «el kata de hoy» (aunque su fecha original fuera antes); si va adelantado, su fecha prevista
+    const nextDate = plannedDate && plannedDate <= today && todayPlanned ? today : plannedDate;
     const nextKata = nextIndex ? kataForDay(a.areaId, nextIndex, level) : null;
     const rel = nextKata ? `${folder}/katas/${nextKata.file}` : "";
 
-    // los katas que tocaban hasta hoy y siguen sin hacerse (más el de hoy, aunque esté hecho)
+    // lo pendiente: solo el siguiente kata, y solo si ya le tocaba (si va adelantado a lo previsto no se lista como atrasado)
     const due: AreaKataDue[] = [];
-    past.forEach((d, i) => {
-      const st = stateOf(d);
-      if (st === "done" && d !== today) return;
-      const k = kataForDay(a.areaId, i + 1, level);
-      if (!k) return;
-      const r = `${folder}/katas/${k.file}`;
-      due.push({ day: i + 1, date: d, state: st, today: d === today, title: k.title, skillName: k.skillName, level: k.level, minutes: k.minutes, summary: kataSummary(k), rel: r, fileReady: inp.existing.files.has(r) });
-    });
-    due.sort((x, y) => Number(y.today) - Number(x.today) || x.date.localeCompare(y.date));
+    if (nextKata && nextDate && plannedDate && plannedDate <= today) {
+      due.push({ day: nextIndex, date: nextDate, state: marks[nextDate] === "skipped" ? "skipped" : "pending", today: nextDate === today, title: nextKata.title, skillName: nextKata.skillName, level: nextKata.level, minutes: nextKata.minutes, summary: kataSummary(nextKata), rel, fileReady: inp.existing.files.has(rel) });
+    }
 
     // semana de lunes a domingo que contiene hoy (o la última del plan)
     const mon = addDays(today, 1 - isoDow(today));
     const week: AreaWeekDay[] = Array.from({ length: 7 }, (_, i) => {
       const date = addDays(mon, i);
       const idx = dates.indexOf(date) + 1;
-      return { date, dow: i + 1, planned: idx > 0, state: idx > 0 ? (date > today ? "pending" : stateOf(date)) : "none", today: date === today, ...(idx > 0 ? { index: idx } : {}) };
+      return { date, dow: i + 1, planned: idx > 0, state: idx > 0 ? (idx <= doneCount ? "done" : date > today ? "pending" : stateOf(date) === "skipped" ? "skipped" : "pending") : "none", today: date === today, ...(idx > 0 ? { index: idx } : {}) };
     });
 
     // semanas del plan: título del proyecto del área, habilidades de sus katas, foco del proyecto full stack
@@ -169,7 +169,7 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
         skills: skillNames,
         focus: focusWeeks.get(i + 1) === a.areaId,
         current: today >= r.start && today <= r.end,
-        doneKatas: inWeek.filter((d) => d <= today && stateOf(d) === "done").length,
+        doneKatas: inWeek.filter((d) => dates.indexOf(d) < doneCount).length,
         katas: inWeek.length,
       };
     });
@@ -186,16 +186,16 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
       languages: sys.languages,
       ledgerSkill: sys.ledgerSkill,
       level,
-      levelSource: doneDates.length >= 40 && level > levelFromDeclared(declared) ? "measured" : "declared",
+      levelSource: doneCount >= 40 && level > levelFromDeclared(declared) ? "measured" : "declared",
       skills,
       kata: {
         skip: kataSkipRule(doneDates.length, past.length),
         plannedDays: past.length,
-        doneDays: doneDates.length,
+        doneDays: doneCount,
         streak,
         todayPlanned,
         todayDone: todayPlanned && stateOf(today) === "done",
-        todayIndex: todayPlanned ? dates.indexOf(today) + 1 : 0,
+        todayIndex: todayPlanned ? nextIndex : 0,
         next: nextKata && nextDate ? { kata: nextKata, date: nextDate, rel, fileReady: inp.existing.files.has(rel), summary: kataSummary(nextKata) } : null,
         week,
         due,

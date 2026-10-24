@@ -6,6 +6,7 @@ import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Play, RefreshCw
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { create } from "zustand";
 import { api } from "../../lib/bridge";
+import { viewWithConsent } from "./ensureView";
 import type { ReviewItem } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { cn, IconButton } from "../ui";
@@ -108,8 +109,8 @@ export function ReviewPanel() {
 
   const practice = async (item: ReviewItem) => {
     try {
-      const view = await api.studyViewEnsure(item.topicPath);
-      if (view.ok && view.path) {
+      const view = await viewWithConsent(item.topicPath);
+      if (view?.ok && view.path) {
         await openNote(view.path);
         useApp.getState().setMode("read");
       }

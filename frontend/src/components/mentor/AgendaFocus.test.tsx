@@ -127,7 +127,8 @@ describe("vista Día: secciones en orden", () => {
     const d = focusDay();
     await openDay(d);
     const day = byTest("agenda-day");
-    expect(byTest("agenda-focus-chip").textContent).toBe("Enfoque: Backend");
+    expect(day.querySelector("[data-testid=agenda-focus-chip]")).toBeNull(); // sin «Enfoque: …»: la cabecera enseña las áreas del día
+    expect(all("agenda-day-area-chip-count", day).length).toBeGreaterThan(0);
     expect(byTest("agenda-day-today-line").textContent).toBe("Hoy: teoría de backend + práctica de Python + teoría y práctica de SQL");
     expect(byTest("agenda-purpose-text").textContent).toContain("Enfoque Backend");
     // una sección por ÁREA (teoría y práctica de cada una), luego práctica de lenguaje, reto de lógica y los proyectos integradores
@@ -243,7 +244,9 @@ describe("Semana, Mes y Calendario con enfoque", () => {
     const wp = byTest("agenda-week-projects");
     expect(wp.querySelectorAll("ol[aria-label='Mini-proyectos diarios de la semana'] li")).toHaveLength(3); // hoy es miércoles: el reparto por avance empieza hoy (miércoles a viernes)
     expect(byTest("agenda-project-weekly", wp).textContent).toMatch(/0 de 3 mini-proyectos diarios hechos/);
-    expect(all("agenda-week-day-focus")[0]!.textContent).toBe("Enfoque: Backend");
+    expect(all("agenda-week-day-focus")).toHaveLength(0);
+    expect(byTest("agenda-week").textContent).not.toContain("Enfoque:");
+    expect(all("agenda-week-day-areas")[0]!.textContent).toMatch(/Back/);
     expect(byTest("agenda-week-counts").textContent).toMatch(/\d+ entregables/);
   });
 

@@ -142,8 +142,7 @@ describe("vista de un área", () => {
   it("kata diario del área: semana L–D con estados, hechos y racha, kata de hoy con enunciado y «Abrir kata»", async () => {
     const view = await openBackend();
     const kata = view.querySelector("[data-testid=area-kata]")!;
-    expect(kata.textContent).toContain("Reto diario · Backend");
-    expect(kata.querySelector("h3")!.textContent).toContain("Kata de hoy");
+    expect(kata.querySelector("h5")!.textContent).toContain("Kata de Backend de hoy");
     const days = [...kata.querySelectorAll("[data-testid=area-kata-week] li")];
     expect(days).toHaveLength(7);
     expect(days.map((d) => /sin kata|hecho|saltado|pendiente/.exec(d.querySelector(".sr-only")!.textContent!)![0])).toEqual(["hecho", "hecho", "pendiente", "pendiente", "pendiente", "sin kata", "sin kata"]);
@@ -151,7 +150,7 @@ describe("vista de un área", () => {
     expect(kata.querySelector("[data-testid=area-kata-count]")!.textContent).toBe("2/4 días hechos");
     expect(kata.textContent).toContain("racha 0"); // el miércoles no se hizo: la racha está cortada
     const today = kata.querySelector("[data-testid=area-kata-today]")!;
-    expect(today.textContent).toContain("Principiante");
+    expect(kata.textContent).toContain("Principiante");
     expect(today.querySelector("[data-testid=area-kata-summary]")!.textContent!.length).toBeGreaterThan(20);
     const open = vi.spyOn(useApp.getState(), "openNote").mockResolvedValue(undefined);
     useApp.setState({ openNote: open });
@@ -192,7 +191,7 @@ describe("vista de un área", () => {
     expect(kata.textContent).toContain("Hoy: hecho");
     expect(kata.querySelector("[data-testid=area-kata-done]")).toBeNull();
     // al estar hecho, el siguiente kata ya no es el de hoy: pasa a «Siguiente», no se adelanta solo
-    expect(kata.querySelector("h3")!.textContent).toContain("Kata siguiente");
+    expect(kata.querySelector("h5")!.textContent).toContain("Kata de Backend siguiente");
   });
 
   it("área sin carpeta: «Carpeta aún no creada: se crea al ejecutar el plan», sin «Abrir kata» y con acceso a «Ejecutar plan»", async () => {

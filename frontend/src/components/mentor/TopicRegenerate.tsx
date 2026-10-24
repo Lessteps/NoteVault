@@ -8,18 +8,16 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
 import type { AreaTopicRow } from "../../lib/planAreaTopics";
+import { LABEL, OBJECT, regenBlockedReason, type RegenKind } from "../../lib/topicSelection";
 import type { TopicRegenerateJob } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { GhostButton, Modal, PrimaryButton } from "../common/forms";
 
-export type RegenWhat = "theory" | "practice" | "exercises";
+export type RegenWhat = RegenKind;
 
 const POLL_MS = 1500;
 const sleep = (ms: number): Promise<void> => new Promise((ok) => setTimeout(ok, ms));
-
-const LABEL: Record<RegenWhat, string> = { theory: "Regenerar teoría", practice: "Regenerar práctica", exercises: "Regenerar ejercicios" };
-const DONE: Record<RegenWhat, string> = { theory: "la teoría", practice: "la práctica", exercises: "los ejercicios" };
 
 /** Lo que el diálogo de confirmación dice que va a pasar (nada de eufemismos: se reemplaza, con copia antes). */
 export function confirmCopy(what: RegenWhat, row: Pick<AreaTopicRow, "title" | "exercises">): { lead: string; points: string[] } {
@@ -30,6 +28,25 @@ export function confirmCopy(what: RegenWhat, row: Pick<AreaTopicRow, "title" | "
         "Antes se hace una copia de seguridad de la nota actual y de su canvas en la carpeta .trash de tu vault.",
         "También se vuelve a generar su canvas explicativo; si lo habías editado a mano, el nuevo se guarda aparte como «… .nuevo.canvas».",
         "Si la generación falla, se restaura la nota anterior.",
+      ],
+    };
+  }
+  if (what === "map") {
+    return {
+      lead: `Se va a REGENERAR el canvas explicativo (mapa) de «${row.title}» a partir de su nota de teoría actual.`,
+      points: [
+        "No usa la IA: el mapa se construye de la nota que ya existe.",
+        "Antes se hace una copia de seguridad de los canvas actuales en la carpeta .trash de tu vault.",
+        "Si habías editado el canvas a mano, se conserva y el nuevo se guarda aparte como «… .nuevo.canvas».",
+      ],
+    };
+  }
+  if (what === "all") {
+    return {
+      lead: `Se va a REEMPLAZAR todo lo generado de «${row.title}»: teoría y mapa, práctica (.practica) y ejercicios, en ese orden.`,
+      points: [
+        "Antes de cada paso se respalda lo actual en la carpeta .trash de tu vault (los ejercicios se archivan, no se borran).",
+        "Si un paso falla, se restaura lo de ese paso y no se sigue con los siguientes.",
       ],
     };
   }
@@ -53,8 +70,8 @@ export function confirmCopy(what: RegenWhat, row: Pick<AreaTopicRow, "title" | "
  * Lanza la regeneración y la sigue hasta el final. Vive FUERA de React: si el panel se pliega a mitad, el aviso final sale igual.
  * `onProgress` se llama con cada estado (la interfaz lo ignora si ya se desmontó).
  */
-export async function runRegeneration(folder: string, what: RegenWhat, onProgress?: (job: TopicRegenerateJob) => void): Promise<TopicRegenerateJob> {
-  const toast = useApp.getState().toast;
+export async function runRegeneration(folder: string, what: RegenWhat, onProgress?: (job: TopicRegenerateJob) => void, opts: { /** sin avisos propios (lo hace quien lanza el lote) */ quiet?: boolean } = {}): Promise<TopicRegenerateJob> {
+  const toast = opts.quiet ? () => undefined : useApp.getState().toast;
   try {
     const { jobId } = await api.studyTopicRegenerate(folder, what, true);
     for (;;) {
@@ -62,8 +79,8 @@ export async function runRegeneration(folder: string, what: RegenWhat, onProgres
       onProgress?.(st);
       if (st.done) {
         useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }));
-        if (st.error) toast("error", `No se pudo regenerar ${DONE[what]}: ${st.error}`);
-        else toast("info", `Se regeneró ${DONE[what]}.${st.backup ? ` Lo anterior está respaldado en ${st.backup}.` : ""}`);
+        if (st.error) toast("error", `No se pudo regenerar ${OBJECT[what]}: ${st.error}`);
+        else toast("info", `Se regeneró ${OBJECT[what]}.${st.backup ? ` Lo anterior está respaldado en ${st.backup}.` : ""}`);
         return st;
       }
       await sleep(POLL_MS);
@@ -92,16 +109,7 @@ export function RegeneratePanel({ row }: { row: AreaTopicRow }) {
     };
   }, []);
 
-  const skipped = row.route === "skipped";
-  const reason = (what: RegenWhat): string => {
-    if (busy) return "Hay una regeneración en curso de este tema.";
-    if (skipped) return "El tema está fuera del plan: no se regenera.";
-    if (!row.exists) return "El tema aún no existe en la vault: usa «Generar todo».";
-    if (bridge) return "La IA está en modo puente: no puede regenerar automáticamente. Cambia de proveedor en los ajustes de IA.";
-    if (what === "theory" && !row.theory) return "Este tema no tiene teoría todavía: usa «Generar todo».";
-    if (what === "exercises" && !row.manifest) return "Primero genera la práctica (.practica) del tema: de ahí salen las competencias.";
-    return "";
-  };
+  const reason = (what: RegenWhat): string => (busy ? "Hay una regeneración en curso de este tema." : regenBlockedReason(row, what, bridge));
 
   const start = async (): Promise<void> => {
     const what = asking;
@@ -136,8 +144,9 @@ export function RegeneratePanel({ row }: { row: AreaTopicRow }) {
       <p className="text-[13.5px] text-dim">
         Regenerar <strong>reemplaza</strong> lo que ya existe: antes se respalda en <code>.trash</code> y, si falla, se restaura. No se hace nada sin confirmar.
       </p>
-      <ul className="grid gap-3 @xl:grid-cols-3">
-        {action("theory", <><strong>Teoría y canvas:</strong> <Artifact ok={row.theory}>{row.theory ? "con nota" : "sin nota"}</Artifact> · <Artifact ok={row.canvas}>{row.canvas ? "con mapa" : "sin mapa"}</Artifact></>)}
+      <ul className="grid gap-3 @xl:grid-cols-4">
+        {action("theory", <><strong>Teoría:</strong> <Artifact ok={row.theory}>{row.theory ? "con nota" : "sin nota"}</Artifact></>)}
+        {action("map", <><strong>Mapa (canvas):</strong> <Artifact ok={row.canvas}>{row.canvas ? "con mapa" : "sin mapa"}</Artifact></>)}
         {action("practice", <><strong>Práctica (.practica):</strong> <Artifact ok={row.manifest}>{row.manifest ? "existe" : "no existe"}</Artifact></>)}
         {action("exercises", <><strong>Ejercicios:</strong> <Artifact ok={row.exercises > 0}>{row.exercises > 0 ? `${row.exercises}${row.planExercises ? ` de ${row.planExercises}` : ""}` : "sin ejercicios"}</Artifact></>)}
       </ul>

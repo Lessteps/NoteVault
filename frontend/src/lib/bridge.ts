@@ -735,7 +735,7 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studySpaceStatus: (jobId: string) =>
     call<{ id: string; folder: string; log: string[]; done: boolean; error: string; finished: number; total: number; conversationId: string }>("study_space_status", jobId),
   /** Regenera la teoría / práctica / ejercicios de un tema (respalda antes lo que reemplaza). Exige `confirm: true`. */
-  studyTopicRegenerate: (folder: string, what: "theory" | "practice" | "exercises", confirm: boolean) => call<{ jobId: string }>("study_topic_regenerate", folder, what, confirm),
+  studyTopicRegenerate: (folder: string, what: "theory" | "map" | "practice" | "exercises" | "all", confirm: boolean) => call<{ jobId: string }>("study_topic_regenerate", folder, what, confirm),
   studyTopicRegenerateStatus: (jobId: string) =>
     call<import("./types").TopicRegenerateJob>("study_topic_regenerate_status", jobId),
   studySpaceList: () => call<string[]>("study_space_list"),

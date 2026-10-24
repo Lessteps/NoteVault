@@ -1,0 +1,269 @@
+// Mentor — «Temas por área»: regeneración en LOTE. Una barra de acciones (siempre visible) sobre la tabla, el diálogo de confirmación que dice
+// qué se reemplaza y cuánto cuesta, y la cola que regenera los temas elegidos DE UNO EN UNO (un trabajo `study_topic_regenerate` cada vez; el
+// turno de generación es compartido). Un fallo no aborta la cola; se puede parar entre temas y al final hay un resumen por tema.
+
+import { BookOpen, ChevronDown, ClipboardList, Dumbbell, Loader2, Map as MapIcon, RefreshCw, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { AreaTopicRow } from "../../lib/planAreaTopics";
+import { LABEL, OBJECT, SHORT, regenBlockedReason, type BulkPlan, type RegenKind } from "../../lib/topicSelection";
+import { useApp } from "../../store/app";
+import { GhostButton, Modal, PrimaryButton } from "../common/forms";
+import { cn } from "../ui";
+import { runRegeneration } from "./TopicRegenerate";
+
+export type ItemState = "pending" | "running" | "ok" | "error" | "cancelled";
+export interface QueueItem {
+  folder: string;
+  title: string;
+  state: ItemState;
+  error?: string;
+  /** última línea del registro del trabajo */
+  note?: string;
+}
+export interface QueueState {
+  what: RegenKind;
+  items: QueueItem[];
+  running: boolean;
+  stopping: boolean;
+}
+
+/** La cola: lanza `runRegeneration` tema a tema. Vive en el componente, pero el bucle no depende de que siga montado. */
+export function useRegenQueue(onTopicDone?: () => void) {
+  const [queue, setQueue] = useState<QueueState | null>(null);
+  const stop = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const patch = (folder: string, p: Partial<QueueItem>): void => {
+    if (alive.current) setQueue((q) => (q ? { ...q, items: q.items.map((i) => (i.folder === folder ? { ...i, ...p } : i)) } : q));
+  };
+
+  const start = async (what: RegenKind, rows: ReadonlyArray<Pick<AreaTopicRow, "folder" | "title">>): Promise<void> => {
+    stop.current = false;
+    const items: QueueItem[] = rows.map((r) => ({ folder: r.folder, title: r.title, state: "pending" }));
+    setQueue({ what, items, running: true, stopping: false });
+    let ok = 0;
+    let bad = 0;
+    let left = 0;
+    for (const r of rows) {
+      if (stop.current) {
+        left++;
+        patch(r.folder, { state: "cancelled" });
+        continue;
+      }
+      patch(r.folder, { state: "running", note: "Empezando…" });
+      try {
+        const st = await runRegeneration(r.folder, what, (j) => patch(r.folder, { note: j.log[j.log.length - 1] ?? "Trabajando…" }), { quiet: true });
+        if (st.error) {
+          bad++;
+          patch(r.folder, { state: "error", error: st.error });
+        } else {
+          ok++;
+          patch(r.folder, { state: "ok" });
+        }
+      } catch (e) {
+        bad++;
+        patch(r.folder, { state: "error", error: (e as Error).message });
+      }
+      onTopicDone?.();
+    }
+    if (alive.current) setQueue((q) => (q ? { ...q, running: false } : q));
+    useApp.getState().toast(bad ? "error" : "info", `${LABEL[what]}: ${ok} bien${bad ? `, ${bad} con error` : ""}${left ? `, ${left} sin hacer` : ""}.`);
+  };
+  return {
+    queue,
+    start,
+    stop: (): void => {
+      stop.current = true;
+      setQueue((q) => (q ? { ...q, stopping: true } : q));
+    },
+    dismiss: (): void => setQueue(null),
+  };
+}
+
+const BUTTONS: ReadonlyArray<{ what: RegenKind; text: string }> = [
+  { what: "theory", text: "Regenerar teoría" },
+  { what: "map", text: "Regenerar mapa" },
+  { what: "practice", text: "Regenerar práctica" },
+  { what: "exercises", text: "Regenerar ejercicios" },
+];
+
+export type SelectHelper = "all" | "missing" | "noExercises" | "clear";
+
+/** Barra de acciones sobre la tabla: siempre visible; sin selección, con los botones desactivados y una pista. */
+export function BulkToolbar({ count, busy, bridge, onAsk, onGenerateMissing, onHelper }: {
+  count: number;
+  busy: boolean;
+  bridge: boolean;
+  onAsk: (what: RegenKind) => void;
+  onGenerateMissing: () => void;
+  onHelper: (h: SelectHelper) => void;
+}) {
+  const [menu, setMenu] = useState(false);
+  const off = count === 0 || busy;
+  const why = busy ? "Hay una regeneración en curso." : count === 0 ? "Selecciona temas para regenerar" : bridge ? "La IA está en modo puente: no puede regenerar automáticamente." : "";
+  const helpers: ReadonlyArray<{ key: SelectHelper; text: string }> = [
+    { key: "all", text: "Seleccionar todos" },
+    { key: "missing", text: "Solo los que faltan" },
+    { key: "noExercises", text: "Solo sin ejercicios" },
+    { key: "clear", text: "Limpiar" },
+  ];
+  return (
+    <div className={cn("sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2", count ? "border-accent" : "border-line")} role="toolbar" aria-label="Acciones sobre los temas seleccionados" data-testid="bulk-bar">
+      <span className="text-[13.5px] font-semibold" aria-live="polite" data-testid="bulk-count">
+        {count === 0 ? <span className="font-normal text-dim">Selecciona temas para regenerar</span> : `${count} ${count === 1 ? "tema seleccionado" : "temas seleccionados"}`}
+      </span>
+      <span className="flex flex-wrap items-center gap-2">
+        {BUTTONS.map((b) => (
+          <GhostButton key={b.what} onClick={() => onAsk(b.what)} disabled={off || bridge} title={why || `${b.text}: respalda lo actual y lo reemplaza`} data-testid={`bulk-${b.what}`}>
+            <RefreshCw size={14} aria-hidden /> {b.text}
+          </GhostButton>
+        ))}
+        <GhostButton onClick={() => onAsk("all")} disabled={off || bridge} title={why || "Rehace teoría, mapa, práctica y ejercicios, en ese orden"} data-testid="bulk-all">
+          <RefreshCw size={14} aria-hidden /> Regenerar todo
+        </GhostButton>
+        <GhostButton onClick={onGenerateMissing} disabled={off} title={why || "Crea lo que falta de los temas elegidos (no toca lo que ya existe)"} data-testid="bulk-missing">
+          <Sparkles size={14} aria-hidden /> Generar lo que falta
+        </GhostButton>
+      </span>
+      <span className="relative ml-auto">
+        <GhostButton onClick={() => setMenu((m) => !m)} aria-expanded={menu} data-testid="bulk-select-menu" title="Elegir temas de un golpe">
+          Selección <ChevronDown size={14} aria-hidden />
+        </GhostButton>
+        {menu && (
+          <ul role="menu" className="absolute right-0 z-20 mt-1 min-w-48 rounded-lg border border-line bg-card p-1 shadow-lg" data-testid="bulk-select-list">
+            {helpers.map((h) => (
+              <li key={h.key} role="none">
+                <button type="button" role="menuitem" className="w-full rounded-md px-3 py-1.5 text-left text-[13.5px] hover:bg-hover" data-testid={`sel-${h.key}`} onClick={() => { setMenu(false); onHelper(h.key); }}>
+                  {h.text}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/** Los cuatro iconos de acciones rápidas de una fila (siempre visibles). */
+const QUICK: ReadonlyArray<{ what: Exclude<RegenKind, "all">; Icon: typeof BookOpen }> = [
+  { what: "theory", Icon: BookOpen },
+  { what: "map", Icon: MapIcon },
+  { what: "practice", Icon: ClipboardList },
+  { what: "exercises", Icon: Dumbbell },
+];
+
+export function RowQuickActions({ row, bridge, busy, onAsk }: { row: AreaTopicRow; bridge: boolean; busy: boolean; onAsk: (what: RegenKind, row: AreaTopicRow) => void }) {
+  return (
+    <span className="inline-flex items-center gap-0.5" data-testid="row-quick">
+      {QUICK.map(({ what, Icon }) => {
+        const why = busy ? "Hay una regeneración en curso." : regenBlockedReason(row, what, bridge);
+        return (
+          <button
+            key={what}
+            type="button"
+            disabled={!!why}
+            onClick={() => onAsk(what, row)}
+            title={why || `${LABEL[what]}: respalda lo actual y lo reemplaza`}
+            aria-label={`${LABEL[what]} de ${row.title}`}
+            data-testid={`quick-${what}`}
+            className="inline-grid h-8 w-8 place-items-center rounded-md text-dim hover:bg-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Icon size={16} aria-hidden />
+          </button>
+        );
+      })}
+    </span>
+  );
+}
+
+/** Diálogo de confirmación del lote: qué se regenera, en cuántos temas, cuántas llamadas a la IA y dónde queda la copia. */
+export function BulkConfirm({ plan, onCancel, onConfirm }: { plan: BulkPlan; onCancel: () => void; onConfirm: () => void }) {
+  const { what, run, skipped, aiCalls } = plan;
+  const shown = run.slice(0, 8);
+  return (
+    <Modal
+      title={LABEL[what]}
+      onClose={onCancel}
+      width={560}
+      footer={
+        <>
+          <span className="flex-1" />
+          <GhostButton onClick={onCancel} data-testid="bulk-confirm-cancel">Cancelar</GhostButton>
+          <PrimaryButton onClick={onConfirm} disabled={run.length === 0} data-testid="bulk-confirm-run">{LABEL[what]}{run.length > 1 ? ` (${run.length})` : ""}</PrimaryButton>
+        </>
+      }
+    >
+      <div className="space-y-3 text-[14px]" data-testid="bulk-confirm">
+        <p className="font-semibold" data-testid="bulk-confirm-lead">
+          {run.length === 0 ? "Ninguno de los temas elegidos se puede regenerar." : `Se va a REEMPLAZAR ${what === "all" ? "todo lo generado (teoría y mapa, práctica y ejercicios)" : OBJECT[what]} de ${run.length} ${run.length === 1 ? "tema" : "temas"}, uno detrás de otro.`}
+        </p>
+        {run.length > 0 && (
+          <>
+            <ul className="list-disc space-y-0.5 pl-5" data-testid="bulk-confirm-topics">
+              {shown.map((r) => <li key={r.folder}>{r.title}</li>)}
+              {run.length > shown.length && <li className="text-dim">y {run.length - shown.length} más</li>}
+            </ul>
+            <p data-testid="bulk-confirm-calls">
+              {aiCalls > 0 ? <>Llamadas a la IA aproximadas: <strong>{aiCalls}</strong> (cada una puede tardar un minuto).</> : <>No usa la IA: el mapa se construye de la teoría que ya existe.</>}
+            </p>
+            <p className="text-dim" data-testid="bulk-confirm-backup">
+              Antes de tocar cada tema se respalda lo que existe en la carpeta <code>.trash/regenerar</code> de tu vault (los ejercicios se archivan, no se borran) y, si un tema falla, se restaura. Un fallo no detiene a los demás y puedes parar la cola entre temas.
+            </p>
+          </>
+        )}
+        {skipped.length > 0 && (
+          <div data-testid="bulk-confirm-skipped">
+            <p className="font-medium text-warn">Se omiten {skipped.length}:</p>
+            <ul className="list-disc space-y-0.5 pl-5 text-dim">
+              {skipped.slice(0, 6).map((s) => <li key={s.row.folder}>{s.row.title}: {s.reason}</li>)}
+              {skipped.length > 6 && <li>y {skipped.length - 6} más</li>}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+/** Progreso de la cola y, al terminar, el resumen por tema. */
+export function BulkProgress({ queue, onStop, onClose }: { queue: QueueState; onStop: () => void; onClose: () => void }) {
+  const { items, running, stopping, what } = queue;
+  const done = items.filter((i) => i.state === "ok" || i.state === "error" || i.state === "cancelled").length;
+  const cur = items.find((i) => i.state === "running");
+  const failed = items.filter((i) => i.state === "error");
+  const cancelled = items.filter((i) => i.state === "cancelled").length;
+  return (
+    <div className="rounded-xl border border-line bg-card px-3 py-2 text-[13.5px]" role="status" data-testid="bulk-progress">
+      {running ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Loader2 size={14} className="animate-spin" aria-hidden />
+          <span className="min-w-0 flex-1" data-testid="bulk-progress-line">
+            {Math.min(done + 1, items.length)}/{items.length} · {cur?.title ?? "…"} · {SHORT[what]}… {cur?.note && <span className="text-dim">{cur.note}</span>}
+          </span>
+          <GhostButton onClick={onStop} disabled={stopping} data-testid="bulk-stop">{stopping ? "Parando tras este tema…" : "Detener la cola"}</GhostButton>
+        </div>
+      ) : (
+        <div className="space-y-2" data-testid="bulk-summary">
+          <p className="font-semibold">
+            {LABEL[what]}: {items.filter((i) => i.state === "ok").length} bien{failed.length ? `, ${failed.length} con error` : ""}
+            {cancelled ? `, ${cancelled} sin hacer (cola detenida)` : ""}.
+          </p>
+          <ul className="space-y-0.5">
+            {items.map((i) => (
+              <li key={i.folder} data-testid="bulk-summary-item" data-state={i.state} className={i.state === "error" ? "text-warn" : i.state === "ok" ? "text-mint" : "text-dim"}>
+                {i.state === "ok" ? "✓" : i.state === "error" ? "✗" : "–"} {i.title}{i.error ? `: ${i.error}` : i.state === "cancelled" ? " (sin hacer)" : ""}
+              </li>
+            ))}
+          </ul>
+          <GhostButton onClick={onClose} data-testid="bulk-summary-close">Cerrar</GhostButton>
+        </div>
+      )}
+    </div>
+  );
+}

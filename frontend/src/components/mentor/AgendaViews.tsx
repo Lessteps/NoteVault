@@ -5,7 +5,7 @@
 import { CalendarDays } from "lucide-react";
 import { dateLabel, dayPurpose, deliverablesText, longDateLabel, monthSummary, topicsText, weekSummary, type ScheduleDay } from "../../lib/planSchedule";
 import { PHASE_LABEL, PRACTICE_NAME, type PracticePhase } from "../../lib/practiceTrack";
-import { areaRank, areaShort, dayByArea } from "../../lib/planTopicsByArea";
+import { areaShort, dayBases, dayByArea } from "../../lib/planTopicsByArea";
 import type { MentorPlan } from "../../lib/types";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
@@ -13,7 +13,8 @@ import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { AreaChip, AreaCounts, DeliverableLine, doneText, focusColour, plural, PurposeBlock, type AgendaModel } from "./agendaKit";
 import { DayDetailFocus, FocusStructure, MonthProjects, WeekProjects } from "./AgendaDayFocus";
-import { AreaDot, MonthAreaTotals, WeekAreaChips, WeekAreaColumns } from "./AreaViews";
+import { AreaDot, MonthAreaTotals } from "./AreaViews";
+import { MonthLegend, MonthStats, MonthWeekBlock, topicsPerDay, WeekCategories, WeekDayStrip, WeekStats } from "./AgendaBoards";
 import { openTopic } from "./openTopic";
 import { TopicNoteLinks } from "./TopicNoteLinks";
 import { hm, ProgressBar } from "./parts";
@@ -206,28 +207,17 @@ export function WeekDetail({ m, week, onPickDay, onChanged, headingId, only = nu
 
       <PurposeBlock planId={m.plan.id} scope="week" keyName={String(week)} text={w.purpose} auto={w.autoPurpose} manual={purposeManual} editable={m.editable} onChanged={onChanged} label={`la semana ${week}`} />
 
-      <dl className={cn("grid gap-3 @xl:grid-cols-2", m.deliverablesDefined ? "@3xl:grid-cols-4" : "@3xl:grid-cols-3")}>
-        {[
-          { l: "Temas", v: String(w.topics), h: w.topicsDone ? `${w.topicsDone} completados` : "sin completar aún" },
-          { l: "Estudio", v: hm(w.topicMinutes), h: w.capacityMinutes ? `de ${hm(w.capacityMinutes)} disponibles` : "sin capacidad" },
-          { l: "Práctica", v: w.practiceMinutes ? hm(w.practiceMinutes) : "—", h: `${plural(w.katas, "kata", "katas")} · ${plural(w.projectSessions, "sesión", "sesiones")}` },
-          ...(m.deliverablesDefined ? [{ l: "Entregables", v: String(w.deliverables.length), h: doneText(w.deliverables.filter((d) => d.status === "hecho").length) }] : []),
-        ].map((x) => (
-          <div key={x.l} className="min-w-0 rounded-xl border border-line bg-card px-4 py-3">
-            <dt className="mb-1 text-[13px] font-semibold uppercase tracking-wide text-faint">{x.l}</dt>
-            <dd className="text-[19px] font-semibold leading-snug">{x.v}</dd>
-            <dd className="mt-0.5 text-[13.5px] text-dim">{x.h}</dd>
-          </div>
-        ))}
-      </dl>
+      <WeekStats w={w} days={days} />
       <div className="flex items-center gap-3">
         <div className="flex-1"><ProgressBar pct={pct} thick label={`Temas completados de la semana ${week}`} /></div>
         <span className="text-[14px] font-semibold">{pct} %</span>
       </div>
 
+      <WeekDayStrip m={m} days={days} counts={topicsPerDay(m.byWeekArea.weeks[week - 1]!)} onPick={onPickDay} />
+
       {m.schedule.mode === "focus" && <FocusStructure days={days} headingId={`${headingId ?? "wk"}-focus`} label={`de la semana ${week}`} />}
 
-      <WeekAreaColumns m={m} week={week} headingId={`${headingId ?? "wk"}-areas`} byWeekArea={m.byWeekArea} only={only} />
+      <WeekCategories m={m} week={week} headingId={`${headingId ?? "wk"}-areas`} only={only} />
 
       {m.schedule.mode === "focus" && <WeekProjects m={m} week={week} headingId={`${headingId ?? "wk"}-projects`} onChanged={onChanged} />}
 
@@ -250,7 +240,7 @@ export function WeekDetail({ m, week, onPickDay, onChanged, headingId, only = nu
       )}
 
       <section aria-labelledby={`${headingId ?? "wk"}-days`} data-testid="agenda-week-days">
-        <h3 id={`${headingId ?? "wk"}-days`} className={cn(SECTION, "mb-2")}>Días de la semana</h3>
+        <h3 id={`${headingId ?? "wk"}-days`} className={cn(SECTION, "mb-2")}>Días de la semana (plan diario)</h3>
         <ol className="space-y-1.5">
           {days.map((d) => <WeekDayRow key={d.date} m={m} day={d} onPick={onPickDay} />)}
         </ol>
@@ -261,27 +251,23 @@ export function WeekDetail({ m, week, onPickDay, onChanged, headingId, only = nu
 
 function WeekDayRow({ m, day, onPick }: { m: AgendaModel; day: ScheduleDay; onPick: (d: string) => void }) {
   const due = m.dueByDate.get(day.date) ?? [];
-  const purpose = dayPurpose(m.plan, day, m.deliverablesDefined ? due : []).text;
   const areas = dayByArea(m.plan, day, due);
+  const bases = new Set(dayBases(m.plan, day).map((b) => b.folder)).size;
   return (
-    <li className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-3 py-2 text-[14px]", day.date === m.today ? "border-accent bg-accent-soft" : "border-line")} data-testid="agenda-week-day">
+    <li className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border px-3.5 py-2.5 text-[14px]", day.date === m.today ? "border-accent bg-accent-soft" : "border-line bg-card")} data-testid="agenda-week-day">
       <span className="w-24 flex-none font-medium capitalize">{DAY_SHORT[day.dow - 1]} {Number(day.date.slice(8))}<span className="sr-only"> {DAY_LONG[day.dow - 1]}</span></span>
-      {day.focus && (
-        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line px-2 py-0.5 text-[13px] font-medium text-text" data-testid="agenda-week-day-focus">
-          <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: focusColour(day.focus.id) }} />
-          Enfoque: {day.focus.label}
-        </span>
-      )}
-      <span className="min-w-0 flex-1 basis-60 text-dim">{purpose}</span>
-      {areas.length > 0 && (
-        <span className="flex flex-wrap gap-1" aria-label={`Por área: ${areas.map((a) => `${a.area} ${a.topics}`).join(", ")}`} data-testid="agenda-week-day-areas">
+      <span className="whitespace-nowrap font-medium">{topicsText(day.topics.length)}</span>
+      {areas.length > 0 || bases > 0 ? (
+        <span className="flex min-w-0 flex-1 basis-48 flex-wrap gap-1" aria-label={`Por área: ${[...areas.map((a) => `${a.area} ${a.topics}`), ...(bases ? [`Bases ${bases}`] : [])].join(", ")}`} data-testid="agenda-week-day-areas">
           {areas.map((a) => (
             <span key={a.subplanId} aria-hidden className="inline-flex items-center gap-1 rounded border border-line px-1.5 py-0.5 text-[12.5px]"><AreaDot {...(a.areaId ? { areaId: a.areaId } : {})} />{areaShort(a.areaId, a.area)} {a.topics}</span>
           ))}
+          {bases > 0 && <span aria-hidden className="inline-flex items-center gap-1 rounded border border-line px-1.5 py-0.5 text-[12.5px]"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent" />Bases {bases}</span>}
         </span>
+      ) : (
+        <span className="min-w-0 flex-1 basis-48 text-dim">{day.study ? "Repaso y práctica" : day.blocked ? "Bloqueado" : "Descanso"}</span>
       )}
-      <span className="whitespace-nowrap">{topicsText(day.topics.length)}</span>
-      {m.deliverablesDefined && <span className="whitespace-nowrap">{deliverablesText(due.length)}</span>}
+      {m.deliverablesDefined && <span className="whitespace-nowrap text-dim">{deliverablesText(due.length)}</span>}
       {day.practice.kata && <Chip large colour="var(--nv-practice, #c58be0)">Kata</Chip>}
       {day.practice.project && <Chip large colour="var(--nv-practice, #c58be0)">Proyecto</Chip>}
       <GhostButton aria-label={`Ver el día ${longDateLabel(day.date)}`} onClick={() => onPick(day.date)}>Ver día</GhostButton>
@@ -295,9 +281,7 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId, only =
   if (!s) return <p className="text-[14px] text-dim">Ese mes queda fuera del plan.</p>;
   const manual = !!m.plan.purposes?.month?.[month];
   const real = s.deliverables.filter((d) => d.kind !== "kata" && d.kind !== "daily_project");
-  const maxMin = Math.max(1, ...s.byArea.map((a) => a.minutes));
-  const monthAreas = [...s.byArea].filter((a) => only === null || a.subplanId === only).sort((a, b) => areaRank(a.areaId) - areaRank(b.areaId));
-  return (
+    return (
     <article className="space-y-4" data-testid="agenda-month" aria-labelledby={headingId}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h2 id={headingId} className="text-[20px] font-bold leading-tight">{s.label}</h2>
@@ -311,24 +295,12 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId, only =
 
       {m.schedule.mode === "focus" && <FocusStructure days={m.schedule.days.filter((d) => d.date >= s.start && d.date <= s.end)} headingId={`${headingId ?? "mo"}-focus`} label={`de ${s.label}`} />}
 
+      <MonthStats weeks={s.weeks.map((x) => x.week)} data={m.byWeekArea} topicMinutes={s.topicMinutes} topics={s.topics} />
+
       <section aria-labelledby={`${headingId ?? "mo"}-areas`} data-testid="agenda-month-areas">
-        <h3 id={`${headingId ?? "mo"}-areas`} className={cn(SECTION, "mb-2")}>Áreas en foco</h3>
-        {s.byArea.length === 0 ? (
-          <p className="text-[14px] text-dim">Este mes no tiene temas repartidos.</p>
-        ) : (
-          <ul className="space-y-2">
-            {monthAreas.map((a) => (
-              <li key={a.subplanId} className="rounded-xl border border-line px-3.5 py-2.5 text-[14px]" style={{ borderLeft: `4px solid ${colourOfArea(m, a.subplanId)}` }}>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="min-w-0 flex-1 text-[15px] font-semibold">{a.area}</span>
-                  <span>{topicsText(a.topics)}</span>
-                  <span className="text-dim">{hm(a.minutes)}</span>
-                </div>
-                <div className="mt-1.5"><ProgressBar pct={(a.minutes / maxMin) * 100} colour={colourOfArea(m, a.subplanId)} label={`Estudio de ${a.area} este mes`} /></div>
-              </li>
-            ))}
-          </ul>
-        )}
+        <h3 id={`${headingId ?? "mo"}-areas`} className={cn(SECTION, "mb-2")}>El mes por categoría</h3>
+        {s.byArea.length === 0 && <p className="mb-2 text-[14px] text-dim">Este mes no tiene temas repartidos.</p>}
+        <MonthAreaTotals weeks={s.weeks.map((x) => x.week)} data={m.byWeekArea} only={only} />
       </section>
 
       {s.milestones.length > 0 && (
@@ -339,24 +311,10 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId, only =
       )}
 
       <section aria-labelledby={`${headingId ?? "mo"}-weeks`} data-testid="agenda-month-weeks">
-        <h3 id={`${headingId ?? "mo"}-weeks`} className={cn(SECTION, "mb-2")}>Temas por semana, separados por área</h3>
-        <div className="mb-2">
-          <MonthAreaTotals weeks={s.weeks.map((x) => x.week)} data={m.byWeekArea} only={only} />
-        </div>
-        <ol className="space-y-2">
-          {s.weeks.map((w) => (
-            <li key={w.week} className="rounded-xl border border-line px-3.5 py-2.5 text-[14px]" data-testid="agenda-month-week">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="text-[15px] font-semibold">Semana {w.week} <span className="font-normal text-dim">{dateLabel(w.start)} – {dateLabel(w.end)}</span></span>
-                <span>{topicsText(w.topics)}</span>
-                {m.deliverablesDefined && <span>{deliverablesText(w.deliverables.length)}</span>}
-                <span className="flex-1" />
-                <GhostButton aria-label={`Ver la semana ${w.week}`} onClick={() => onPickWeek(w.start)}>Ver semana</GhostButton>
-              </div>
-              <WeekAreaChips week={w.week} data={m.byWeekArea} only={only} />
-              <p className="mt-1 text-dim">{w.purpose}</p>
-            </li>
-          ))}
+        <h3 id={`${headingId ?? "mo"}-weeks`} className={cn(SECTION, "mb-2")}>Temas por semana, separados por categoría</h3>
+        <div className="mb-3"><MonthLegend data={m.byWeekArea} only={only} bases={s.weeks.some((x) => (m.byWeekArea.weeks[x.week - 1]?.bases.length ?? 0) > 0)} /></div>
+        <ol className="space-y-3">
+          {s.weeks.map((w) => <MonthWeekBlock key={w.week} m={m} week={w.week} summary={w} onPickWeek={onPickWeek} only={only} {...(m.deliverablesDefined ? { deliverablesText: deliverablesText(w.deliverables.length) } : {})} />)}
         </ol>
       </section>
 

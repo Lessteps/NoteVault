@@ -10,7 +10,7 @@
 // la persona hace aquí o en «Hoy»; nada se inventa. Lo único que escribe es la marca «hecho / saltado» de un kata (datos de la app, no notas).
 // «Abrir práctica» abre el diálogo de práctica de programación que ya existe; las carpetas de las áreas se crean al «Ejecutar plan».
 
-import { Check, ExternalLink, FolderOpen, SkipForward, Undo2 } from "lucide-react";
+import { CheckCircle2, Circle, ExternalLink, FolderOpen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import { api } from "../../lib/bridge";
 import type { AreaPracticeView } from "../../lib/areaPracticeView";
@@ -29,7 +29,7 @@ import {
   type PracticeTrack,
   type PracticeWeek,
 } from "../../lib/practiceTrack";
-import type { MentorAreaPractice, MentorPracticeStatus } from "../../lib/types";
+import type { MentorAreaPractice, MentorPlan, MentorPracticeStatus } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { usePersistedNav } from "../../store/navState";
@@ -38,7 +38,8 @@ import { cn } from "../ui";
 import { usePracticeDialog } from "../practice/PracticeProjectDialog";
 import { ProgressBar, hm } from "./parts";
 import { Tabs, TabPanel } from "./planKit";
-import { DAY_LONG, DAY_SHORT } from "./planShared";
+import { DAY_LONG, DAY_SHORT, type Loaded } from "./planShared";
+import { PracticeAreaView } from "./PracticeAreaView";
 
 export const PHASE_STATUS_LABEL: Record<PhaseStatus, string> = { pendiente: "Pendiente", en_curso: "En curso", hecho: "Hecho", saltado: "Saltado" };
 export const PHASE_STATUS_COLOUR: Record<PhaseStatus, string> = { pendiente: "var(--nv-faint)", en_curso: "var(--nv-accent)", hecho: "var(--nv-mint)", saltado: "var(--nv-warn)" };
@@ -117,8 +118,8 @@ export function usePlanAreaPractice(planId: string | undefined): AreaPracticeSta
 
 // ── Piezas ──────────────────────────────────────────────────────────────
 
-const CARD = "min-w-0 rounded-xl border border-line bg-card p-4";
-const EYEBROW = "text-[13px] font-medium uppercase tracking-wide text-faint";
+const CARD = "min-w-0 rounded-2xl border border-line bg-card p-4 @3xl:p-5";
+const EYEBROW = "text-[12px] font-semibold uppercase tracking-wider text-dim";
 
 function PhaseChips({ week, status }: { week: PracticeWeek; status?: Record<PracticePhase, PhaseStatus> }) {
   return (
@@ -305,69 +306,6 @@ function FolderNotice({ area, ppReady, onExecute }: { area: AreaPracticeView; pp
   );
 }
 
-export function KataToday({ area, ppBase, today, mark, onExecute, ppReady }: { area: AreaPracticeView; ppBase: string; today: string; mark: AreaPracticeState["mark"]; onExecute?: () => void; ppReady: boolean }) {
-  const toast = useApp((s) => s.toast);
-  const next = area.kata.next;
-  const isToday = !!next && next.date === today;
-  const todayState = area.kata.week.find((d) => d.today)?.state;
-  const open = async () => {
-    if (!next) return;
-    try {
-      await useApp.getState().openNote(`${ppBase}/${next.rel}`);
-    } catch (e) {
-      toast("error", (e as Error).message);
-    }
-  };
-  return (
-    <section className={CARD} style={PAGE_CARD_STYLE} data-testid="area-kata" aria-labelledby={`ak-${area.areaId}`}>
-      <div className={EYEBROW}>Reto diario · {area.label}</div>
-      <h3 id={`ak-${area.areaId}`} className="text-[16px] font-semibold leading-snug">
-        {next ? `Kata ${isToday ? "de hoy" : "siguiente"} · ${next.kata.minutes} min` : "Sin katas en este plan"}
-      </h3>
-      <AreaWeekStrip area={area} />
-      <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[14px] text-dim">
-        <span data-testid="area-kata-count">{area.kata.doneDays}/{area.kata.plannedDays} días hechos</span>
-        <span>· racha {area.kata.streak}</span>
-        {area.kata.todayPlanned && <Chip large colour={area.kata.todayDone ? "var(--nv-mint)" : "var(--nv-warn)"}>Hoy: {area.kata.todayDone ? "hecho" : "pendiente"}</Chip>}
-        {!area.kata.todayPlanned && <Chip large>Hoy no toca kata</Chip>}
-      </p>
-      {next && (
-        <div className="mt-3 min-w-0 rounded-lg border border-line bg-surface/50 p-3" data-testid="area-kata-today">
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="min-w-0 break-words text-[15px] font-semibold">{next.kata.title}</span>
-          </p>
-          <p className="mt-1 flex flex-wrap items-center gap-1.5">
-            <Chip large colour={PRACTICE_COLOUR}>{next.kata.skillName}</Chip>
-            <Chip large>{KATA_LEVEL_LABEL[next.kata.level]}</Chip>
-            <span className="text-[13.5px] text-dim">kata {area.kata.todayIndex || "·"} · {isToday ? "hoy" : dateLabel(next.date)}</span>
-          </p>
-          <p className="mt-2 break-words text-[14px] text-dim" data-testid="area-kata-summary">{next.summary}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {next.fileReady ? (
-              <PrimaryButton onClick={() => void open()} data-testid="area-kata-open"><ExternalLink size={15} aria-hidden /> Abrir kata</PrimaryButton>
-            ) : (
-              <span className="text-[13.5px] text-faint" data-testid="area-kata-nofile">El archivo del kata aún no existe: {ppReady ? "se crea al ejecutar el plan." : "se crea al ejecutar el plan."}</span>
-            )}
-            {isToday && todayState !== "done" && (
-              <GhostButton onClick={() => void mark(area.areaId, today, "done")} data-testid="area-kata-done"><Check size={15} aria-hidden /> Verificar y marcar hecho</GhostButton>
-            )}
-            {isToday && todayState === "pending" && (
-              <GhostButton onClick={() => void mark(area.areaId, today, "skipped")} disabled={!area.kata.skip.allowed} title={area.kata.skip.allowed ? undefined : `Para saltar hace falta el ${area.kata.skip.neededPct} % de los katas hechos; llevas el ${area.kata.skip.pct} %`} data-testid="area-kata-skip"><SkipForward size={15} aria-hidden /> Saltar hoy</GhostButton>
-            )}
-            {isToday && (todayState === "done" || todayState === "skipped") && (
-              <GhostButton onClick={() => void mark(area.areaId, today, null)}><Undo2 size={15} aria-hidden /> Quitar marca</GhostButton>
-            )}
-          </div>
-        </div>
-      )}
-      <div className="mt-3">
-        <FolderNotice area={area} ppReady={ppReady} onExecute={onExecute} />
-      </div>
-      <p className="mt-2 text-[13.5px] text-faint">Hecho = hay un intento calificado del kata (nota de 75 o más, sin ver la solución). No se puede marcar a mano sin esa verificación.</p>
-    </section>
-  );
-}
-
 function AreaSkills({ area }: { area: AreaPracticeView }) {
   return (
     <section className={CARD} style={PAGE_CARD_STYLE} data-testid="area-skills" aria-labelledby={`as-${area.areaId}`}>
@@ -481,52 +419,62 @@ function AreaMonthly({ area }: { area: AreaPracticeView }) {
   );
 }
 
-/** La vista de UN área: su sistema de práctica completo. */
-function AreaView({ area, data, track, status, today, mark, onExecute }: { area: AreaPracticeView; data: MentorAreaPractice; track: PracticeTrack; status: MentorPracticeStatus | null | undefined; today: string; mark: AreaPracticeState["mark"]; onExecute?: () => void }) {
+/** La vista de UN área: su página (teoría de hoy, práctica, kata, ejercicios) y, debajo, habilidades y proyectos. */
+function AreaView({ area, data, track, status, today, mark, onExecute, plan, loaded }: { area: AreaPracticeView; data: MentorAreaPractice; track: PracticeTrack; status: MentorPracticeStatus | null | undefined; today: string; mark: AreaPracticeState["mark"]; onExecute?: () => void; plan?: MentorPlan; loaded?: Loaded }) {
   return (
-    <div className="space-y-4" data-testid="practice-area-view">
-      <p className="break-words text-[14px] text-dim">
-        <span className="font-medium text-text">{area.name}.</span> {area.purpose}
-        {area.languages.length > 0 && <> Lenguajes: {area.languages.join(", ")}.</>}
-      </p>
-      <div className="grid items-start gap-4 @3xl:grid-cols-2 [&>*]:min-w-0">
-        <KataToday area={area} ppBase={data.ppBase} today={today} mark={mark} onExecute={onExecute} ppReady={data.ppReady} />
+    <PracticeAreaView
+      area={area}
+      ppBase={data.ppBase}
+      ppReady={data.ppReady}
+      today={today}
+      mark={mark}
+      {...(plan ? { plan } : {})}
+      {...(loaded ? { loaded } : {})}
+      weekStrip={<AreaWeekStrip area={area} />}
+      folderNotice={<FolderNotice area={area} ppReady={data.ppReady} {...(onExecute ? { onExecute } : {})} />}
+    >
+      <div className="space-y-4" data-testid="area-projects">
+        <h4 className="px-0.5 text-[12px] font-semibold uppercase tracking-wider text-dim">Habilidades y proyectos de {area.label}</h4>
         <AreaSkills area={area} />
+        <AreaWeeklyProject area={area} track={track} status={status} today={today} />
+        <div className="grid items-start gap-4 @3xl:grid-cols-2 [&>*]:min-w-0">
+          <AreaWeeks area={area} />
+          <AreaMonthly area={area} />
+        </div>
       </div>
-      <AreaWeeklyProject area={area} track={track} status={status} today={today} />
-      <div className="grid items-start gap-4 @3xl:grid-cols-2 [&>*]:min-w-0">
-        <AreaWeeks area={area} />
-        <AreaMonthly area={area} />
-      </div>
-    </div>
+    </PracticeAreaView>
   );
 }
 
-/** La tarjeta compacta de un área en «Todas las áreas»: kata de hoy y estado. */
+/** La tarjeta compacta de un área en «Todas las áreas»: kata de hoy, estado (con icono y texto, nunca solo color) y un botón con nombre. */
 function AreaCompactCard({ area, today, onOpen }: { area: AreaPracticeView; today: string; onOpen: () => void }) {
   const next = area.kata.next;
   const isToday = !!next && next.date === today;
   return (
-    <li className={CARD} style={PAGE_CARD_STYLE} data-testid="area-compact">
+    <li className={cn(CARD, "flex flex-col gap-2")} style={PAGE_CARD_STYLE} data-testid="area-compact">
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <h4 className="min-w-0 break-words text-[16px] font-semibold">{area.label}</h4>
         <Chip large>{KATA_LEVEL_LABEL[area.level]}</Chip>
       </div>
       {next ? (
         <>
-          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[13.5px] text-dim">
+          <p className="flex flex-wrap items-center gap-1.5 text-[13.5px] text-dim">
             <span>{isToday ? "Kata de hoy" : `Siguiente: ${dateLabel(next.date)}`}</span>
-            {area.kata.todayPlanned && <Chip large colour={area.kata.todayDone ? "var(--nv-mint)" : "var(--nv-warn)"}>Hoy: {area.kata.todayDone ? "hecho" : "pendiente"}</Chip>}
+            {area.kata.todayPlanned && (
+              <Chip large colour={area.kata.todayDone ? "var(--nv-mint)" : "var(--nv-warn)"}>
+                {area.kata.todayDone ? <CheckCircle2 size={13} aria-hidden /> : <Circle size={13} aria-hidden />} Hoy: {area.kata.todayDone ? "hecho" : "pendiente"}
+              </Chip>
+            )}
           </p>
-          <p className="mt-1 break-words text-[14px] font-medium">{next.kata.title}</p>
+          <p className="break-words text-[14.5px] font-medium">{next.kata.title}</p>
           <p className="break-words text-[13.5px] text-dim">{next.kata.skillName} · {next.kata.minutes} min</p>
         </>
       ) : (
-        <p className="mt-1 text-[14px] text-dim">Este plan no tiene días de kata.</p>
+        <p className="text-[14px] text-dim">Este plan no tiene días de kata.</p>
       )}
-      <p className="mt-1.5 text-[13.5px] text-dim">{area.kata.doneDays}/{area.kata.plannedDays} días hechos · racha {area.kata.streak}</p>
-      <p className="mt-1 text-[13px] text-faint">{area.folderReady ? `Carpeta creada: programming_practice/${area.folder}/` : FOLDER_MISSING}</p>
-      <GhostButton className="mt-2" onClick={onOpen} aria-label={`Ver la práctica de ${area.label}`}>Ver {area.label}</GhostButton>
+      <p className="text-[13.5px] text-dim">{area.kata.doneDays}/{area.kata.plannedDays} días hechos · racha {area.kata.streak}</p>
+      <p className="text-[13px] text-dim">{area.folderReady ? `Carpeta creada: programming_practice/${area.folder}/` : FOLDER_MISSING}</p>
+      <GhostButton large="md" className="mt-auto self-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" onClick={onOpen} aria-label={`Ver la práctica de ${area.label}`}>Ver {area.label}</GhostButton>
     </li>
   );
 }
@@ -535,7 +483,7 @@ const ALL = "all";
 export const practiceAreaKey = (planId: string): string => `mentor.practiceArea.${planId}`;
 
 /** La pestaña «Práctica» del plan. `planId` activa el sistema por área; sin él (o sin áreas) se muestra solo la pista general. */
-export function PracticeRow({ track, status, today, planId, onExecute }: { track: PracticeTrack; status: MentorPracticeStatus | null | undefined; today: string; planId?: string; onExecute?: () => void }) {
+export function PracticeRow({ track, status, today, planId, onExecute, plan, loaded }: { track: PracticeTrack; status: MentorPracticeStatus | null | undefined; today: string; planId?: string; onExecute?: () => void; /** el plan y sus datos cargados: dan los temas de hoy de cada área */ plan?: MentorPlan; loaded?: Loaded }) {
   const area = usePlanAreaPractice(planId);
   const [sel, setSel] = usePersistedNav<string>(practiceAreaKey(planId ?? "none"), ALL);
   const areas = area.data?.areas ?? [];
@@ -571,7 +519,7 @@ export function PracticeRow({ track, status, today, planId, onExecute }: { track
 
       {area.loading && !area.data && planId && <p role="status" className="text-[14px] text-dim">Leyendo la práctica de cada área…</p>}
       {area.error && (
-        <p role="alert" className="text-[14px] text-danger">{area.error} <button type="button" className="inline-flex min-h-8 items-center underline" onClick={area.reload}>Reintentar</button></p>
+        <p role="alert" className="text-[14px] text-danger">{area.error} <button type="button" className="inline-flex min-h-11 items-center underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={area.reload}>Reintentar</button></p>
       )}
 
       {hasAreas && (
@@ -596,7 +544,7 @@ export function PracticeRow({ track, status, today, planId, onExecute }: { track
                   </div>
                 </div>
               )}
-              {t.id === active && t.id !== ALL && current && <AreaView area={current} data={area.data!} track={track} status={status} today={area.data!.today || today} mark={area.mark} onExecute={onExecute} />}
+              {t.id === active && t.id !== ALL && current && <AreaView area={current} data={area.data!} track={track} status={status} today={area.data!.today || today} mark={area.mark} onExecute={onExecute} plan={plan} loaded={loaded} />}
             </TabPanel>
           ))}
         </div>

@@ -2,15 +2,21 @@
 // otra sub-barra con sus grupos (Bases, Lenguaje, Conocimientos…) y la tabla de sus temas en el orden de la ruta, con lo que existe de cada uno
 // y el botón «Generar todo». Sustituye a las tarjetas: la información es la misma que la del catálogo, pero ordenada por área.
 //
-// Cada tema se despliega (chevron) en un panel con «Regenerar teoría / práctica / ejercicios» (`TopicRegenerate`): reemplaza lo que existe, con copia
-// de seguridad y confirmación.
+// Regenerar es visible a tres niveles: una casilla por tema + una barra de acciones sobre la tabla (teoría, mapa, práctica, ejercicios, «lo que falta»)
+// que trabaja con los temas elegidos (cola de uno en uno, `TopicBulk`); cuatro iconos de acción rápida al final de cada fila; y el panel
+// desplegable de cada tema (`TopicRegenerate`) con el estado de cada pieza. Siempre reemplaza con copia de seguridad y confirmación.
+// Un filtro por estado (falta nota / mapa / práctica / ejercicios / completo) ayuda a elegir.
 //
 // Los datos salen del plan (áreas, grupos, semanas) y de `mentor_plan_topic_catalog` (lo que existe en la vault); la lógica está en
 // `lib/planAreaTopics.ts`. Solo lectura salvo «Generar», que pasa siempre por el diálogo de confirmación de «Ejecutar plan».
 
 import { Check, ChevronDown, ChevronRight, X } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useState } from "react";
-import { areaTabsOf, areaTopicRows, basesTopicRows, BASES_KEY, groupTabsOf, pendingGenerate, rowsOfGroup, type AreaTab, type GroupTab } from "../../lib/planAreaTopics";
+import { api } from "../../lib/bridge";
+import { matchesStatus, planBulk, STATUS_FILTERS, type BulkPlan, type RegenKind, type StatusFilter } from "../../lib/topicSelection";
+import { useApp } from "../../store/app";
+import { useMentor } from "../../store/mentor";
+import { type AreaTopicRow, areaTabsOf, areaTopicRows, basesTopicRows, BASES_KEY, groupTabsOf, pendingGenerate, rowsOfGroup, type AreaTab, type GroupTab } from "../../lib/planAreaTopics";
 import { ROUTE_LABEL } from "../../lib/planRoute";
 import { buildSchedule, progressPlan, type PlanSchedule } from "../../lib/planSchedule";
 import { timeTagOf, topicTimes } from "../../lib/planTopicTime";
@@ -22,7 +28,9 @@ import { TimeChip, TopicMenu } from "./PlanBoard";
 import { LoadState, ProgressBar } from "./parts";
 import { SectionHeading } from "./planKit";
 import { usePlanTopicCatalog } from "./PlanTopicCatalog";
-import { areaScope, GenerateButton, GenerateTopicButton } from "./TopicGenerate";
+import { ExecuteDialog } from "./PlanExecution";
+import { BulkConfirm, BulkProgress, BulkToolbar, RowQuickActions, useRegenQueue, type SelectHelper } from "./TopicBulk";
+import { areaScope, GenerateButton, GenerateTopicButton, topicScope } from "./TopicGenerate";
 import { RegeneratePanel } from "./TopicRegenerate";
 
 /** Una sub-barra de pestañas (botones con `aria-pressed`) que se desplaza en horizontal en anchos estrechos. */
@@ -100,6 +108,21 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
   // temas desplegados (su panel de «Regenerar»); se recuerdan al cambiar de área
   const [openRows, setOpenRows] = useState<ReadonlySet<string>>(new Set());
   const toggleRow = (folder: string): void => setOpenRows((s) => { const n = new Set(s); if (!n.delete(folder)) n.add(folder); return n; });
+  // selección para el lote, filtro por estado, modo puente de la IA y la cola
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [bridge, setBridge] = useState(false);
+  const [asking, setAsking] = useState<BulkPlan | null>(null);
+  const [genChain, setGenChain] = useState<AreaTopicRow[]>([]);
+  const { queue, start, stop, dismiss } = useRegenQueue();
+  const queueBusy = !!queue?.running;
+  useEffect(() => {
+    let alive = true;
+    api.aiSettings().then((s) => alive && setBridge(!!s?.config?.is_bridge)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const cat = catalog ?? [];
   const baseTabs = useMemo(() => areaTabsOf(plan, cat), [plan, cat]);
@@ -124,9 +147,40 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
     if (group && group.id !== groupId) setGroupId(group.id);
   }, [group, groupId]);
 
+  // lo que se ve (tras el filtro por estado); la selección y las acciones en lote solo cuentan lo que se ve
+  const visible = useMemo(() => shown.filter((r) => matchesStatus(r, statusFilter)), [shown, statusFilter]);
+  const selectedRows = useMemo(() => visible.filter((r) => selected.has(r.folder)), [visible, selected]);
+  const allOn = visible.length > 0 && selectedRows.length === visible.length;
+  const statusCounts = useMemo(() => new Map(STATUS_FILTERS.map((f) => [f.key, shown.filter((r) => matchesStatus(r, f.key)).length])), [shown]);
+
   const pickArea = (k: string): void => {
     setAreaKey(k);
     setGroupId("");
+    setSelected(new Set());
+  };
+  const pickGroup = (id: string): void => {
+    setGroupId(id);
+    setSelected(new Set());
+  };
+  const toggleSel = (folder: string): void => setSelected((s) => { const n = new Set(s); if (!n.delete(folder)) n.add(folder); return n; });
+  const helper = (h: SelectHelper): void => {
+    if (h === "clear") setSelected(new Set());
+    else if (h === "all") setSelected(new Set(visible.map((r) => r.folder)));
+    else if (h === "missing") setSelected(new Set(visible.filter(pendingGenerate).map((r) => r.folder)));
+    else setSelected(new Set(visible.filter((r) => r.exercises === 0).map((r) => r.folder)));
+  };
+  const ask = (what: RegenKind, rows: ReadonlyArray<AreaTopicRow>): void => setAsking(planBulk(rows, what, bridge));
+  const confirmBulk = (): void => {
+    const p = asking;
+    setAsking(null);
+    if (!p || p.run.length === 0) return;
+    void start(p.what, p.run);
+  };
+  // «Generar lo que falta» de la selección: el diálogo de «Ejecutar plan» (uno por tema) de los que están en ruta y les falta algo
+  const generateMissing = (): void => {
+    const todo = selectedRows.filter((r) => r.route !== "skipped" && r.incomplete);
+    if (todo.length === 0) useApp.getState().toast("info", "A los temas elegidos no les falta nada que generar.");
+    else setGenChain(todo);
   };
 
   return (
@@ -160,38 +214,75 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
             />}
           </div>
 
-          {groups.length > 1 && <TabBar label={`Grupos de ${active.area}`} tabs={groupTabsView(groups)} active={group.id} onSelect={setGroupId} level={2} testid="group-tabs" />}
+          {groups.length > 1 && <TabBar label={`Grupos de ${active.area}`} tabs={groupTabsView(groups)} active={group.id} onSelect={pickGroup} level={2} testid="group-tabs" />}
 
           {shown.length > 0 && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-[13px] text-dim hover:bg-hover hover:text-text"
-                data-testid="expand-all"
-                onClick={() => setOpenRows(shown.every((r) => openRows.has(r.folder)) ? new Set() : new Set(shown.map((r) => r.folder)))}
-              >
-                {shown.every((r) => openRows.has(r.folder)) ? "Contraer todo" : "Expandir todo"}
-              </button>
-            </div>
+            <>
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filtrar por estado" data-testid="status-filters">
+                <span className="text-[13px] text-dim">Estado:</span>
+                {STATUS_FILTERS.map((f) => {
+                  const on = statusFilter === f.key;
+                  return (
+                    <button
+                      key={f.key}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setStatusFilter(f.key)}
+                      data-testid={`status-filter-${f.key}`}
+                      className={cn("inline-flex min-h-8 items-center gap-1 rounded-lg border px-2.5 text-[13px] transition-colors", on ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:bg-hover hover:text-text")}
+                    >
+                      {f.label} <span className="rounded bg-hover px-1 text-[11.5px] tabular-nums">{statusCounts.get(f.key) ?? 0}</span>
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  className="ml-auto inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-[13px] text-dim hover:bg-hover hover:text-text"
+                  data-testid="expand-all"
+                  onClick={() => setOpenRows(visible.every((r) => openRows.has(r.folder)) ? new Set() : new Set(visible.map((r) => r.folder)))}
+                >
+                  {visible.every((r) => openRows.has(r.folder)) ? "Contraer todo" : "Expandir todo"}
+                </button>
+              </div>
+              <BulkToolbar count={selectedRows.length} busy={queueBusy} bridge={bridge} onAsk={(w) => ask(w, selectedRows)} onGenerateMissing={generateMissing} onHelper={helper} />
+              {queue && <BulkProgress queue={queue} onStop={stop} onClose={dismiss} />}
+            </>
           )}
 
           {shown.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-empty">Esta sección no tiene temas.</p>
+          ) : visible.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-filter-empty">Ningún tema cumple ese estado.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-line">
-              <table className="w-full min-w-[66rem] border-collapse text-left text-[14px]" data-testid="area-table">
+              <table className="w-full min-w-[74rem] border-collapse text-left text-[14px]" data-testid="area-table">
                 <caption className="sr-only">Temas de {active.area}{group.id ? `, grupo ${group.title}` : ""}</caption>
                 <thead className="bg-card text-[12.5px] uppercase tracking-wide text-faint">
                   <tr>
-                    {["Sem.", "Tema", "Avance", "Previsto", "Nota", "Mapa", ".practica", "Ejercicios", "Estado", "Generar"].map((h) => (
+                    <th scope="col" className="w-9 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        aria-label="Seleccionar todos los temas visibles"
+                        checked={allOn}
+                        ref={(el) => { if (el) el.indeterminate = selectedRows.length > 0 && !allOn; }}
+                        onChange={() => setSelected(allOn ? new Set() : new Set(visible.map((r) => r.folder)))}
+                        disabled={queueBusy}
+                        data-testid="select-all"
+                        className="h-4 w-4 accent-[var(--nv-accent)]"
+                      />
+                    </th>
+                    {["Sem.", "Tema", "Avance", "Previsto", "Nota", "Mapa", ".practica", "Ejercicios", "Estado", "Regenerar", "Generar"].map((h) => (
                       <th key={h} scope="col" className="px-3 py-2 font-semibold">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map((r) => (
+                  {visible.map((r) => (
                     <Fragment key={r.folder}>
-                    <tr className={cn("border-t border-line align-top", r.route === "skipped" && "opacity-60")} data-testid="area-row" data-folder={r.folder}>
+                    <tr className={cn("border-t border-line align-top", r.route === "skipped" && "opacity-60")} data-testid="area-row" data-folder={r.folder} data-selected={selected.has(r.folder) || undefined}>
+                      <td className="px-3 py-2">
+                        <input type="checkbox" aria-label={`Seleccionar ${r.title}`} checked={selected.has(r.folder)} onChange={() => toggleSel(r.folder)} disabled={queueBusy} data-testid="row-select" className="mt-1 h-4 w-4 accent-[var(--nv-accent)]" />
+                      </td>
                       <td className="px-3 py-2 tabular-nums text-dim">{r.week}</td>
                       <th scope="row" className="min-w-0 max-w-[24rem] px-3 py-2 font-normal">
                         <span className="flex min-w-0 items-start gap-1">
@@ -232,13 +323,14 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
                         })()}
                         {r.route !== "core" && <span className="block text-dim">{ROUTE_LABEL[r.route]}</span>}
                       </td>
+                      <td className="px-3 py-2"><RowQuickActions row={r} bridge={bridge} busy={queueBusy} onAsk={(w, row) => ask(w, [row])} /></td>
                       <td className="px-3 py-2">
                         <GenerateTopicButton planId={plan.id} proposed={!!plan.proposed} folder={r.folder} title={r.title} inPlan={r.route !== "skipped"} incomplete={pendingGenerate({ ...r, completed: false })} />
                       </td>
                     </tr>
                     {openRows.has(r.folder) && (
                       <tr className="border-t border-line bg-surface/40" data-testid="area-row-expanded" data-folder={r.folder}>
-                        <td colSpan={10}><RegeneratePanel row={r} /></td>
+                        <td colSpan={12}><RegeneratePanel row={r} /></td>
                       </tr>
                     )}
                     </Fragment>
@@ -248,6 +340,20 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
             </div>
           )}
         </>
+      )}
+
+      {asking && <BulkConfirm plan={asking} onCancel={() => setAsking(null)} onConfirm={confirmBulk} />}
+      {genChain.length > 0 && (
+        <ExecuteDialog
+          key={genChain[0]!.folder}
+          planId={plan.id}
+          proposed={!!plan.proposed}
+          initialScope={topicScope(genChain[0]!.folder)}
+          onClose={() => setGenChain((c) => c.slice(1))}
+          onStarted={() => {
+            useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+          }}
+        />
       )}
     </section>
   );

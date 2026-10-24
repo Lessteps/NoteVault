@@ -346,6 +346,8 @@ export function PlanView({ planId, source }: { planId: string; source: PlanSourc
                       status={data.practice}
                       today={data.today}
                       planId={plan.id}
+                      plan={plan}
+                      loaded={data}
                       onExecute={() => {
                         changeTab("plan");
                         openPlanSection(plan.id, "ejecutar");

@@ -1770,7 +1770,7 @@ export * from "./nutritionTypes";
 export interface TopicRegenerateJob {
   id: string;
   folder: string;
-  what: "theory" | "practice" | "exercises";
+  what: "theory" | "map" | "practice" | "exercises" | "all";
   log: string[];
   done: boolean;
   error: string;

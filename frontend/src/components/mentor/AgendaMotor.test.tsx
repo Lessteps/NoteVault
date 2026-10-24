@@ -151,7 +151,7 @@ describe("Agenda: áreas juntas, lenguaje diario, proyecto del tema y entregable
     await openDay(dayOf(p), p);
     const day = byTest("agenda-day");
     expect(day.textContent).toContain("Áreas juntas");
-    expect(day.textContent).toContain("Enfoque: Full stack");
+    expect(day.textContent).not.toContain("Enfoque: Full stack");
     expect(byTest("agenda-day-today-line").textContent).toMatch(/teoría de backend.*teoría de frontend|teoría de frontend.*teoría de backend/);
     expect(byTest("agenda-day-today-line").textContent).toContain("práctica de");
     const blocks = all("agenda-block", day).map((b) => b.getAttribute("data-block"));

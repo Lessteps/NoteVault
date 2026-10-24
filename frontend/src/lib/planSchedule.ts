@@ -877,13 +877,12 @@ export function weekSummary(plan: SchedulePlan, sch: PlanSchedule, week: number,
   const seq = [...new Map(pend.map((t) => [t.folder, t])).values()];
   const areas = byArea.map((a) => a.area);
   const fstats = focusStatsOf(days);
-  const focusText = fstats.byFocus.map((f) => `${f.label} (${f.days} ${f.days === 1 ? "día" : "días"})`).join(" + ");
   const autoPurposeBase = !seq.length && !byArea.length
     ? `Semana ${week} · práctica y repaso${real.length ? `; entrega: ${real.map((d) => d.title).join(", ")}` : ""}.`
     : `Semana ${week} · ${areas.slice(0, 2).join(" y ")}${areas.length > 2 ? " y más" : ""}: ${
         seq.length > 1 ? `de ${shortTitle(seq[0]!.title)} a ${shortTitle(seq[seq.length - 1]!.title)}` : shortTitle((seq[0] ?? days.flatMap((d) => d.topics)[0])?.title ?? "repaso")
       }${real.length ? `; entrega: ${real.map((d) => d.title).join(", ")}` : ""}.`;
-  const autoPurpose = sch.mode === "focus" && fstats.byFocus.length ? `Semana ${week} · enfoque ${focusText}: teoría y práctica cada día${real.length ? `; entrega: ${real.map((d) => d.title).join(", ")}` : ""}.` : autoPurposeBase;
+  const autoPurpose = sch.mode === "focus" && fstats.byFocus.length ? `Semana ${week} · ${seq.length} ${seq.length === 1 ? "tema" : "temas"} en ${areas.length} ${areas.length === 1 ? "área" : "áreas"}: teoría y práctica${real.length ? `; entrega: ${real.map((d) => d.title).join(", ")}` : ""}.` : autoPurposeBase;
   const manual = plan.purposes?.week?.[String(week)];
   return {
     focus: fstats,
@@ -932,7 +931,7 @@ export function monthSummary(plan: SchedulePlan, sch: PlanSchedule, month: strin
   const autoPurposeBase = byArea.length
     ? `${monthName(month)} · ${topAreas.join(" y ")}: ${folders.size} ${folders.size === 1 ? "tema" : "temas"} en ${weeks.length} ${weeks.length === 1 ? "semana" : "semanas"}${milestones.length ? `; hito: ${milestones[0]}` : ""}.`
     : `${monthName(month)} · práctica y repaso${milestones.length ? `; hito: ${milestones[0]}` : ""}.`;
-  const autoPurpose = sch.mode === "focus" && mstats.byFocus.length ? `${monthName(month)} · enfoque ${mstats.byFocus.map((f) => `${f.label} (${f.days} ${f.days === 1 ? "día" : "días"})`).join(" + ")}: ${folders.size} ${folders.size === 1 ? "tema" : "temas"} en ${weeks.length} ${weeks.length === 1 ? "semana" : "semanas"}${milestones.length ? `; hito: ${milestones[0]}` : ""}.` : autoPurposeBase;
+  const autoPurpose = sch.mode === "focus" && mstats.byFocus.length ? `${monthName(month)}: ${folders.size} ${folders.size === 1 ? "tema" : "temas"} en ${weeks.length} ${weeks.length === 1 ? "semana" : "semanas"}${milestones.length ? `; hito: ${milestones[0]}` : ""}.` : autoPurposeBase;
   const manual = plan.purposes?.month?.[month];
   return {
     focus: mstats,

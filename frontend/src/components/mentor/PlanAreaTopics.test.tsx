@@ -123,7 +123,7 @@ describe("PlanAreaTopics — panel desplegable «Regenerar»", () => {
   const job = (over: Record<string, unknown> = {}) => ({ id: "j1", folder: "P/4/4.2 REST", what: "theory", log: ["✓ Teoría regenerada."], done: true, error: "", finished: 3, total: 3, backup: ".trash/regenerar/x_4.2 REST", restored: false, created: [], archived: [], ...over });
   const ai = (bridge: boolean) => vi.spyOn(api, "aiSettings").mockResolvedValue({ config: { is_bridge: bridge }, providers: [], models: [] } as never);
 
-  it("cada tema se despliega con las tres acciones y lo que existe de cada artefacto; desplegar no llama a nada", async () => {
+  it("cada tema se despliega con las cuatro acciones y lo que existe de cada artefacto; desplegar no llama a nada", async () => {
     ai(false);
     const start = vi.spyOn(api, "studyTopicRegenerate");
     await mount(PLAN);
@@ -133,10 +133,10 @@ describe("PlanAreaTopics — panel desplegable «Regenerar»", () => {
     expect(byTest("row-expand")!.getAttribute("aria-expanded")).toBe("true");
     expect(byTest("area-row-expanded")).toBeTruthy();
     expect(byTest("regen-theory")!.textContent).toContain("con nota");
-    expect(byTest("regen-theory")!.textContent).toContain("sin mapa");
+    expect(byTest("regen-map")!.textContent).toContain("sin mapa");
     expect(byTest("regen-practice")!.textContent).toContain("existe");
     expect(byTest("regen-exercises")!.textContent).toContain("sin ejercicios");
-    expect(["regen-theory-button", "regen-practice-button", "regen-exercises-button"].map((t) => byTest(t)!.textContent!.trim())).toEqual(["Regenerar teoría", "Regenerar práctica", "Regenerar ejercicios"]);
+    expect(["regen-theory-button", "regen-map-button", "regen-practice-button", "regen-exercises-button"].map((t) => byTest(t)!.textContent!.trim())).toEqual(["Regenerar teoría", "Regenerar mapa", "Regenerar práctica", "Regenerar ejercicios"]);
     expect(start).not.toHaveBeenCalled();
     await click("row-expand");
     expect(byTest("regen-panel")).toBeNull();
@@ -181,7 +181,7 @@ describe("PlanAreaTopics — panel desplegable «Regenerar»", () => {
     await mount(PLAN);
     await click("row-expand");
     await flush();
-    for (const w of ["theory", "practice", "exercises"]) {
+    for (const w of ["theory", "map", "practice", "exercises"]) {
       expect((byTest(`regen-${w}-button`) as HTMLButtonElement).disabled).toBe(true);
       expect(byTest(`regen-${w}-hint`)!.textContent).toContain("modo puente");
     }

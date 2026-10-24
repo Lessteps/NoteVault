@@ -17,6 +17,7 @@ import * as path from "node:path";
 import { withAiSignal } from "../../core/aiAbort.js";
 import { AIConfig } from "../../core/aiClient.js";
 import { ApiError } from "../../core/errors.js";
+import { generateConcept } from "../../../tools/kb_canvas";
 import { diskExercises, scanTopicDesigns } from "../../core/mentor/topicDesignScan.js";
 import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 import { practiceCells } from "../../lib/planExecution.js";
@@ -26,8 +27,8 @@ import { withGenerationLock } from "./generationLock.js";
 import { clearStudySnapshotCache, reevaluateTopic, studyApi } from "./study.js";
 import { studySpaceApi } from "./studySpace.js";
 
-export type RegenWhat = "theory" | "practice" | "exercises";
-const WHATS: readonly RegenWhat[] = ["theory", "practice", "exercises"];
+export type RegenWhat = "theory" | "map" | "practice" | "exercises" | "all";
+const WHATS: readonly RegenWhat[] = ["theory", "map", "practice", "exercises", "all"];
 
 export interface RegenJob {
   id: string;
@@ -56,6 +57,8 @@ export interface RegenHooks {
   reevaluate?: (folder: string, signal: AbortSignal) => Promise<void>;
   /** construye los ejercicios de una celda; devuelve las rutas nuevas */
   buildExercises?: (folder: string, skill: string, difficulty: number, signal: AbortSignal) => Promise<string[]>;
+  /** rehace el canvas explicativo desde la nota; devuelve el texto de error o "" y la ruta del archivo nuevo si fue un `.nuevo.canvas` */
+  generateMap?: (topicAbs: string) => { error: string; alt?: string };
   pollMs?: number;
   now?: () => Date;
 }
@@ -125,6 +128,13 @@ export function topicRegenerateApi(app: AppState, hooks: RegenHooks = {}) {
       return r.exercises.filter((e) => e.is_new).map((e) => e.path.replace(/\\/g, "/"));
     },
   };
+  const generateMap =
+    hooks.generateMap ??
+    ((topicAbs: string): { error: string; alt?: string } => {
+      const r = generateConcept(topicAbs);
+      if (r.problems.length) return { error: `El canvas no pasó la verificación: ${r.problems.slice(0, 3).join("; ")}` };
+      return r.written.includes(".nuevo.canvas") ? { error: "", alt: r.written.replace(/^.*→ wrote /, "") } : { error: "" };
+    });
   const generateTheory = hooks.generateTheory ?? defaults.generateTheory;
   const reevaluate = hooks.reevaluate ?? defaults.reevaluate;
   const buildExercises = hooks.buildExercises ?? defaults.buildExercises;
@@ -148,6 +158,62 @@ export function topicRegenerateApi(app: AppState, hooks: RegenHooks = {}) {
         return [];
       }
     };
+
+    if (what === "all") {
+      // teoría (que ya rehace el mapa), práctica y ejercicios, en ese orden; se para en el primer fallo
+      const steps: RegenWhat[] = ["theory", "practice", "exercises"];
+      job.total = steps.length;
+      for (const step of steps) {
+        if (signal.aborted) {
+          job.error = "Cancelado.";
+          break;
+        }
+        const sub: RegenJob = { ...job, what: step, log: [], error: "", finished: 0, total: 1, restored: false, created: [], archived: [] };
+        say(`— ${step === "theory" ? "Teoría y mapa" : step === "practice" ? "Práctica" : "Ejercicios"} —`);
+        await run(sub, folder, topicAbs, step, signal);
+        job.log.push(...sub.log);
+        job.created.push(...sub.created);
+        job.archived.push(...sub.archived);
+        job.finished += 1;
+        if (sub.restored) job.restored = true;
+        if (sub.error) {
+          job.error = sub.error;
+          break;
+        }
+      }
+      return;
+    }
+
+    if (what === "map") {
+      job.total = 2;
+      if (!fs.existsSync(noteAbs)) {
+        job.error = "El tema no tiene nota de teoría: de ella sale el mapa. Usa «Generar lo que falta».";
+        say(`✗ ${job.error}`);
+        job.finished = 2;
+        return;
+      }
+      const cs = canvasesNow();
+      for (const c of cs) job.archived.push(rel(copyInto(path.join(topicAbs, c), backupAbs)));
+      say(cs.length ? `Copia de seguridad de ${cs.length} canvas en ${job.backup}.` : "No había canvas que respaldar.");
+      job.finished = 1;
+      say(`Rehaciendo el mapa de «${name}» desde su teoría…`);
+      const had = new Set(cs);
+      try {
+        const r = generateMap(topicAbs);
+        if (r.error) {
+          job.error = r.error;
+          say(`✗ ${job.error}`);
+        } else {
+          for (const c of canvasesNow()) if (!had.has(c)) job.created.push(rel(path.join(topicAbs, c)));
+          say(r.alt ? "✓ Tu canvas tiene cambios a mano: se conservó y el nuevo se guardó aparte como «.nuevo.canvas»." : "✓ Mapa regenerado.");
+        }
+      } catch (e) {
+        job.error = (e as Error).message;
+        say(`✗ ${job.error}`);
+      }
+      job.finished = 2;
+      return;
+    }
 
     if (what === "theory") {
       job.total = 3;
@@ -274,7 +340,7 @@ export function topicRegenerateApi(app: AppState, hooks: RegenHooks = {}) {
     /** Regenera la teoría / práctica / ejercicios de UN tema (`Espacio/Área/Tema`). Exige `confirm: true`. */
     study_topic_regenerate(folderRel: string, what: string, confirm?: boolean): { jobId: string } {
       if (confirm !== true) throw new ApiError("Falta la confirmación: regenerar reemplaza contenido y solo se hace cuando la persona la da.");
-      if (!WHATS.includes(what as RegenWhat)) throw new ApiError("Elige qué regenerar: teoría, práctica o ejercicios.");
+      if (!WHATS.includes(what as RegenWhat)) throw new ApiError("Elige qué regenerar: teoría, mapa, práctica, ejercicios o todo.");
       const parts = String(folderRel ?? "").replace(/\\/g, "/").split("/").filter(Boolean);
       const topicAbs = path.join(app.root, ...parts);
       if (parts.length !== 3 || !fs.existsSync(topicAbs) || !fs.statSync(topicAbs).isDirectory()) throw new ApiError("Selecciona la carpeta de un tema (Espacio / Área / Tema).");

@@ -172,7 +172,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
         <H id={headingId} className="text-[20px] font-bold leading-tight first-letter:uppercase">{longDateLabel(date)}</H>
         <Chip large colour="var(--nv-accent)">Semana {day.week}</Chip>
         {isToday && <Chip large colour="var(--nv-mint)">Hoy</Chip>}
-        {day.focus && <FocusChip id={day.focus.id} label={day.focus.label} />}
+        {entries.map((e) => <AreaChip key={e.subplanId} colour={areaColour(e.areaId)}>{e.area}<span className="font-normal text-dim" data-testid="agenda-day-area-chip-count"> {e.topics}</span></AreaChip>)}
         {day.focus?.together && <Chip large colour="var(--nv-mint)">Áreas juntas</Chip>}
         {!day.study && <Chip large colour="var(--nv-faint)">{day.blocked ? "Bloqueado" : "Descanso"}</Chip>}
         <span className="flex-1" />

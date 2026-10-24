@@ -13,6 +13,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { api } from "../../lib/bridge";
 import { planTogetherPhases } from "../../lib/planAreas";
 import { buildSchedule, progressPlan } from "../../lib/planSchedule";
+import { topicsByWeekArea } from "../../lib/planTopicsByArea";
 import { weekRangesOf } from "../../lib/planTime";
 import type { MentorChangeEntry, MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../../lib/types";
 import { useApp } from "../../store/app";
@@ -274,19 +275,20 @@ describe("Agenda: Semana y Mes con los temas separados por área", () => {
     await openAgenda(p, "semana");
     const sec = byTest("agenda-week-areas");
     const cards = all("week-area", sec);
-    expect(cards.map((c) => c.getAttribute("data-area"))).toEqual(["backend", "frontend", "databases", "tooling", "automation"]);
+    expect(cards.map((c) => c.getAttribute("data-area"))).toEqual(["backend", "frontend", "databases", "tooling"]);
     const be = cards[0]!;
     expect(be.querySelector("h4")!.textContent).toContain("Backend");
     expect(byTest("week-area-count", be).textContent).toMatch(/^\d+ temas?$/);
     const topics = all("area-topic", be);
     expect(topics.length).toBeGreaterThan(0);
     for (const t of topics) {
-      expect(t.textContent).toMatch(/(lun|mar|mié|jue|vie|sáb|dom) \d+/);
+      expect(byTest("area-topic-days", t).getAttribute("aria-label")).toMatch(/Día asignado: (lunes|martes|miércoles|jueves|viernes|sábado|domingo) \d+/);
       expect(t.textContent).toMatch(/Sin tratar/);
     }
     expect(byTest("week-area-total", be).textContent).toMatch(/En todo el plan: 12 temas/);
-    // Automation aún no empieza: la tarjeta lo dice y no tiene temas
-    expect(cards[4]!.textContent).toContain("Fuera de su fase esta semana");
+    // Automation aún no empieza: no tiene tarjeta, va en la línea de «sin temas esta semana»
+    expect(byTest("week-areas-empty").textContent).toContain("Automation");
+    expect(byTest("week-areas-empty").textContent).toContain("fuera de su fase");
     // el total de la cabecera de la semana es la suma de las áreas
     const sum = cards.reduce((n, c) => n + all("area-topic", c).length, 0);
     expect(byTest("agenda-week-counts").textContent).toContain(`${sum} temas`);
@@ -301,6 +303,93 @@ describe("Agenda: Semana y Mes con los temas separados por área", () => {
     const chips = byTest("month-week-areas", weeks[1]!);
     expect(chips.textContent).toMatch(/Backend \d+ temas?/);
     expect(chips.getAttribute("aria-label")).toMatch(/^Temas de la semana \d+ por área$/);
+  });
+});
+
+describe("Agenda: Semana y Mes segmentadas por categoría", () => {
+  const withBases = (): PlanData => {
+    const p = fivePlan("together");
+    const subplans = p.subplans.map((s) => (s.areaId === "backend" ? { ...s, groups: [...(s.groups ?? []), { id: "bases", title: "Bases", kind: "bases" as const, order: 1 }], topics: s.topics.map((t, i) => (i < 3 ? { ...t, group: "bases" } : t)) } : s));
+    return { ...p, subplans } as PlanData;
+  };
+  const sched = (p: PlanData) => buildSchedule(progressPlan(p as never, { today: TODAY }));
+
+  it("Semana: cifras, tira de días con conteos y una tarjeta separada por área con los mismos temas que el selector compartido", async () => {
+    const p = fivePlan("together");
+    await openAgenda(p, "semana");
+    expect(all("week-stat-pending").length + all("week-stat-theory").length + all("week-stat-practice").length + all("week-stat-projects").length).toBe(4);
+    expect(byTest("agenda-week").textContent).not.toContain("Enfoque:");
+    const week = Math.floor((Date.parse(`${TODAY}T00:00:00Z`) - Date.parse(`${START}T00:00:00Z`)) / 86400000 / 7) + 1;
+    const data = topicsByWeekArea(p as never, sched(p));
+    const w = data.weeks[week - 1]!;
+    // una tarjeta por área CON temas, en el orden fijo, y sus conteos son los del selector compartido (Agenda == Ejecución)
+    const cards = all("week-area");
+    expect(cards.map((c) => c.getAttribute("data-area"))).toEqual(w.cells.filter((c) => c.topics.length).map((c) => c.areaId));
+    for (const c of w.cells.filter((x) => x.topics.length)) {
+      const card = cards.find((x) => x.getAttribute("data-area") === c.areaId)!;
+      expect(byTest("week-area-count", card).textContent).toBe(`${c.topics.length} ${c.topics.length === 1 ? "tema" : "temas"}`);
+      expect(all("area-topic", card).map((r) => r.getAttribute("data-folder"))).toEqual(c.topics.map((t) => t.folder));
+      expect(byTest("week-area-progress", card).textContent).toBe(`${c.done}/${c.topics.length} hechos`);
+      for (const r of all("area-topic", card)) {
+        expect(r.textContent).toMatch(/Teoría|Práctica/);
+        expect(r.textContent).toMatch(/Sin tratar|En curso|Hecho/);
+        expect(r.querySelectorAll("[data-testid=area-topic-days] [data-on='1']").length).toBeGreaterThan(0);
+      }
+    }
+    // tira de días: 7 botones y cada conteo = temas del selector asignados a ese día
+    const strip = all("agenda-week-strip-day");
+    expect(strip).toHaveLength(7);
+    for (const b of strip) {
+      const d = b.getAttribute("data-date")!;
+      const n = [...w.cells.flatMap((c) => c.topics), ...w.bases].filter((t) => t.dates.includes(d)).length;
+      expect(b.getAttribute("data-count")).toBe(String(n));
+    }
+    expect(strip.find((b) => b.getAttribute("data-date") === TODAY)!.getAttribute("aria-current")).toBe("date");
+    expect(byTest("agenda-week-strip-today")).toBeTruthy();
+    // pulsar un día abre la vista Día de esa fecha
+    await click(strip.find((b) => b.getAttribute("data-date") === TODAY)!);
+    expect(byTest("agenda-day")).toBeTruthy();
+  });
+
+  it("Semana: Bases va en su propia sección y sus temas no cuentan en ninguna área", async () => {
+    const p = withBases();
+    await openAgenda(p, "semana");
+    const wk = Math.floor((Date.parse(`${TODAY}T00:00:00Z`) - Date.parse(`${START}T00:00:00Z`)) / 86400000 / 7) + 1;
+    const w = topicsByWeekArea(p as never, sched(p)).weeks[wk - 1]!;
+    expect(w.bases.length).toBeGreaterThan(0);
+    const bases = byTest("week-bases");
+    expect(bases.textContent).toContain("Bases · lógica aplicada");
+    expect(all("area-topic", bases).map((r) => r.getAttribute("data-folder"))).toEqual(w.bases.map((t) => t.folder));
+    for (const card of all("week-area")) for (const r of all("area-topic", card)) expect(w.bases.map((t) => t.folder)).not.toContain(r.getAttribute("data-folder"));
+  });
+
+  it("Mes: cifras, leyenda y un bloque por semana con una fila por área (nº de temas y horas) y los temas como chips que se expanden", async () => {
+    const p = withBases();
+    await openAgenda(p, "mes");
+    const data = topicsByWeekArea(p as never, sched(p));
+    expect(all("month-stat-topics")).toHaveLength(1);
+    expect(byTest("month-legend").textContent).toContain("Backend");
+    expect(byTest("month-legend").textContent).toContain("Bases");
+    const blocks = all("agenda-month-week");
+    expect(blocks.length).toBeGreaterThan(3);
+    for (const b of blocks) {
+      const w = data.weeks[Number(b.getAttribute("data-week")) - 1]!;
+      const rows = all("month-week-area", b);
+      expect(rows.map((r) => r.getAttribute("data-area"))).toEqual(w.cells.filter((c) => c.topics.length).map((c) => c.areaId));
+      if (!rows.length && !w.bases.length) expect(byTest("month-week-empty", b)).toBeTruthy();
+      for (const r of rows) {
+        const c = w.cells.find((x) => x.areaId === r.getAttribute("data-area"))!;
+        expect(r.textContent).toContain(`${c.topics.length} ${c.topics.length === 1 ? "tema" : "temas"}`);
+        expect(all("month-week-area-topics", r)[0]!.querySelectorAll("span").length).toBe(Math.min(3, c.topics.length));
+      }
+    }
+    const withMore = blocks.flatMap((b) => all("month-week-area-more", b));
+    expect(withMore.length).toBeGreaterThan(0);
+    const row = withMore[0]!.closest("[data-testid=month-week-area]")!;
+    const before = row.querySelectorAll("[data-testid=month-week-area-topics] > span").length;
+    await click(withMore[0]);
+    expect(row.querySelectorAll("[data-testid=month-week-area-topics] > span").length).toBeGreaterThan(before);
+    expect(all("month-week-bases").length).toBeGreaterThan(0);
   });
 });
 

@@ -126,7 +126,7 @@ describe("regenerar la teoría", () => {
 
   it("no admite dos regeneraciones a la vez del mismo tema", async () => {
     let release!: () => void;
-    const api = make({ generateTheory: () => new Promise<string>((ok) => (release = () => ok(""))) });
+    const api = make({ generateTheory: () => new Promise<string>((ok) => (release = () => ok(""))), reevaluate: async () => undefined });
     const { jobId } = api.study_topic_regenerate(FOLDER, "theory", true);
     expect(() => api.study_topic_regenerate(FOLDER, "practice", true)).toThrow(/en curso/);
     await new Promise((ok) => setTimeout(ok, 30));
@@ -193,5 +193,61 @@ describe("regenerar los ejercicios", () => {
     expect(st.restored).toBe(true);
     expect(read(`${FOLDER}/Ejercicios/implement/ej_implement_d1_1_0.md`)).toBe(OLD_EX);
     expect(read(`${FOLDER}/Ejercicios/implement/ej_implement_d1_1_1.md`)).toBe(OLD_EX);
+  });
+});
+
+describe("regenerar el mapa", () => {
+  it("respalda el canvas y, si estaba editado a mano, lo conserva y deja el nuevo en .nuevo.canvas (sin IA)", async () => {
+    const api = make({ generateTheory: async () => { throw new Error("no debe usar la IA"); } });
+    const st = await finish(api, api.study_topic_regenerate(FOLDER, "map", true).jobId);
+    expect(st.error).toBe("");
+    expect(st.what).toBe("map");
+    expect(read(`${st.backup}/4.1 Uno — mapa.canvas`)).toBe(OLD_CANVAS);
+    expect(read(`${FOLDER}/4.1 Uno — mapa.canvas`)).toBe(OLD_CANVAS); // sin huella del generador = editado a mano: no se pisa
+    expect(exists(`${FOLDER}/4.1 Uno — mapa.nuevo.canvas`)).toBe(true);
+    expect(JSON.parse(read(`${FOLDER}/4.1 Uno — mapa.nuevo.canvas`)).nodes.length).toBeGreaterThan(1);
+    expect(st.created).toEqual([`${FOLDER}/4.1 Uno — mapa.nuevo.canvas`]);
+    expect(read(`${FOLDER}/4.1 Uno.md`)).toBe(OLD_NOTE); // la nota no se toca
+  });
+
+  it("sin canvas previo lo crea; sin nota de teoría falla con un mensaje claro", async () => {
+    fs.rmSync(abs(`${FOLDER}/4.1 Uno — mapa.canvas`));
+    const api = make({});
+    const ok = await finish(api, api.study_topic_regenerate(FOLDER, "map", true).jobId);
+    expect(ok.error).toBe("");
+    expect(exists(`${FOLDER}/4.1 Uno — mapa.canvas`)).toBe(true);
+    fs.rmSync(abs(`${FOLDER}/4.1 Uno.md`));
+    const bad = await finish(api, api.study_topic_regenerate(FOLDER, "map", true).jobId);
+    expect(bad.error).toContain("no tiene nota");
+  });
+});
+
+describe("regenerar todo", () => {
+  it("encadena teoría, práctica y ejercicios; se para en el primer fallo", async () => {
+    const order: string[] = [];
+    const api = make({
+      generateTheory: async () => { order.push("theory"); return ""; },
+      reevaluate: async () => { order.push("practice"); throw new Error("plan inválido"); },
+      buildExercises: async () => { order.push("exercises"); return []; },
+    });
+    const st = await finish(api, api.study_topic_regenerate(FOLDER, "all", true).jobId);
+    expect(order).toEqual(["theory", "practice"]);
+    expect(st.error).toContain("plan inválido");
+    expect(st.finished).toBe(2);
+    expect(st.total).toBe(3);
+  });
+
+  it("con todo bien hace los tres pasos en orden", async () => {
+    const order: string[] = [];
+    const api = make({
+      generateTheory: async () => { order.push("theory"); return ""; },
+      reevaluate: async () => { order.push("practice"); },
+      buildExercises: async (_f, skill, d) => { order.push("exercises"); const rel = `${FOLDER}/Ejercicios/${skill}/ej_${skill}_d${d}_n_${order.length}.md`; put(rel, "# n"); return [rel]; },
+    });
+    const st = await finish(api, api.study_topic_regenerate(FOLDER, "all", true).jobId);
+    expect(st.error).toBe("");
+    expect(order.slice(0, 2)).toEqual(["theory", "practice"]);
+    expect(order[2]).toBe("exercises");
+    expect(st.finished).toBe(3);
   });
 });

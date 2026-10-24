@@ -59,7 +59,8 @@ export function mentorAreaPracticeApi(app: AppState, hooks: { today: () => strin
       const plan = planOf(opts);
       const date = String((opts as Record<string, unknown>)?.date ?? "");
       if (!DATE_RE.test(date)) throw new ApiError("Fecha inválida (AAAA-MM-DD).");
-      return { items: areaPracticeFor(plan, date).map((d) => ({ areaId: d.areaId, label: d.label, day: d.day, rel: d.rel, title: d.kata.title, skill: d.kata.skillName, level: d.kata.level, minutes: d.kata.minutes })) };
+      const consumed = new Map(viewOf(plan).areas.map((a) => [a.areaId, new Set(a.kata.consumed)] as const));
+      return { items: areaPracticeFor(plan, date, undefined, consumed).map((d) => ({ areaId: d.areaId, label: d.label, day: d.day, rel: d.rel, title: d.kata.title, skill: d.kata.skillName, level: d.kata.level, minutes: d.kata.minutes })) };
     },
 
     /**
@@ -75,11 +76,12 @@ export function mentorAreaPracticeApi(app: AppState, hooks: { today: () => strin
       const katas: Array<Record<string, unknown>> = [];
       for (const a of viewOf(plan).areas) {
         const sub = plan.subplans.find((s) => s.areaId === a.areaId);
+        const consumed = new Set(a.kata.consumed);
         if (!sub || (only && sub.id !== only)) continue;
         const dates = areaKataDates(plan, a.areaId);
         let n = 0;
         dates.forEach((d, i) => {
-          if (d <= today || n >= limit) return;
+          if (d <= today || n >= limit || consumed.has(d)) return;
           const k = kataForDay(a.areaId, i + 1, a.level);
           if (!k) return;
           n++;

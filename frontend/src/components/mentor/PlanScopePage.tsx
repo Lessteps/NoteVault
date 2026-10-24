@@ -7,7 +7,7 @@
 
 import { ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { canShift, clampToPlan, dateLabel, deliverableInArea, deliverablesText, dayBlockCounts, longDateLabel, monthSummary, periodTitle, shiftAnchor, topicsText, weekSummary, type AgendaView } from "../../lib/planSchedule";
+import { canShift, clampToPlan, dateLabel, deliverablesText, dayBlockCounts, longDateLabel, monthSummary, periodTitle, shiftAnchor, topicsText, weekSummary, type AgendaView } from "../../lib/planSchedule";
 import { daysBetween, isDate, weeksLabel } from "../../lib/planTime";
 import { BASES_KEY } from "../../lib/planAreaTopics";
 import { orderedAreas } from "../../lib/planTopicsByArea";
@@ -20,7 +20,7 @@ import { AgendaCalendar } from "./AgendaCalendar";
 import { PracticeCurriculumBar, MonthProjects, WeekProjects } from "./AgendaDayFocus";
 import { DayDetail, MonthDetail, WeekDetail } from "./AgendaViews";
 import { AreaDot, DeliverablesPendingNote } from "./AreaViews";
-import { activeAreas, areaState, normalizePageTab, scopeDates, scopeInfo, scopeKey, scopeProgress, type PageScope } from "./mentorAreas";
+import { activeAreas, areaState, normalizePageTab, scopeDeliverables, scopeInfo, scopeKey, scopePeriodSummary, scopeProgress, scopeRouteEnd, type PageScope } from "./mentorAreas";
 import { hasBasesRoute, PAGE_BASES, pageAreaId, PLAN_NAV_PREFIX } from "./mentorNav";
 import { MonthlyDeliverables } from "./MonthlyDeliverables";
 import { DeliverableLine, useAgendaModel, type AgendaModel } from "./agendaKit";
@@ -120,19 +120,23 @@ export function PlanScopePage(props: PlanScopePageProps) {
 
   // ── resumen del periodo (para lectores de pantalla y atajos) ──
   const summary = useMemo(() => {
+    const scoped = scope.kind !== "all";
     if (navView === "dia") {
       const d = m.schedule.byDate.get(anchor);
       if (!d) return "fuera del plan";
+      if (scoped) return scopePeriodSummary(m, scope, anchor, anchor, m.deliverablesDefined);
       const c = dayBlockCounts(d);
       return `${d.focus ? `enfoque ${d.focus.label}, ${c.theory} ${c.theory === 1 ? "teoría" : "teorías"}, ${c.practice} ${c.practice === 1 ? "práctica" : "prácticas"}, ` : ""}${topicsText(d.topics.length)}, ${delText((m.dueByDate.get(anchor) ?? []).length)}`;
     }
     if (navView === "semana") {
       const w = weekSummary(plan, m.schedule, week, m.deliverablesDefined ? m.deliverables : []);
-      return w ? `${topicsText(w.topics)}, ${delText(w.deliverables.length)}` : "";
+      if (!w) return "";
+      return scoped ? scopePeriodSummary(m, scope, w.start, w.end, m.deliverablesDefined) : `${topicsText(w.topics)}, ${delText(w.deliverables.length)}`;
     }
     const s = monthSummary(plan, m.schedule, month, m.deliverablesDefined ? m.deliverables : []);
-    return s ? `${topicsText(s.topics)}, ${delText(s.deliverables.length)}` : "";
-  }, [navView, anchor, m, plan, week, month, delText]);
+    if (!s) return "";
+    return scoped ? scopePeriodSummary(m, scope, s.start, s.end, m.deliverablesDefined) : `${topicsText(s.topics)}, ${delText(s.deliverables.length)}`;
+  }, [navView, anchor, m, plan, week, month, delText, scope]);
   const title = periodTitle(navView === "mes" || tab === "calendario" ? "mes" : navView, anchor, plan);
   const live = useRef("");
   const lastTitle = useRef("");
@@ -179,7 +183,9 @@ export function PlanScopePage(props: PlanScopePageProps) {
   const progress = scopeProgress(plan, m, scope);
   const overall = scope.kind === "all" && summary0 ? { pct: summary0.pct, done: summary0.done, total: summary0.topics } : null;
   const pct = overall?.pct ?? progress.pct;
-  const dates = scopeDates(plan, scope);
+  // «Fechas» son SIEMPRE las del plan (inicio–fin y sus semanas); lo que termina antes o después es la ruta propia del área («Tu ruta de X: termina ~fecha»)
+  const dates = { start: plan.start, end: plan.end };
+  const routeEnd = scopeRouteEnd(m, scope);
   const weeks = Math.round(((Date.parse(dates.end) - Date.parse(dates.start)) / 86400000 + 1) / 7 * 10) / 10;
   const currentWeek = summary0?.currentWeek ?? week;
   const aState = scope.kind === "all" ? null : areaState(plan, scope, progress, currentWeek);
@@ -221,6 +227,11 @@ export function PlanScopePage(props: PlanScopePageProps) {
             <span>{rangeLabel(dates.start, dates.end)}</span>
             <Chip large>{weeksLabel(weeks)}</Chip>
           </Prop>
+          {routeEnd && routeEnd !== plan.end && (
+            <Prop label="Tu ruta" testid="prop-route-end">
+              <span className="text-[14px] text-dim">Tu ruta de {info.name}: termina ~{dateLabel(routeEnd)} {routeEnd.slice(0, 4)}</span>
+            </Prop>
+          )}
           <Prop label="Progreso" testid="prop-progress">
             <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
               <div className="min-w-0 flex-1"><ProgressBar pct={pct} label={`Avance de ${info.title}`} /></div>
@@ -402,7 +413,7 @@ function ProjectsTab({ data, m, scope, week, month, period, onChanged, headingId
   const list = m.deliverables
     .filter((d) => d.kind !== "kata" && d.kind !== "daily_project")
     .filter((d) => !chained || (d.kind !== "weekly_project" && d.kind !== "monthly_project"))
-    .filter((d) => scope.kind === "all" || (areaId ? deliverableInArea(d, areaId) : false))
+    .filter((d) => scope.kind === "all" || scopeDeliverables(m.plan, scope, [d]).length > 0)
     .filter((d) => scope.kind !== "all" || (period === "mes" ? d.dueDate.startsWith(month) : weekRange(m, week, d.dueDate)));
   return (
     <div className="space-y-5" data-testid="plan-projects">

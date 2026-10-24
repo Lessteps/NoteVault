@@ -4,6 +4,8 @@
 
 import { BookOpen, Dumbbell, Lock, Network, Timer } from "lucide-react";
 import { usePomodoro } from "../../store/pomodoro";
+import { mentorAssignment } from "../../lib/pomodoro";
+import type { WorkKind } from "../../lib/timeLog";
 import { dateLabel } from "../../lib/planSchedule";
 import { orderedAreas } from "../../lib/planTopicsByArea";
 import type { TopicTimeTag } from "../../lib/planTopicTime";
@@ -43,6 +45,8 @@ export interface BoardRow {
   sub?: string;
   /** tema añadido a mano a este día: lleva la marca «Extra» y, si hay `remove`, la × que lo quita */
   extra?: { remove?: () => void };
+  /** si la fila es de Teoría o de Práctica (al asignarla al Pomodoro el bloque nace con ese tipo); sin dato, Teoría */
+  work?: "theory" | "practice";
 }
 
 const TIME_COLOUR: Record<TopicTimeTag["status"], string> = { done: "var(--nv-mint)", scheduled: "var(--nv-faint, #888)", current: "var(--nv-accent)", pending: "var(--nv-warn)" };
@@ -59,7 +63,7 @@ export function TimeChip({ time }: { time: TopicTimeTag }) {
 }
 
 /** El menú de un tema: apunte (.md), archivo de práctica, canvas explicativo o asignarlo al Pomodoro. */
-export function TopicMenu({ folder, title, trigger, className }: { folder: string; title: string; trigger?: React.ReactNode; className?: string }) {
+export function TopicMenu({ folder, title, trigger, className, work, areaKey }: { folder: string; title: string; trigger?: React.ReactNode; className?: string; /** tipo de trabajo de la fila (Teoría / Práctica) y área del Mentor: el bloque del Pomodoro nace ya con ellos */ work?: WorkKind; areaKey?: string }) {
   const assignTopic = usePomodoro((s) => s.assignTopic);
   return (
     <RowMenu
@@ -70,13 +74,13 @@ export function TopicMenu({ folder, title, trigger, className }: { folder: strin
         { id: "note", label: "Abrir apunte (.md)", icon: <BookOpen size={16} aria-hidden className="text-accent-text" />, onClick: () => void openTopicNote(folder), testid: "board-open-note" },
         { id: "practice", label: "Abrir archivo de práctica", icon: <Dumbbell size={16} aria-hidden className="text-mint" />, onClick: () => void openTopic(folder), testid: "board-open-practice" },
         { id: "canvas", label: "Abrir canvas explicativo", icon: <Network size={16} aria-hidden className="text-accent-text" />, onClick: () => void openTopicCanvas(folder), testid: "board-open-canvas" },
-        { id: "pomodoro", label: "Asignar al Pomodoro", icon: <Timer size={16} aria-hidden className="text-warn" />, onClick: () => assignTopic({ folder, title }), testid: "board-assign-pomodoro" },
+        { id: "pomodoro", label: "Asignar al Pomodoro", icon: <Timer size={16} aria-hidden className="text-warn" />, onClick: () => assignTopic(work || areaKey ? mentorAssignment(work ?? "theory", { folder, title, ...(areaKey ? { areaKey } : {}) }) : { folder, title }), testid: "board-assign-pomodoro" },
       ]}
     />
   );
 }
 
-export function TopicRow({ r, colour }: { r: BoardRow; colour: string }) {
+export function TopicRow({ r, colour, areaKey }: { r: BoardRow; colour: string; /** área del Mentor de la lista que la pinta (para el Pomodoro) */ areaKey?: string }) {
   const locked = !!r.unlockOn;
   const assigned = usePomodoro((s) => s.p.assignedTopics.some((t) => t.folder === r.folder));
   const working = !r.done && !locked && r.state !== "sin_tratar";
@@ -103,7 +107,7 @@ export function TopicRow({ r, colour }: { r: BoardRow; colour: string }) {
         );
         const cls = cn("min-w-0 flex-1 text-[15px] leading-snug", r.done && "text-faint line-through decoration-faint/60");
         // pulsar el tema abre sus opciones: apunte (.md), archivo de práctica, canvas y Pomodoro
-        return locked ? <span className={cls}>{label}</span> : <span className={cls}><TopicMenu folder={r.folder} title={r.title} trigger={label} className="w-full rounded-md hover:text-accent-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" /></span>;
+        return locked ? <span className={cls}>{label}</span> : <span className={cls}><TopicMenu folder={r.folder} title={r.title} trigger={label} {...(r.work ? { work: r.work } : {})} {...(areaKey ? { areaKey } : {})} className="w-full rounded-md hover:text-accent-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" /></span>;
       })()}
       {r.extra && <ExtraTag title={r.title} {...(r.extra.remove ? { onRemove: r.extra.remove } : {})} />}
       {r.time && <TimeChip time={r.time} />}
@@ -132,7 +136,7 @@ export function TopicRow({ r, colour }: { r: BoardRow; colour: string }) {
           <Lock size={14} aria-hidden />
         </span>
       ) : (
-        <TopicMenu folder={r.folder} title={r.title} />
+        <TopicMenu folder={r.folder} title={r.title} {...(r.work ? { work: r.work } : {})} {...(areaKey ? { areaKey } : {})} />
       )}
     </li>
   );

@@ -6,7 +6,7 @@
 //     de repaso de cada tema. Es el MISMO calendario de repasos del módulo de estudio (`Repaso/<tema>.md`): practicar un tema lo reprograma.
 // Debajo va la práctica diaria del área (katas). Solo lectura sobre el plan.
 
-import { CalendarClock, Play } from "lucide-react";
+import { CalendarClock, Play, Timer } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AreaPracticeView } from "../../lib/areaPracticeView";
 import type { MentorPlan } from "../../lib/types";
@@ -16,6 +16,7 @@ import { dateLabel } from "../../lib/planSchedule";
 import { executionLists, type AreaSets } from "../../lib/planAreaLists";
 import { useMentor } from "../../store/mentor";
 import { usePomodoro } from "../../store/pomodoro";
+import { mentorAssignment } from "../../lib/pomodoro";
 import { cn } from "../ui";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { AddExtraTopic } from "./AddExtraTopic";
@@ -72,7 +73,7 @@ export function useReviewItems(enabled = true) {
 
 const dueColour = (inDays: number): string => (inDays < 0 ? "var(--nv-danger)" : inDays === 0 ? "var(--nv-warn)" : "var(--nv-accent)");
 
-function ReviewList({ title, rows, colour }: { title: string; rows: ReviewRow[]; colour: string }) {
+function ReviewList({ title, rows, colour, areaKey }: { title: string; rows: ReviewRow[]; colour: string; areaKey: string }) {
   if (!rows.length) return null;
   return (
     <section aria-label={title} data-testid="review-bucket">
@@ -89,6 +90,9 @@ function ReviewList({ title, rows, colour }: { title: string; rows: ReviewRow[];
             <Chip colour={dueColour(r.inDays)}>{dueText(r.inDays)}</Chip>
             <GhostButton onClick={() => void openTopic(r.folder)} aria-label={`Ir a la práctica de repaso de ${r.title}`} data-testid="review-go">
               <Play size={13} aria-hidden style={{ color: colour }} /> Ir al repaso
+            </GhostButton>
+            <GhostButton onClick={() => usePomodoro.getState().assignTopic(mentorAssignment("review", { folder: r.folder, title: r.title, areaKey }))} aria-label={`Asignar el repaso de ${r.title} al Pomodoro`} data-testid="review-assign">
+              <Timer size={13} aria-hidden /> Al Pomodoro
             </GhostButton>
           </li>
         ))}
@@ -116,7 +120,7 @@ export interface UpcomingWeekView {
 const UPCOMING_STEP = 4;
 
 /** «Lo que viene»: los temas de las semanas siguientes, con su etiqueta de tiempo. Es la proyección del plan: se ve aunque la ruta sólida aún no los desbloquee. */
-function UpcomingWeeks({ weeks, colour }: { weeks: UpcomingWeekView[]; colour: string }) {
+function UpcomingWeeks({ weeks, colour, areaKey }: { weeks: UpcomingWeekView[]; colour: string; areaKey: string }) {
   const [shown, setShown] = useState(UPCOMING_STEP);
   if (!weeks.length) return null;
   return (
@@ -134,7 +138,7 @@ function UpcomingWeeks({ weeks, colour }: { weeks: UpcomingWeekView[]; colour: s
             <div key={d.date} data-date={d.date}>
               <p className="px-1 pt-1 text-[12.5px] font-medium text-dim first-letter:uppercase">{d.label}</p>
               <ul className="space-y-0.5" aria-label={`Temas de ${d.label}`}>
-                {d.rows.map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} />)}
+                {d.rows.map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} />)}
               </ul>
             </div>
           ))}
@@ -148,7 +152,7 @@ function UpcomingWeeks({ weeks, colour }: { weeks: UpcomingWeekView[]; colour: s
 }
 
 /** La semana en curso: un cajón por día, lo completado y el nivel de avance (media del avance de cada tema; un tema hecho cuenta 100 %). */
-function WeekView({ days, today, colour, upcoming }: { days: WeekDayView[]; today: string; colour: string; upcoming?: UpcomingWeekView[] }) {
+function WeekView({ days, today, colour, upcoming, areaKey }: { days: WeekDayView[]; today: string; colour: string; upcoming?: UpcomingWeekView[]; areaKey: string }) {
   const unique = new Map<string, BoardRow>();
   for (const d of days) for (const r of d.rows) if (!unique.has(r.folder) || r.done) unique.set(r.folder, r);
   const all = [...unique.values()];
@@ -183,13 +187,13 @@ function WeekView({ days, today, colour, upcoming }: { days: WeekDayView[]; toda
               <p className="px-2 py-1.5 text-[13.5px] text-faint">Sin temas de esta ruta este día.</p>
             ) : (
               <ul className="space-y-0.5" aria-label={`Temas de ${d.label}`}>
-                {rows.map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} />)}
+                {rows.map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} />)}
               </ul>
             )}
           </section>
         );
       })}
-      {upcoming && <UpcomingWeeks weeks={upcoming} colour={colour} />}
+      {upcoming && <UpcomingWeeks weeks={upcoming} colour={colour} areaKey={areaKey} />}
     </div>
   );
 }
@@ -222,6 +226,7 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
   plannedMinutes: number;
   onStartBlock?: () => void;
 }) {
+  const areaKey = areaId ?? subplanId ?? "bases";
   const buckets = useMemo(() => bucketReviews(reviews, today), [reviews, today]);
   const todayTag = { text: "Hoy", colour };
   const lists = useMemo(() => {
@@ -260,7 +265,7 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
         </div>
         {plannedMinutes > 0 && (
           <div className="min-w-44 rounded-xl border border-line bg-card px-3.5 py-2" data-testid="area-today-progress">
-            <p className="text-[12px] text-dim">Progreso de hoy</p>
+            <p className="text-[12px] text-dim">Tiempo registrado hoy</p>
             <p className="font-mono text-[15px] font-bold">{loggedMinutes} / {plannedMinutes} min</p>
             <div className="mt-1"><ProgressBar pct={Math.min(100, Math.round((loggedMinutes / plannedMinutes) * 100))} label="Tiempo registrado hoy frente al previsto" /></div>
           </div>
@@ -288,10 +293,10 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
         weekCount === 0 ? (
           <div className="space-y-4">
             <p className="rounded-2xl border border-dashed border-line p-5 text-[14.5px] text-dim" data-testid="work-empty">Esta semana no hay temas repartidos en esta ruta.</p>
-            {upcoming && <UpcomingWeeks weeks={upcoming} colour={colour} />}
+            {upcoming && <UpcomingWeeks weeks={upcoming} colour={colour} areaKey={areaKey} />}
           </div>
         ) : (
-          <WeekView days={weekDays} today={today} colour={colour} {...(upcoming ? { upcoming } : {})} />
+          <WeekView days={weekDays} today={today} colour={colour} areaKey={areaKey} {...(upcoming ? { upcoming } : {})} />
         )
       ) : view !== "repasos" ? (
         lists[view].length === 0 ? (
@@ -308,7 +313,7 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
               </p>
             )}
             <ul className="space-y-1" aria-label={VIEWS.find((v) => v.id === view)!.label} data-testid="work-list">
-              {lists[view].map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} />)}
+              {lists[view].map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} />)}
             </ul>
           </div>
         )
@@ -318,10 +323,10 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
         </p>
       ) : (
         <div className="space-y-4 rounded-2xl border border-line bg-card p-4" data-testid="work-reviews">
-          <ReviewList title="Vencidos y de hoy" rows={buckets.today} colour={colour} />
-          <ReviewList title="Esta semana" rows={buckets.week} colour={colour} />
-          <ReviewList title="La próxima semana" rows={buckets.nextWeek} colour={colour} />
-          <ReviewList title="Más adelante" rows={buckets.later} colour={colour} />
+          <ReviewList title="Vencidos y de hoy" rows={buckets.today} colour={colour} areaKey={areaKey} />
+          <ReviewList title="Esta semana" rows={buckets.week} colour={colour} areaKey={areaKey} />
+          <ReviewList title="La próxima semana" rows={buckets.nextWeek} colour={colour} areaKey={areaKey} />
+          <ReviewList title="Más adelante" rows={buckets.later} colour={colour} areaKey={areaKey} />
           <p className="px-1 text-[13px] text-faint">Son los mismos repasos del módulo de estudio: practicar un tema lo reprograma solo.</p>
         </div>
       )}

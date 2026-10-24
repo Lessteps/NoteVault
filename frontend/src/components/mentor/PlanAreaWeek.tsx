@@ -10,7 +10,7 @@ import { Chip, GhostButton } from "../common/forms";
 import { cn } from "../ui";
 import { PurposeBlock, type AgendaModel } from "./agendaKit";
 import { RegisteredTime, WeekCategories, WeekStats } from "./AgendaBoards";
-import { dayViewable, scopeDayRow, scopeOnly, scopeWeekStats, type PageScope } from "./mentorAreas";
+import { dayViewable, scopeDayRow, scopeOnly, scopeWeekPurpose, scopeWeekStats, type PageScope } from "./mentorAreas";
 import { pagePace } from "./PlanPageSlots";
 import { DAY_LONG, DAY_SHORT } from "./planShared";
 
@@ -88,6 +88,8 @@ export function AreaWeek({ m, scope, week, onPickDay, onChanged, headingId, dayE
   const stats = scopeWeekStats(m, scope, week, w);
   const days = m.schedule.days.filter((d) => d.week === week);
   const current = m.today >= w.start && m.today <= w.end;
+  const autoPurpose = scopeWeekPurpose(m, scope, week, w);
+  const manualPurpose = m.plan.purposes?.week?.[String(week)];
   const del = !m.deliverablesDefined ? "entregables por definir" : stats.deliverables.length === 1 ? `Entregable: ${stats.deliverables[0]!.title}` : deliverablesText(stats.deliverables.length);
   return (
     <article className="space-y-4" data-testid="agenda-week" aria-labelledby={headingId}>
@@ -98,7 +100,7 @@ export function AreaWeek({ m, scope, week, onPickDay, onChanged, headingId, dayE
       <p className="text-[15px] font-medium text-text" data-testid="agenda-week-counts">
         {topicsText(stats.topics)} · {del}
       </p>
-      <PurposeBlock planId={m.plan.id} scope="week" keyName={String(week)} text={w.purpose} auto={w.autoPurpose} manual={!!m.plan.purposes?.week?.[String(week)]} editable={m.editable} onChanged={onChanged} label={`la semana ${week}`} />
+      <PurposeBlock planId={m.plan.id} scope="week" keyName={String(week)} text={manualPurpose || autoPurpose} auto={autoPurpose} manual={!!m.plan.purposes?.week?.[String(week)]} editable={m.editable} onChanged={onChanged} label={`la semana ${week}`} />
       <ScopeWeekCards m={m} scope={scope} week={week} />
       <WeekCategories m={m} week={week} headingId={`${headingId}-areas`} only={scopeOnly(scope)} />
       <section aria-labelledby={`${headingId}-days`} data-testid="agenda-week-days">

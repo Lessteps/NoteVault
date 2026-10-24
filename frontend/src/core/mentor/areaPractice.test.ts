@@ -132,6 +132,31 @@ describe("estado derivado por área", () => {
     expect(one.kata.next!.kata.id).toBe("backend-002");
   });
 
+  it("un kata ADELANTADO y hecho se consume una vez: su día original deja de listarse y la secuencia no se salta nada", () => {
+    const withExtra = (x: Array<{ id: string; kind: string; date: string; area: string; kataDate: string; title: string; done: boolean }>) => ({ ...base, attempts: { b: att("backend", "2026-10-05") }, plan: { ...plan, subplans: [{ id: "s-be", area: "Backend", areaId: "backend" }, { id: "s-fe", area: "Frontend", areaId: "frontend" }], extraPractice: x } });
+    const ahead = { id: "x1", kind: "kata" as const, date: "2026-10-06", area: "s-be", kataDate: "2026-10-09", title: "k", done: true };
+    const plain = deriveAreaPractice({ ...withExtra([]), today: "2026-10-06" })[0]!;
+    const b = deriveAreaPractice({ ...withExtra([ahead]), today: "2026-10-06" })[0]!;
+    expect(plain.kata.consumed).toEqual([]);
+    expect(b.kata.consumed).toEqual(["2026-10-09"]);
+    // el original (vie 9, kata nº 5) ya no cuenta ni se lista en la semana; hoy sigue tocando el nº 2
+    expect(plain.kata.week.map((d) => d.planned)).toEqual([true, true, true, true, true, false, false]);
+    expect(b.kata.week.map((d) => d.planned)).toEqual([true, true, true, true, false, false, false]);
+    expect(b.kata.next!.kata.id).toBe("backend-002");
+    expect(b.kata.todayIndex).toBe(2);
+    // el kata adelantado (nº 5) cuenta como hecho en su habilidad
+    expect(b.skills.reduce((n, s) => n + s.done, 0)).toBe(2);
+    // al hacer los katas 2, 3 y 4 en sus días, el siguiente salta el 5 (consumido) y es el 6
+    const later = deriveAreaPractice({ ...withExtra([ahead]), attempts: { b: att("backend", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08") }, today: "2026-10-12" })[0]!;
+    expect(later.kata.next!.kata.id).toBe("backend-006");
+    // sin hacerlo (aún no `done`, sin intento ese día) no se consume
+    expect(deriveAreaPractice({ ...withExtra([{ ...ahead, done: false }]), today: "2026-10-06" })[0]!.kata.consumed).toEqual([]);
+    // hecho por intento verificado en un día que no es de kata (sábado 10): se consume y ese intento no cuenta como kata del calendario
+    const sat = deriveAreaPractice({ ...withExtra([{ ...ahead, date: "2026-10-10", done: false }]), attempts: { b: att("backend", "2026-10-05", "2026-10-10") }, today: "2026-10-10" })[0]!;
+    expect(sat.kata.consumed).toEqual(["2026-10-09"]);
+    expect(sat.kata.doneDays).toBe(1);
+  });
+
   it("las marcas manuales cuentan, se pueden quitar y se guardan solo en los datos de la app", () => {
     const store = new AreaPracticeStore(dir);
     store.mark("p", "frontend", "2026-10-06", "done");

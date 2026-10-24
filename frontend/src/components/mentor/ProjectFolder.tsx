@@ -4,19 +4,23 @@
 import { FolderPlus, FileText } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../lib/bridge";
+import { mentorAssignment } from "../../lib/pomodoro";
 import { useApp } from "../../store/app";
+import { usePomodoro } from "../../store/pomodoro";
 import { GhostButton } from "../common/forms";
 import { FolderOpenMenu } from "./FolderOpenMenu";
 
 type Project = Record<string, unknown>;
 
-export function ProjectFolder({ planId, areaKeys, project, label = "Crear carpeta del proyecto", testid = "project-folder" }: {
+export function ProjectFolder({ planId, areaKeys, project, label = "Crear carpeta del proyecto", testid = "project-folder", pomodoro }: {
   planId: string;
   areaKeys: string[];
   /** el proyecto tal como lo entiende `sanitizeProject` (kind, title, description, sections…); sin él solo se prepara la estructura de la ruta */
   project?: Project;
   label?: string;
   testid?: string;
+  /** al crear (o reabrir) la carpeta, la pieza queda asignada al Pomodoro como Proyecto de esa área: el bloque nace con su tipo y su área */
+  pomodoro?: { folder: string; title: string; areaKey: string };
 }) {
   const [busy, setBusy] = useState(false);
   const [made, setMade] = useState<{ dirs: string[]; readme: string; existed: boolean } | null>(null);
@@ -30,6 +34,7 @@ export function ProjectFolder({ planId, areaKeys, project, label = "Crear carpet
       const readme = r.projects[0]?.readme ?? `${r.route}/README.md`;
       const fresh = r.projects.some((p) => p.created.length > 0);
       useApp.getState().refreshTree?.();
+      if (pomodoro) usePomodoro.getState().assignTopic(mentorAssignment("project", pomodoro));
       setMade({ dirs: dirs.length ? dirs : [r.route], readme, existed: !!project && !fresh });
       toast("info", !project ? "Estructura de la ruta lista en Mentor." : fresh ? `Carpeta creada en ${r.projects.length === 1 ? r.projects[0]!.area : `${r.projects.length} áreas`}.` : "La carpeta ya existía: no se tocó nada.");
     } catch (e) {

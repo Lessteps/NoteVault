@@ -3,7 +3,7 @@
 // el catálogo de la vault (`lib/planTopicCatalog.ts`), para que la vista se actualice sola cuando cambian las áreas o los temas del plan.
 
 import { areaKeyOf } from "./planCoverage.js";
-import type { PlanTopicRow } from "./planTopicCatalog.js";
+import type { OutdatedSkills, PlanTopicRow } from "./planTopicCatalog.js";
 import type { MentorPlan, MentorSubplan } from "./types.js";
 
 /** Una pestaña de área. */
@@ -43,6 +43,8 @@ export interface AreaTopicRow {
   planExercises?: number;
   /** le falta algo de lo que se puede generar */
   incomplete: boolean;
+  /** piezas hechas con una versión anterior de su skill: piden regenerarse (botón verde) */
+  outdated?: OutdatedSkills;
 }
 
 const routeOf = (r: string | undefined): AreaTopicRow["route"] => (r === "optional" || r === "skipped" ? r : "core");
@@ -80,6 +82,7 @@ export function areaTopicRows(sub: MentorSubplan, catalog: ReadonlyArray<PlanTop
         exercises: c?.exercises ?? 0,
         ...(c?.planExercises ? { planExercises: c.planExercises } : {}),
         incomplete: needsGenerate(c),
+        ...(c?.outdated ? { outdated: c.outdated } : {}),
       };
     });
 }

@@ -274,7 +274,7 @@ export function FocusCard({ areaKey, planId, session, loggedMinutes, goalMinutes
         </div>
       </div>
       <div>
-        <p className="flex items-baseline gap-2 text-[13px] text-dim">Tiempo acumulado hoy <span className="flex-1" /><strong className="text-[15px] text-text" data-testid="run-focus-logged">{loggedMinutes} min</strong>{goalMinutes > 0 && <span>/ Meta {hm(goalMinutes)}</span>}</p>
+        <p className="flex items-baseline gap-2 text-[13px] text-dim">Tiempo registrado hoy <span className="flex-1" /><strong className="text-[15px] text-text" data-testid="run-focus-logged">{loggedMinutes} min</strong>{goalMinutes > 0 && <span>/ Meta {hm(goalMinutes)}</span>}</p>
         <div className="mt-1.5"><ProgressBar pct={pct} label="Tiempo registrado hoy frente a la meta" /></div>
       </div>
       <p className="text-[12.5px] text-faint">{loggedMinutes === 0 ? "Aún no has registrado tiempo. Abre un área y empieza un Pomodoro para sincronizar tus avances automáticamente." : "Cada bloque que guardas queda en el registro de horas del área."}</p>

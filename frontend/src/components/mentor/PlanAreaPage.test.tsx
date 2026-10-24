@@ -116,8 +116,8 @@ describe("página de un área", () => {
     expect(props).toContain("Estado");
     expect(props).toContain("Activo");
     expect(props).toContain("Fechas");
-    expect(props).toMatch(/5 oct 2026 – \d+ \w+ 2026/); // la fase del área: semanas 1–10
-    expect(props).toContain("10 semanas");
+    expect(props).toMatch(/5 oct 2026 – \d+ \w+ 2027?/); // las fechas del PLAN, no las de la fase del área
+    expect(props).toMatch(/\d+(,\d)? semanas/);
     expect(props).toContain("Progreso");
     expect(byTest("prop-progress-text").textContent).toMatch(/^Semana 2 · \d+ temas pendientes$/);
     // la nota de práctica con sus dos acciones

@@ -84,6 +84,8 @@ export interface AreaPracticeView {
     skip: { allowed: boolean; pct: number; neededPct: number };
     /** los katas de hoy y los atrasados (pendientes o saltados), con hoy primero y luego del más antiguo al más reciente */
     due: AreaKataDue[];
+    /** fechas de katas que ya se hicieron ADELANTADOS (en otro día): en su fecha original ya no se listan ni cuentan */
+    consumed: string[];
   };
   weekly: { title: string; description: string; week: number | null; focus: boolean };
   weeks: AreaWeeklyRow[];

@@ -3,7 +3,7 @@
 // `dayBases`, `areaRouteTopics`), de modo que los números de una página coinciden con los de los demás sitios.
 
 import { BASES_KEY } from "../../lib/planAreaTopics";
-import { deliverableInArea, type ScheduleDay, type WeekSummary } from "../../lib/planSchedule";
+import { deliverableInArea, deliverablesText, topicsText, type ScheduleDay, type WeekSummary } from "../../lib/planSchedule";
 import { addDays } from "../../lib/planTime";
 import { areaRouteTopics, basesClassifier, basesRouteTopics, dayBases, dayByArea, orderedAreas, type DayAreaEntry, type DayBasesItem } from "../../lib/planTopicsByArea";
 import type { PlanDeliverable } from "../../lib/planAreas";
@@ -99,6 +99,17 @@ export function scopeDates(plan: Pick<MentorPlan, "subplans" | "start" | "end">,
   return { start: plan.start, end: plan.end };
 }
 
+/**
+ * Cuándo termina de verdad la ruta de un área según el reparto por avance: el último día en que aún tiene un tema por hacer. null si no le queda
+ * nada (completa), si no tiene fase propia que comparar o si es la Vista general / Bases. Se compara con el final del PLAN para decidir si se enseña.
+ */
+export function scopeRouteEnd(m: Pick<AgendaModel, "schedule">, s: PageScope): string | null {
+  if (s.kind !== "area") return null;
+  let last: string | null = null;
+  for (const d of m.schedule.days) if (d.topics.some((t) => t.subplanId === s.subplanId && !t.done) && (!last || d.date > last)) last = d.date;
+  return last;
+}
+
 /** Las áreas «activas» del plan en la semana actual (su fase la incluye; sin fases, todas): son los chips de la Vista general. */
 export function activeAreas(plan: Pick<MentorPlan, "subplans">, currentWeek: number) {
   const all = orderedAreas(plan);
@@ -110,6 +121,20 @@ export function activeAreas(plan: Pick<MentorPlan, "subplans">, currentWeek: num
 }
 
 // ── Cifras de una semana ────────────────────────────────────────────────
+
+/**
+ * ¿El entregable es PROPIO del área? Más estricto que `deliverableInArea`: un integrador (`areaId: "all"`) solo cuenta si nombra el área en
+ * `areaIds`; uno sin lista es del plan entero y no se le atribuye a ninguna área en concreto.
+ */
+export const deliverableOfArea = (d: PlanDeliverable, areaId: string): boolean => d.areaId === areaId || (d.areaId === "all" && !!d.areaIds?.includes(areaId));
+
+/** Los entregables de una lista que pertenecen al alcance de la página (todos para la Vista general; ninguno para Bases). */
+export function scopeDeliverables(plan: Pick<MentorPlan, "subplans">, s: PageScope, list: readonly PlanDeliverable[]): PlanDeliverable[] {
+  if (s.kind === "all") return [...list];
+  if (s.kind === "bases") return [];
+  const areaId = plan.subplans.find((x) => x.id === s.subplanId)?.areaId;
+  return areaId ? list.filter((d) => deliverableOfArea(d, areaId)) : [];
+}
 
 export interface ScopeWeekStats {
   /** temas de la semana en esta página y cuántos están hechos */
@@ -163,8 +188,43 @@ export function scopeWeekStats(m: AgendaModel, s: PageScope, week: number, w: We
     practiceMinutes,
     practiceBlocks,
     projectDays,
-    deliverables: areaId && w ? w.deliverables.filter((d) => deliverableInArea(d, areaId)) : [],
+    deliverables: areaId && w ? w.deliverables.filter((d) => d.kind !== "kata" && deliverableOfArea(d, areaId)) : [],
   };
+}
+
+const shortTopic = (t: string): string => t.replace(/^[\d.\s_-]+/, "").trim() || t;
+
+/**
+ * El propósito AUTOMÁTICO de la semana de un área o de Bases, hecho solo con SUS temas y SUS entregables:
+ * «Semana 3 · 4 temas de Backend: de HTTP a REST; entrega: Proyecto…».
+ */
+export function scopeWeekPurpose(m: AgendaModel, s: PageScope, week: number, w: WeekSummary | null): string {
+  if (s.kind === "all") return w?.autoPurpose ?? "";
+  const stats = scopeWeekStats(m, s, week, w);
+  const name = scopeInfo(m.plan, s).name;
+  const cells = m.byWeekArea.weeks[week - 1];
+  const list = !cells ? [] : s.kind === "bases" ? cells.bases : cells.cells.find((c) => c.subplanId === s.subplanId)?.topics ?? [];
+  const pend = list.filter((t) => !t.done);
+  const seq = pend.length ? pend : list;
+  const del = stats.deliverables.map((d) => d.title);
+  const range = seq.length > 1 ? `: de ${shortTopic(seq[0]!.title)} a ${shortTopic(seq[seq.length - 1]!.title)}` : seq.length === 1 ? `: ${shortTopic(seq[0]!.title)}` : ": práctica y repaso";
+  return `Semana ${week} · ${stats.topics > 0 ? `${topicsText(stats.topics)} de ${name}` : name}${range}${del.length ? `; entrega: ${del.join(", ")}` : ""}.`;
+}
+
+/** «4 temas, 2 entregables» de un día, un mes o una semana de un área / Bases (para el resumen de la página). */
+export function scopePeriodSummary(m: AgendaModel, s: PageScope, from: string, to: string, defined: boolean): string {
+  const isBases = basesClassifier(m.plan);
+  const folders = new Set<string>();
+  for (const d of m.schedule.days) {
+    if (d.date < from || d.date > to) continue;
+    for (const t of d.topics) {
+      const bases = isBases(t);
+      if (s.kind === "bases" ? bases : s.kind === "area" ? !bases && t.subplanId === s.subplanId : true) folders.add(t.folder);
+    }
+  }
+  const due: PlanDeliverable[] = [];
+  for (const [date, list] of m.dueByDate) if (date >= from && date <= to) due.push(...list.filter((d) => d.kind !== "kata"));
+  return `${topicsText(folders.size)}, ${defined ? deliverablesText(scopeDeliverables(m.plan, s, due).length) : "entregables por definir"}`;
 }
 
 export interface ScopeDayRowData {

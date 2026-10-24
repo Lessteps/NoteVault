@@ -50,6 +50,7 @@ function PieceRow({ p, planId, week }: { p: ChainPiece; planId: string; week: Ch
             areaKeys={p.areaIds}
             testid={`chain-folder-${p.id}`}
             label="Crear la carpeta de esta pieza"
+            pomodoro={{ folder: `project:piece:${p.id}`, title: `Proyecto: ${p.title}`, areaKey: p.areaIds[0]! }}
             project={{ kind: "daily", title: p.title, description: p.description, date: p.date, weeklyPart: p.slice, topics: [], week: week.week }}
           />
           <p className="mt-1 text-[13px] text-dim">Se da por hecha cuando marcas todas las casillas de su carpeta.</p>

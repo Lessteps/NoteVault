@@ -1,7 +1,7 @@
 // Mentor — páginas del plan: iconos de las áreas, alcance de una página, pestañas por página y fechas de un área (módulo puro).
 
 import { describe, expect, it } from "vitest";
-import { activeAreas, areaState, normalizePageTab, scopeDates, scopeFromStored, scopeInfo, scopeKey, scopeOnly, SCOPE_ALL, SCOPE_BASES } from "./mentorAreas";
+import { activeAreas, areaState, normalizePageTab, scopeDates, deliverableOfArea, scopeDeliverables, scopeFromStored, scopeInfo, scopeKey, scopeOnly, scopeRouteEnd, SCOPE_ALL, SCOPE_BASES } from "./mentorAreas";
 
 const plan = {
   start: "2026-10-05",
@@ -52,5 +52,26 @@ describe("mentorAreas", () => {
     expect(areaState(plan, { kind: "area", subplanId: "s-fe" }, mid, 2)).toBe("proximo");
     expect(areaState(plan, { kind: "area", subplanId: "s-fe" }, mid, 8)).toBe("activo");
     expect(areaState(plan, { kind: "area", subplanId: "s-fe" }, done, 2)).toBe("completo");
+  });
+
+  it("los entregables de un área son solo los suyos: un integrador cuenta únicamente si la nombra", () => {
+    const d = (id: string, areaId: string, areaIds?: string[]) => ({ id, areaId, ...(areaIds ? { areaIds } : {}) }) as never;
+    const list = [d("a", "backend"), d("b", "frontend"), d("c", "all", ["backend", "frontend"]), d("d", "all", ["frontend"]), d("e", "all")];
+    expect(deliverableOfArea(list[2] as never, "backend")).toBe(true);
+    expect(scopeDeliverables(plan, { kind: "area", subplanId: "s-be" }, list).map((x: { id: string }) => x.id)).toEqual(["a", "c"]);
+    expect(scopeDeliverables(plan, SCOPE_ALL, list)).toHaveLength(5);
+    expect(scopeDeliverables(plan, SCOPE_BASES, list)).toEqual([]);
+  });
+
+  it("el final de la ruta de un área es su último día con un tema por hacer (null si no queda nada)", () => {
+    const m = { schedule: { days: [
+      { date: "2026-10-05", topics: [{ subplanId: "s-be", done: true }] },
+      { date: "2026-12-01", topics: [{ subplanId: "s-be", done: false }, { subplanId: "s-fe", done: false }] },
+      { date: "2027-02-01", topics: [{ subplanId: "s-fe", done: false }] },
+    ] } } as never;
+    expect(scopeRouteEnd(m, { kind: "area", subplanId: "s-be" })).toBe("2026-12-01");
+    expect(scopeRouteEnd(m, { kind: "area", subplanId: "s-fe" })).toBe("2027-02-01");
+    expect(scopeRouteEnd(m, { kind: "area", subplanId: "s-x" })).toBeNull();
+    expect(scopeRouteEnd(m, SCOPE_ALL)).toBeNull();
   });
 });

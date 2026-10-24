@@ -4,7 +4,7 @@
 import { Play, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/bridge";
-import { BREAK_CHOICES, FOCUS_CHOICES, inferWork } from "../lib/pomodoro";
+import { BREAK_CHOICES, FOCUS_CHOICES, assignedAreaKey, inferWork } from "../lib/pomodoro";
 import { useApp } from "../store/app";
 import { usePomodoro } from "../store/pomodoro";
 import { AssignPanel } from "./mentor/AssignPanel";
@@ -76,7 +76,7 @@ export function PomodoroSetup() {
       toast("info", "Completa primero el registro de la sesión anterior.");
       return;
     }
-    start(plan.id, areaKey || FREE_AREA, p.work ?? inferWork(p.assignedTopics));
+    start(plan.id, areaKey || assignedAreaKey(p.assignedTopics) || FREE_AREA, p.work ?? inferWork(p.assignedTopics));
   };
 
   return (

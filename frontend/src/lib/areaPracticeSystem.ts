@@ -650,7 +650,22 @@ export interface KataPlanLike {
   end: string;
   programmingPractice?: { kata?: { days: number[]; minutesPerDay: number } };
   preconditions?: { blockedDates?: string[]; levels?: Record<string, string> };
-  subplans: ReadonlyArray<{ area: string; areaId?: string; phase?: { fromWeek: number } }>;
+  subplans: ReadonlyArray<{ id?: string; area: string; areaId?: string; phase?: { fromWeek: number } }>;
+  /** práctica extra del plan: los katas planeados que se adelantaron llevan `kataDate` (la fecha en que les tocaba) y `area` (el subplan) */
+  extraPractice?: ReadonlyArray<{ kind?: string; area?: string; kataDate?: string; date: string; done?: boolean }>;
+}
+
+/** Los katas de un área que se ADELANTARON (extra de tipo kata con la fecha en que les tocaba), sin repetir su fecha original. */
+export function broughtForwardKatas(plan: Pick<KataPlanLike, "subplans" | "extraPractice">, areaId: string): Array<{ kataDate: string; date: string; done: boolean }> {
+  const subs = new Set(plan.subplans.filter((s) => s.areaId === areaId && s.id).map((s) => s.id!));
+  const seen = new Set<string>();
+  const out: Array<{ kataDate: string; date: string; done: boolean }> = [];
+  for (const x of plan.extraPractice ?? []) {
+    if (x.kind !== "kata" || !x.kataDate || !x.area || !subs.has(x.area) || seen.has(x.kataDate)) continue;
+    seen.add(x.kataDate);
+    out.push({ kataDate: x.kataDate, date: x.date, done: x.done === true });
+  }
+  return out;
 }
 
 /** Las áreas del plan con sistema de práctica propio, en orden y sin repetir. */
@@ -710,9 +725,11 @@ export interface AreaPracticeDay {
  * La práctica por área que toca en una fecha: un kata por área del plan (vacío si no es día de kata). Es lo que el calendario y la agenda pueden
  * mostrar; `level` es el nivel de cada área (por defecto el declarado en las precondiciones).
  */
-export function areaPracticeFor(plan: KataPlanLike, date: string, levels?: Record<string, number>): AreaPracticeDay[] {
+export function areaPracticeFor(plan: KataPlanLike, date: string, levels?: Record<string, number>, consumed?: ReadonlyMap<string, ReadonlySet<string>>): AreaPracticeDay[] {
   const out: AreaPracticeDay[] = [];
   for (const a of practiceAreasOf(plan)) {
+    // el kata de ese día ya se hizo adelantado en otra fecha: aquí no se vuelve a listar
+    if (consumed?.get(a.areaId)?.has(date)) continue;
     const day = areaKataDates(plan, a.areaId).indexOf(date) + 1;
     if (day < 1) continue;
     const level = levels?.[a.areaId] ?? levelFromDeclared(declaredLevelOf(plan.preconditions?.levels, a.areaId));

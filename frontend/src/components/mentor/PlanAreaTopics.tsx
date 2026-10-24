@@ -10,10 +10,10 @@
 // Los datos salen del plan (áreas, grupos, semanas) y de `mentor_plan_topic_catalog` (lo que existe en la vault); la lógica está en
 // `lib/planAreaTopics.ts`. Solo lectura salvo «Generar», que pasa siempre por el diálogo de confirmación de «Ejecutar plan».
 
-import { Check, ChevronDown, ChevronRight, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, RefreshCw, X } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
-import { matchesStatus, planBulk, STATUS_FILTERS, type BulkPlan, type RegenKind, type StatusFilter } from "../../lib/topicSelection";
+import { matchesStatus, planBulk, regenBlockedReason, STATUS_FILTERS, type BulkPlan, type RegenKind, type StatusFilter } from "../../lib/topicSelection";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { type AreaTopicRow, areaTabsOf, areaTopicRows, basesTopicRows, BASES_KEY, groupTabsOf, pendingGenerate, rowsOfGroup, type AreaTab, type GroupTab } from "../../lib/planAreaTopics";
@@ -89,6 +89,40 @@ function Ring({ pct, done }: { pct: number; done: boolean }) {
   );
 }
 
+/** Piezas hechas con una versión anterior de su skill → qué regenerar y cómo se llama. */
+const OUTDATED_KINDS = [
+  { key: "theory", what: "theory", label: "Nota", full: "la nota de teoría" },
+  { key: "canvas", what: "map", label: "Mapa", full: "el mapa" },
+  { key: "practica", what: "practice", label: ".practica", full: "el manifiesto .practica" },
+] as const;
+
+/** Botones verdes junto al tema: la skill cambió después de generar esa pieza. Pulsar pide confirmar y regenera (con copia de seguridad). */
+function OutdatedButtons({ row, bridge, busy, onAsk }: { row: AreaTopicRow; bridge: boolean; busy: boolean; onAsk: (what: RegenKind, row: AreaTopicRow) => void }) {
+  const list = OUTDATED_KINDS.filter((k) => row.outdated?.[k.key]);
+  if (list.length === 0) return null;
+  return (
+    <span className="mt-1 flex flex-wrap gap-1" data-testid="outdated-buttons">
+      {list.map((k) => {
+        const why = busy ? "Hay una regeneración en curso." : regenBlockedReason(row, k.what, bridge);
+        return (
+          <button
+            key={k.key}
+            type="button"
+            disabled={!!why}
+            onClick={() => onAsk(k.what, row)}
+            title={why || `La skill cambió después de generar ${k.full}: regenerarla con la versión nueva (respalda lo actual)`}
+            aria-label={`Regenerar ${k.full} de ${row.title}: la skill cambió`}
+            data-testid={`outdated-${k.key}`}
+            className="inline-flex min-h-7 items-center gap-1 rounded-md border border-mint bg-mint/15 px-2 text-[12.5px] font-medium text-mint hover:bg-mint/25 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw size={12} aria-hidden /> {k.label}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
+
 function Mark({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   return ok ? (
     <span className="inline-flex items-center gap-1"><Check size={14} aria-hidden className="text-mint" /> {yes}</span>
@@ -132,7 +166,8 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
     ? { key: BASES_KEY, area: "Bases", subplanId: BASES_KEY, total: basesRows.length, done: basesRows.filter((r) => r.completed).length, missing: basesRows.filter(pendingGenerate).length }
     : undefined;
   const tabs = useMemo(() => (basesTab ? [...baseTabs, basesTab] : baseTabs), [baseTabs, basesTab]);
-  const active = only ? tabs.find((t) => t.key === only) : tabs.find((t) => t.key === areaKey) ?? tabs[0];
+  // `only` puede ser la clave del área (`areaId`) o el id del subplan (la página del área pasa éste): si no coincidiera, la vista quedaría vacía
+  const active = only ? tabs.find((t) => t.key === only || t.subplanId === only) : tabs.find((t) => t.key === areaKey) ?? tabs[0];
   const isBases = active?.key === BASES_KEY;
   const sub = active && !isBases ? plan.subplans.find((s) => s.id === active.subplanId) : undefined;
   const areaRows = useMemo(() => (isBases ? basesRows : sub ? areaTopicRows(sub, cat) : []), [isBases, basesRows, sub, cat]);
@@ -148,6 +183,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
   }, [group, groupId]);
 
   // lo que se ve (tras el filtro por estado); la selección y las acciones en lote solo cuentan lo que se ve
+  const outdatedCount = useMemo(() => areaRows.filter((r) => r.outdated).length, [areaRows]);
   const visible = useMemo(() => shown.filter((r) => matchesStatus(r, statusFilter)), [shown, statusFilter]);
   const selectedRows = useMemo(() => visible.filter((r) => selected.has(r.folder)), [visible, selected]);
   const allOn = visible.length > 0 && selectedRows.length === visible.length;
@@ -186,7 +222,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
   return (
     <section aria-labelledby={`${uid}-h`} data-testid="plan-areas-view" className="space-y-3">
       <SectionHeading id={`${uid}-h`} hint="Cada área del plan con todos sus temas en el orden de la ruta y lo que existe de cada uno. Elige un área arriba y, dentro de ella, un grupo.">
-        {only ? `Temas de ${tabs.find((t) => t.key === only)?.area ?? "el área"}` : "Temas por área"}
+        {only ? `Temas de ${tabs.find((t) => t.key === only || t.subplanId === only)?.area ?? "el área"}` : "Temas por área"}
       </SectionHeading>
       <LoadState warming={warming} error={error} empty={!catalog} onRetry={reload} />
 
@@ -200,6 +236,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
             <div className="min-w-0 flex-1 basis-72 text-[14.5px]">
               <strong>{active.area}</strong> · {active.total} {active.total === 1 ? "tema" : "temas"} · {active.done} completados ·{" "}
               {active.missing > 0 ? <span className="text-warn">{active.missing} por generar</span> : <span className="text-mint">nada por generar</span>}
+              {outdatedCount > 0 && <span className="text-mint" data-testid="outdated-count"> · {outdatedCount} con skill nueva por regenerar</span>}
               <span className="mt-1.5 block max-w-md"><ProgressBar pct={active.total ? Math.round((active.done / active.total) * 100) : 0} label={`Avance de ${active.area}`} /></span>
             </div>
             {!isBases && <GenerateButton
@@ -299,6 +336,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                         <span className="min-w-0 flex-1">
                         <TopicMenu folder={r.folder} title={r.title} trigger={<span className="block truncate" title={r.folder} data-testid="area-open">{r.title}</span>} className="font-semibold text-accent-text underline-offset-2 hover:underline" />
                         {!r.exists && <span className="block text-[12.5px] text-faint">Aún no existe en la vault</span>}
+                        <OutdatedButtons row={r} bridge={bridge} busy={queueBusy} onAsk={(w, row) => ask(w, [row])} />
                         </span>
                         </span>
                       </th>

@@ -476,7 +476,7 @@ describe("vista de ejecución", () => {
     expect(rows[1]!.textContent).toContain("Atrasado");
     // el acceso directo: la flecha de un kata atrasado abre ESE kata aunque su archivo aún no exista
     await click(rows[1]!.querySelector("[data-testid=board-arrow]"));
-    expect([...byTest("board-menu")!.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir kata (.md)", "Verificar y marcar hecho", "Saltar este día (pide 70 %)", "Ver práctica de Backend"]);
+    expect([...byTest("board-menu")!.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir kata (.md)", "Verificar y marcar hecho", "Saltar este día (pide 70 %)", "Asignar al Pomodoro", "Ver práctica de Backend"]);
     await click(byTest("kata-open"));
     expect(open).toHaveBeenCalledWith(PID, "backend", "2026-10-07");
     // y se marca el día concreto con la casilla

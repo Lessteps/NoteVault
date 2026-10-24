@@ -39,8 +39,13 @@ export const usePomodoro = create<PomodoroStore>((set, get) => ({
   setMode: (mode) => set((s) => ({ p: { ...s.p, mode } })),
   setDurations: (focusMin, breakMin) => set((s) => (s.p.phase === "idle" ? { p: { ...s.p, focusMin, breakMin } } : s)),
   assignTopic: (topic) => set((s) => {
-    if (s.p.assignedTopics.some((t) => t.folder === topic.folder)) return s;
-    return { p: { ...s.p, assignedTopics: [...s.p.assignedTopics, topic] } };
+    // desde el Mentor la fila trae tipo de trabajo y área: con el reloj parado, el bloque ya nace con ellos (un bloque en marcha no cambia)
+    const idle = s.p.phase === "idle";
+    const prefill = idle ? { ...(topic.work ? { work: topic.work } : {}), ...(topic.areaKey ? { areaKey: topic.areaKey } : {}) } : {};
+    if (s.p.assignedTopics.some((t) => t.folder === topic.folder)) {
+      return Object.keys(prefill).length ? { p: { ...s.p, ...prefill, assignedTopics: s.p.assignedTopics.map((t) => (t.folder === topic.folder ? { ...t, ...topic } : t)) } } : s;
+    }
+    return { p: { ...s.p, ...prefill, assignedTopics: [...s.p.assignedTopics, topic] } };
   }),
   removeAssignedTopic: (folder) => set((s) => ({
     p: { ...s.p, assignedTopics: s.p.assignedTopics.filter((t) => t.folder !== folder) },

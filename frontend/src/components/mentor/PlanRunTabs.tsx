@@ -29,6 +29,9 @@ export interface TodayCard {
   doneN: number;
 }
 
+/** El tipo de trabajo con que se preselecciona el bloque de un área si nada asignado lo decide: temas por hacer hoy → Teoría; sin ellos, su proyecto diario → Proyecto; si no, Práctica. */
+export const areaDefaultWork = (o: { pendingTopics: boolean; project: boolean }): "theory" | "practice" | "project" => (o.pendingTopics ? "theory" : o.project ? "project" : "practice");
+
 /** La pestaña de un área: su trabajo (hoy, semana, pendientes, repasos) a la izquierda y su sesión (Pomodoro y horas) a la derecha. */
 export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets, reviews, date, practice, dailyProject, weeklyProjectTitle, onGoProjects }: {
   plan: MentorPlan;
@@ -99,6 +102,7 @@ export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets,
               planId={plan.id}
               areaKeys={[areaKey]}
               testid="daily-project-folder"
+              pomodoro={{ folder: `project:daily:${areaKey}`, title: `Proyecto diario: ${dailyProject.title}`, areaKey }}
               project={{ kind: "daily", title: dailyProject.title, description: dailyProject.description, minutes: dailyProject.minutes, weeklyPart: dailyProject.weeklyPart, date: dailyProject.date, topics: dailyProject.topics.map((t: { title: string }) => t.title), sections: dailySections }}
             />
           </SectionCard>
@@ -112,6 +116,7 @@ export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets,
         plannedMinutes={planned}
         colour={colour}
         {...(current ? { currentTopic: current } : {})}
+        defaultWork={areaDefaultWork({ pendingTopics: (card?.rows ?? []).some((r) => !r.done), project: !!dailyProject })}
         todayTopics={(card?.rows ?? []).filter((r) => !r.done).map((r) => ({ folder: r.folder, title: r.title, kind: "topic" as const }))}
         suggestions={[
           ...(dailyProject ? [{ folder: `project:daily:${areaKey}`, title: `Proyecto diario: ${dailyProject.title}`, kind: "project" as const }] : []),
@@ -155,7 +160,7 @@ export function RunBases({ plan, routeRows, todayRows, weekDays, upcoming, sets,
           onStartBlock={() => { if (!startAreaBlock(plan.id, "bases")) toast("info", "Ya hay un Pomodoro en marcha: termínalo o detenlo primero."); }}
         />
       </div>
-      <AreaSession planId={plan.id} areaKey="bases" areaName="Bases" date={date} plannedMinutes={0} colour={colour} {...(current ? { currentTopic: current } : {})} />
+      <AreaSession planId={plan.id} areaKey="bases" areaName="Bases" date={date} plannedMinutes={0} colour={colour} defaultWork="theory" {...(current ? { currentTopic: current } : {})} />
     </div>
   );
 }

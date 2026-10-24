@@ -3,12 +3,14 @@
 // Lista TODOS los katas que tocaban hasta hoy y siguen sin hacerse (más el de hoy), no solo el de hoy: si el contador dice 0/6 hay seis retos.
 // Cada fila tiene su casilla (marca el día) y la flecha con el acceso directo al kata, que existe siempre: si el archivo falta, se crea al abrirlo.
 
-import { BookOpen, Check, Dumbbell, SkipForward, Undo2 } from "lucide-react";
+import { BookOpen, Check, Dumbbell, SkipForward, Timer, Undo2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
 import { KATA_LEVEL_LABEL } from "../../lib/areaPracticeSystem";
 import type { AreaKataDue, AreaPracticeView } from "../../lib/areaPracticeView";
+import { mentorAssignment } from "../../lib/pomodoro";
 import { dateLabel } from "../../lib/planSchedule";
+import { usePomodoro } from "../../store/pomodoro";
 import { useApp } from "../../store/app";
 import { useNavState } from "../../store/navState";
 import { cn } from "../ui";
@@ -39,6 +41,7 @@ function KataRow({ planId, area, d, mark }: { planId: string; area: AreaPractice
     ...(!done ? [{ id: "done", label: "Verificar y marcar hecho", icon: <Check size={16} aria-hidden className="text-mint" />, onClick: () => void mark(area.areaId, d.date, "done"), testid: "kata-mark-done" }] : []),
     ...(d.state === "pending" ? [{ id: "skip", label: `${d.today ? "Saltar hoy" : "Saltar este día"}${skipOk ? "" : ` (pide ${area.kata.skip.neededPct} %)`}`, icon: <SkipForward size={16} aria-hidden />, onClick: () => { if (skipOk) void mark(area.areaId, d.date, "skipped"); else toast("info", `Para saltar un kata hace falta haber hecho al menos el ${area.kata.skip.neededPct} % de los que tocaban hasta hoy: llevas el ${area.kata.skip.pct} %.`); }, testid: "kata-mark-skip" }] : []),
     ...(done || d.state === "skipped" ? [{ id: "undo", label: "Quitar marca", icon: <Undo2 size={16} aria-hidden />, onClick: () => void mark(area.areaId, d.date, null), testid: "kata-mark-undo" }] : []),
+    { id: "pomodoro", label: "Asignar al Pomodoro", icon: <Timer size={16} aria-hidden className="text-warn" />, onClick: () => usePomodoro.getState().assignTopic(mentorAssignment("practice", { folder: `manual:kata:${area.areaId}:${d.date}`, title: `Kata: ${d.title}`, kind: "task", areaKey: area.areaId })), testid: "kata-assign-pomodoro" },
     { id: "area", label: `Ver práctica de ${area.label}`, icon: <Dumbbell size={16} aria-hidden className="text-mint" />, onClick: () => { useNavState.getState().set(practiceAreaKey(planId), area.areaId); openPlanTab(planId, "practica"); }, testid: "kata-area" },
   ];
   return (

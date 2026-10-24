@@ -9,6 +9,7 @@ import { ApiError } from "../../core/errors.js";
 import { examSlug, listExamRecords } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
 import { cachedTopicSnaps, clearTopicSnapCache } from "./topicSnapCache.js";
+import { outdatedByFolder } from "./skillFreshness.js";
 import { hubSnapshot } from "../../core/practice/recommender.js";
 import { manifestsFromNotes, type TopicManifest } from "../../core/practice/topic.js";
 import { FILTER_ACTIVE, ITEM_DONE } from "../../core/goalManager.js";
@@ -2228,7 +2229,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
         planTopics,
         designs,
       );
-      return { loading: false as const, rows };
+      // piezas hechas con una versión anterior de su skill (sin IA: huella de la skill contra la fecha de cada archivo)
+      const outdated = outdatedByFolder(app.root, rows.filter((r) => r.exists).map((r) => r.folder));
+      return { loading: false as const, rows: rows.map((r) => (outdated.has(r.folder) ? { ...r, outdated: outdated.get(r.folder)! } : r)) };
     },
 
     /**

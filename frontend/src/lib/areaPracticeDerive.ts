@@ -4,7 +4,7 @@
 
 import { AREA_SKILLS } from "./planAreaPractice.js";
 import type { AreaKataDue, AreaPracticeView, AreaSkillProgress, AreaWeekDay, AreaWeeklyRow } from "./areaPracticeView.js";
-import { areaFolderOf, areaLabelOf, areaPracticeSystem, declaredLevelOf, areaKataDates, kataForDay, kataLevel, levelFromDeclared, practiceAreasOf, skillOfDay, type AreaKata, type KataPlanLike } from "./areaPracticeSystem.js";
+import { areaFolderOf, areaLabelOf, areaPracticeSystem, broughtForwardKatas, declaredLevelOf, areaKataDates, kataForDay, kataLevel, levelFromDeclared, practiceAreasOf, skillOfDay, type AreaKata, type KataPlanLike } from "./areaPracticeSystem.js";
 import { addDays, isoDow, weekRangesOf } from "./planTime.js";
 import { weeklyPieceOf, monthlyPieceOf } from "./planAreaPractice.js";
 
@@ -103,16 +103,34 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
   const out: AreaPracticeView[] = [];
   for (const a of practiceAreasOf(plan)) {
     const sys = areaPracticeSystem(a.areaId);
-    const dates = areaKataDates(plan, a.areaId);
+    const allDates = areaKataDates(plan, a.areaId);
     if (!sys) continue;
     const folder = areaFolderOf(a.areaId);
     const attemptDates = kataDatesOf(inp.attempts, { id: a.areaId, folder });
     const marks = inp.marks[a.areaId] ?? {};
     const stateOf = (d: string): "done" | "skipped" | "pending" => (attemptDates.has(d) || marks[d] === "done" ? "done" : marks[d] === "skipped" ? "skipped" : "pending");
+    // Katas ADELANTADOS ya hechos (marcados hechos, o con un intento verificado ese día si no era día de kata): se CONSUMEN una vez. Su fecha
+    // original deja de listarse y de contarse, y el resto de la secuencia sigue su orden sin saltarse ni repetir contenido.
+    const consumedIdx: number[] = [];
+    const extraDoneDates = new Set<string>();
+    for (const x of broughtForwardKatas(plan, a.areaId)) {
+      const idx = allDates.indexOf(x.kataDate) + 1;
+      if (idx < 1 || consumedIdx.includes(idx)) continue;
+      const byAttempt = x.date <= today && !allDates.includes(x.date) && attemptDates.has(x.date);
+      if (!x.done && !byAttempt) continue;
+      consumedIdx.push(idx);
+      if (byAttempt) extraDoneDates.add(x.date);
+    }
+    const consumed = new Set(consumedIdx);
+    const origIdx: number[] = [];
+    allDates.forEach((_, i) => { if (!consumed.has(i + 1)) origIdx.push(i + 1); });
+    const dates = origIdx.map((i) => allDates[i - 1]!);
+    const orig = (pos: number): number => origIdx[pos - 1] ?? pos;
     const past = dates.filter((d) => d <= today);
     // El contenido NO avanza con el calendario: el kata que toca es el siguiente a los que de verdad se hicieron (intento verificado o marca «hecho»),
     // sin importar en qué fecha. Los días de kata solo marcan el ritmo previsto (qué toca «hoy» y cuántos van atrasados).
     const doneAll = new Set<string>([...attemptDates, ...Object.entries(marks).filter(([, v]) => v === "done").map(([d]) => d)]);
+    for (const d of extraDoneDates) doneAll.delete(d);
     const doneCount = doneAll.size;
     const doneDates = past.filter((d) => stateOf(d) === "done");
     const declared = declaredLevelOf(plan.preconditions?.levels, a.areaId);
@@ -126,10 +144,14 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
     // katas hechos por habilidad (el kata nº i usa la habilidad `skillOfDay(i)`) frente a los que tocaban hasta hoy
     const skills: AreaSkillProgress[] = (AREA_SKILLS[a.areaId] ?? []).map((s) => ({ id: s.id, name: s.name, why: s.why, measure: s.measure, levels: s.levels, done: 0, planned: 0, pct: 0 }));
     for (let i = 1; i <= Math.max(past.length, doneCount); i++) {
-      const row = skills.find((s) => s.id === skillOfDay(a.areaId, i)?.id);
+      const row = skills.find((s) => s.id === skillOfDay(a.areaId, orig(i))?.id);
       if (!row) continue;
       if (i <= past.length) row.planned++;
       if (i <= doneCount) row.done++;
+    }
+    for (const j of consumedIdx) {
+      const row = skills.find((s) => s.id === skillOfDay(a.areaId, j)?.id);
+      if (row) { row.planned++; row.done++; }
     }
     for (const s of skills) s.pct = s.planned ? Math.min(100, Math.round((s.done / s.planned) * 100)) : 0;
 
@@ -138,13 +160,14 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
     const plannedDate = nextIndex ? dates[nextIndex - 1] : undefined;
     // si ya le tocaba y hoy es día de kata, es «el kata de hoy» (aunque su fecha original fuera antes); si va adelantado, su fecha prevista
     const nextDate = plannedDate && plannedDate <= today && todayPlanned ? today : plannedDate;
-    const nextKata = nextIndex ? kataForDay(a.areaId, nextIndex, level) : null;
+    const nextDay = nextIndex ? orig(nextIndex) : 0;
+    const nextKata = nextIndex ? kataForDay(a.areaId, nextDay, level) : null;
     const rel = nextKata ? `${folder}/katas/${nextKata.file}` : "";
 
     // lo pendiente: solo el siguiente kata, y solo si ya le tocaba (si va adelantado a lo previsto no se lista como atrasado)
     const due: AreaKataDue[] = [];
     if (nextKata && nextDate && plannedDate && plannedDate <= today) {
-      due.push({ day: nextIndex, date: nextDate, state: marks[nextDate] === "skipped" ? "skipped" : "pending", today: nextDate === today, title: nextKata.title, skillName: nextKata.skillName, level: nextKata.level, minutes: nextKata.minutes, summary: kataSummary(nextKata), rel, fileReady: inp.existing.files.has(rel) });
+      due.push({ day: nextDay, date: nextDate, state: marks[nextDate] === "skipped" ? "skipped" : "pending", today: nextDate === today, title: nextKata.title, skillName: nextKata.skillName, level: nextKata.level, minutes: nextKata.minutes, summary: kataSummary(nextKata), rel, fileReady: inp.existing.files.has(rel) });
     }
 
     // semana de lunes a domingo que contiene hoy (o la última del plan)
@@ -152,14 +175,14 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
     const week: AreaWeekDay[] = Array.from({ length: 7 }, (_, i) => {
       const date = addDays(mon, i);
       const idx = dates.indexOf(date) + 1;
-      return { date, dow: i + 1, planned: idx > 0, state: idx > 0 ? (idx <= doneCount ? "done" : date > today ? "pending" : stateOf(date) === "skipped" ? "skipped" : "pending") : "none", today: date === today, ...(idx > 0 ? { index: idx } : {}) };
+      return { date, dow: i + 1, planned: idx > 0, state: idx > 0 ? (idx <= doneCount ? "done" : date > today ? "pending" : stateOf(date) === "skipped" ? "skipped" : "pending") : "none", today: date === today, ...(idx > 0 ? { index: orig(idx) } : {}) };
     });
 
     // semanas del plan: título del proyecto del área, habilidades de sus katas, foco del proyecto full stack
     const focusWeeks = new Map((plan.programmingPractice?.weeklyProject?.weeks ?? []).map((w) => [w.week, w.focus]));
     const weeks: AreaWeeklyRow[] = ranges.map((r, i) => {
       const inWeek = dates.filter((d) => d >= r.start && d <= r.end);
-      const skillNames = [...new Set(inWeek.map((d) => skillOfDay(a.areaId, dates.indexOf(d) + 1)?.name ?? "").filter(Boolean))];
+      const skillNames = [...new Set(inWeek.map((d) => skillOfDay(a.areaId, allDates.indexOf(d) + 1)?.name ?? "").filter(Boolean))];
       const piece = weeklyPieceOf(a.areaId, i + 1, skillNames);
       return {
         week: i + 1,
@@ -195,10 +218,11 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
         streak,
         todayPlanned,
         todayDone: todayPlanned && stateOf(today) === "done",
-        todayIndex: todayPlanned ? nextIndex : 0,
+        todayIndex: todayPlanned ? nextDay : 0,
         next: nextKata && nextDate ? { kata: nextKata, date: nextDate, rel, fileReady: inp.existing.files.has(rel), summary: kataSummary(nextKata) } : null,
         week,
         due,
+        consumed: consumedIdx.map((i) => allDates[i - 1]!).sort(),
       },
       weekly: { title: curPiece?.title ?? sys.weekly.title, description: curPiece?.description ?? sys.weekly.summary, week: cur?.week ?? null, focus: !!cur?.focus },
       weeks,

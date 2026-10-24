@@ -63,3 +63,22 @@ describe("pomodoro", () => {
     expect(clock(3600_000)).toBe("01:00:00");
   });
 });
+
+describe("asignación desde el Mentor", () => {
+  it("el tipo de trabajo y el área viajan con la fila; manda lo explícito sobre lo deducido", async () => {
+    const { assignedAreaKey, inferWork, mentorAssignment } = await import("./pomodoro");
+    const theory = mentorAssignment("theory", { folder: "a", title: "A", areaKey: "backend" });
+    const practice = mentorAssignment("practice", { folder: "b", title: "B", areaKey: "backend" });
+    const review = mentorAssignment("review", { folder: "c", title: "C", areaKey: "frontend" });
+    const project = mentorAssignment("project", { folder: "project:daily:x", title: "P", areaKey: "backend" });
+    const kata = mentorAssignment("practice", { folder: "manual:kata:backend:2026-10-26", title: "K", areaKey: "backend", kind: "task" });
+    expect(theory).toMatchObject({ kind: "topic", work: "theory", areaKey: "backend" });
+    expect(project.kind).toBe("project");
+    expect(kata.kind).toBe("task");
+    expect(inferWork([practice])).toBe("practice"); // sin `work` sería «theory» (un tema del plan)
+    expect(inferWork([theory, review])).toBe("review"); // lo último asignado
+    expect(inferWork([{ folder: "z", title: "Z" }])).toBe("theory"); // sin tipo explícito, como siempre
+    expect(assignedAreaKey([theory, review])).toBe("frontend");
+    expect(assignedAreaKey([{ folder: "z", title: "Z" }])).toBeNull();
+  });
+});

@@ -12,7 +12,23 @@ export interface AssignedTopic {
   folder: string;
   title: string;
   kind?: "topic" | "task" | "project";
+  /** tipo de trabajo con que se asignó desde el Mentor (una fila de Práctica, un repaso, una pieza de proyecto…); manda sobre lo que se deduce de `kind` */
+  work?: WorkKind;
+  /** área del Mentor desde la que se asignó (`areaId` o id del subplan; «bases» para los fundamentos) */
+  areaKey?: string;
 }
+
+/**
+ * Lo que se asigna al Pomodoro desde un punto de partida del Mentor: el tipo de trabajo y el área viajan con la fila, así el bloque nace ya
+ * clasificado. Teoría/Práctica → tema del plan; Repaso → el tema repasado; Proyecto → una pieza de proyecto; un kata → una tarea de Práctica.
+ */
+export const mentorAssignment = (work: WorkKind, base: { folder: string; title: string; areaKey?: string; kind?: AssignedTopic["kind"] }): AssignedTopic => ({
+  folder: base.folder,
+  title: base.title,
+  kind: base.kind ?? (work === "project" ? "project" : "topic"),
+  work,
+  ...(base.areaKey ? { areaKey: base.areaKey } : {}),
+});
 
 export const ASSIGN_KIND_LABEL: Record<NonNullable<AssignedTopic["kind"]>, string> = { topic: "Tema", task: "Tarea", project: "Proyecto" };
 
@@ -21,7 +37,10 @@ export const manualAssignment = (kind: "task" | "project", title: string, seed =
 
 /** El tipo de trabajo que se deduce de lo asignado al bloque: un proyecto → Proyecto; temas del plan → Teoría; si no hay pista, `null` (que lo elija la persona). */
 export const inferWork = (topics: ReadonlyArray<AssignedTopic>): WorkKind | null =>
-  topics.some((t) => t.kind === "project") ? "project" : topics.some((t) => (t.kind ?? "topic") === "topic") ? "theory" : topics.some((t) => t.kind === "task") ? "practice" : null;
+  [...topics].reverse().find((t) => t.work)?.work ?? (topics.some((t) => t.kind === "project") ? "project" : topics.some((t) => (t.kind ?? "topic") === "topic") ? "theory" : topics.some((t) => t.kind === "task") ? "practice" : null);
+
+/** El área del Mentor desde la que se asignó lo último al bloque (si alguna). */
+export const assignedAreaKey = (topics: ReadonlyArray<AssignedTopic>): string | null => [...topics].reverse().find((t) => t.areaKey)?.areaKey ?? null;
 
 export interface PomodoroAssessment {
   planId: string;

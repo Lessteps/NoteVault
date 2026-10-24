@@ -156,6 +156,8 @@ interface WeekRow {
   kinds: Array<TopicKind | "project">;
   area: string;
   areaId?: string;
+  /** clave del área en el Mentor (la del Pomodoro y el registro de horas): `areaId` o el id del subplan; «bases» para los fundamentos */
+  areaKey: string;
 }
 interface WeekSection {
   key: string;
@@ -170,18 +172,18 @@ interface WeekSection {
 function weekSections(m: AgendaModel, w: WeekAreas, week: number, only: string | null): WeekSection[] {
   const kinds = topicKindsByFolder(m, week);
   const projects = new Set(m.schedule.days.filter((d) => d.week === week).flatMap((d) => (d.topicProjects ?? []).map((p) => p.folder)));
-  const row = (t: WeekAreaTopic, area: string, areaId?: string): WeekRow => {
+  const row = (t: WeekAreaTopic, area: string, areaKey: string, areaId?: string): WeekRow => {
     const ks = kinds.get(t.folder);
     const list: Array<TopicKind | "project"> = ks && ks.size ? (["theory", "practice"] as TopicKind[]).filter((k) => ks.has(k)) : ["theory"];
     if (projects.has(t.folder)) list.push("project");
-    return { t, estado: estadoOf(m, t), kinds: list, area, ...(areaId ? { areaId } : {}) };
+    return { t, estado: estadoOf(m, t), kinds: list, area, areaKey, ...(areaId ? { areaId } : {}) };
   };
   const out: WeekSection[] = [];
   for (const c of w.cells) {
     if ((only !== null && c.subplanId !== only) || c.topics.length === 0) continue;
-    out.push({ key: c.subplanId, cell: c, name: c.area, ...(c.areaId ? { areaId: c.areaId } : {}), rows: inRouteOrder(c.topics, areaRouteTopics(m.plan, c.subplanId)).map((t) => row(t, c.area, c.areaId)) });
+    out.push({ key: c.subplanId, cell: c, name: c.area, ...(c.areaId ? { areaId: c.areaId } : {}), rows: inRouteOrder(c.topics, areaRouteTopics(m.plan, c.subplanId)).map((t) => row(t, c.area, c.areaId ?? c.subplanId, c.areaId)) });
   }
-  if ((only === null || only === BASES_KEY) && w.bases.length > 0) out.push({ key: BASES_KEY, cell: null, name: "Bases", rows: inRouteOrder(w.bases, basesRouteTopics(m.plan)).map((t) => row(t, "Bases")) });
+  if ((only === null || only === BASES_KEY) && w.bases.length > 0) out.push({ key: BASES_KEY, cell: null, name: "Bases", rows: inRouteOrder(w.bases, basesRouteTopics(m.plan)).map((t) => row(t, "Bases", "bases")) });
   return out;
 }
 
@@ -205,7 +207,7 @@ function TopicRow({ m, r, seq, showArea }: { m: AgendaModel; r: WeekRow; seq: nu
       <span className="w-6 flex-none text-right tabular-nums text-faint" data-testid="area-topic-seq">{seq}</span>
       <span className="w-12 flex-none">{code && <span className="rounded bg-hover px-1.5 py-px font-mono text-[12px] text-dim" data-testid="area-topic-code">{code}</span>}</span>
       <span className="flex min-w-0 flex-1 basis-52 flex-wrap items-baseline gap-x-2" title={t.folder}>
-        <TopicMenu folder={t.folder} title={t.title} trigger={<span className={cn("break-words", done ? "font-normal" : "font-medium")}>{t.title}</span>} className="hover:text-accent-text hover:underline" />
+        <TopicMenu folder={t.folder} title={t.title} work={r.kinds.includes("theory") || !r.kinds.includes("practice") ? "theory" : "practice"} areaKey={r.areaKey} trigger={<span className={cn("break-words", done ? "font-normal" : "font-medium")}>{t.title}</span>} className="hover:text-accent-text hover:underline" />
         {showArea && <span className="text-[12.5px] text-faint" data-testid="area-topic-area">{r.area}</span>}
         {t.minutes > 0 && <span className="whitespace-nowrap text-[12px] text-faint" data-testid="area-topic-minutes">est. {hm(t.minutes)}</span>}
       </span>

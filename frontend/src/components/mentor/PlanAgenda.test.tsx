@@ -245,7 +245,7 @@ describe("conteos visibles de temas y entregables", () => {
   it("semana: temas por área, horas, práctica y entregables de la semana, y los días con «Ver día»", async () => {
     await openAgenda();
     const w = byTest("agenda-week");
-    expect(byTest("agenda-week-counts").textContent).toMatch(/\d+ temas · .+ de estudio · \d+ entregables/);
+    expect(byTest("agenda-week-counts").textContent).toMatch(/\d+ temas · \d+ entregables/);
     expect(w.querySelectorAll("[data-testid=agenda-week-day]")).toHaveLength(7);
     expect(byTest("agenda-week-areas").querySelectorAll("li").length).toBeGreaterThan(0);
     expect(byTest("agenda-week-deliverables").textContent).toMatch(/\d+ entregables/);
@@ -257,7 +257,7 @@ describe("conteos visibles de temas y entregables", () => {
   it("mes: temas por semana dentro del mes, áreas en foco, hitos y entregables del mes", async () => {
     await openAgenda();
     await click(view("mes"));
-    expect(byTest("agenda-month-counts").textContent).toMatch(/\d+ temas · .+ de estudio · \d+ entregables · \d+ semanas/);
+    expect(byTest("agenda-month-counts").textContent).toMatch(/\d+ temas · \d+ entregables · \d+ semanas/);
     expect(host.querySelectorAll("[data-testid=agenda-month-week]").length).toBeGreaterThanOrEqual(4);
     expect(byTest("agenda-month-areas").querySelectorAll("li").length).toBeGreaterThan(0);
     expect(byTest("agenda-month-deliverables").textContent).toMatch(/\d+ katas/);

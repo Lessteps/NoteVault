@@ -165,7 +165,17 @@ export function spaceRows(rows: ReadonlyArray<TopicRow>): SpaceRow[] {
     .map(([space, rs]) => ({ space, areas: new Set(rs.map((r) => r.area)).size, ...totalsOf(rs) }))
     .sort((a, b) => natural(a.space, b.space));
 }
-export function areaRows(rows: ReadonlyArray<TopicRow>, space: string): AreaRow[] {
+export function allAreaRows(rows: ReadonlyArray<TopicRow>): AreaRow[] {
+  return [...groupBy(rows, (r) => r.area)]
+    .map(([area, rs]) => {
+      const space = rs[0]?.space ?? "";
+      const t = totalsOf(rs);
+      return { space, area, name: area === space ? "General" : baseOf(area) || "General", ...t, state: stateOf(t.pct, t.started, t.completed === t.topics && t.topics > 0) };
+    })
+    .sort((a, b) => natural(a.space, b.space) || natural(a.name, b.name));
+}
+export function areaRows(rows: ReadonlyArray<TopicRow>, space?: string): AreaRow[] {
+  if (!space) return allAreaRows(rows);
   return [...groupBy(rows.filter((r) => r.space === space), (r) => r.area)]
     .map(([area, rs]) => {
       const t = totalsOf(rs);

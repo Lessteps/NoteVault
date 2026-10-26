@@ -9,7 +9,7 @@
 
 import { loadAllAttempts } from "../../core/practice/ledger.js";
 import { listReviews } from "../../core/practice/reviewFiles.js";
-import { areaRows, spaceRows, topicRows, topicsOf, type AreasLevel, type TopicDashboardItem, type TopicRow } from "../../lib/mentorAreasOverview.js";
+import { allAreaRows, areaRows, spaceRows, topicRows, topicsOf, type AreasLevel, type TopicDashboardItem, type TopicRow } from "../../lib/mentorAreasOverview.js";
 import type { AppState } from "../appState.js";
 import { vaultScan } from "../vaultScan.js";
 import { studyApi } from "./study.js";
@@ -77,7 +77,7 @@ export function mentorAreasOverviewApi(app: AppState) {
       const base = loading ? { loading: true as const } : {};
       if (level === "areas") return { level, space, rows: areaRows(rows, space), ...base };
       if (level === "topics") return { level, space, area, rows: topicsOf(rows, space, area), ...base };
-      return { level, rows: spaceRows(rows), ...base };
+      return { level, rows: spaceRows(rows), areas: allAreaRows(rows), ...base };
     },
   };
 }

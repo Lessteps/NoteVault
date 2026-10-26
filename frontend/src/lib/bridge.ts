@@ -435,7 +435,7 @@ export const api = {
   /** Sistema de práctica por área: katas, habilidades y proyectos de cada área del plan. */
   /** «Áreas» del Mentor: avance de solo lectura por espacio / área / tema (una llamada por nivel). */
   mentorAreasOverview: (opts: { level?: "spaces" | "areas" | "topics"; space?: string; area?: string } = {}) =>
-    call<{ level: string; space?: string; area?: string; rows: unknown[]; loading?: boolean }>("mentor_areas_overview", opts),
+    call<{ level: string; space?: string; area?: string; rows: unknown[]; areas?: unknown[]; loading?: boolean }>("mentor_areas_overview", opts),
   mentorAreaPractice: (id: string) => call<import("./types").MentorAreaPractice>("mentor_area_practice", { id }),
   mentorAreaPracticeOn: (id: string, date: string) => call<{ items: Array<{ areaId: string; label: string; day: number; rel: string; title: string; skill: string; level: number; minutes: number }> }>("mentor_area_practice_on", { id, date }),
   /** Acceso directo al kata de un área: lo crea si falta (nunca sobrescribe) y devuelve su ruta en la vault. */

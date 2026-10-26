@@ -54,7 +54,7 @@ beforeEach(() => {
   vi.spyOn(api, "mentorPlanList").mockResolvedValue([]);
   vi.spyOn(api, "mentorPlanBuildList").mockResolvedValue([] as never);
   overview = vi.spyOn(api, "mentorAreasOverview").mockImplementation((async (o: { level?: string }) =>
-    o.level === "areas" ? { level: "areas", rows: AREAS } : o.level === "topics" ? { level: "topics", rows: TOPICS } : { level: "spaces", rows: SPACES }) as never);
+    o.level === "areas" ? { level: "areas", rows: AREAS } : o.level === "topics" ? { level: "topics", rows: TOPICS } : { level: "spaces", rows: SPACES, areas: AREAS }) as never);
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -223,5 +223,27 @@ describe("Áreas: barra lateral y página de cada materia", () => {
     await click(byId("space-tab-areas"));
     await click(byId("area-1 Backend"));
     expect(useNavState.getState().values["mentor.areas.path"]).toBe("Programación|Programación/1 Backend");
+    expect(byId("area-page")).toBeTruthy();
+    expect(byId("area-page")!.getAttribute("data-area")).toBe("Programación/1 Backend");
+  });
+
+  it("la barra lista las sub-áreas bajo cada materia y pulsar una abre su AreaPage dedicada", async () => {
+    await mount("areas", "", "resumen");
+    const sub = byId("nav-areas:Programación|Programación/1 Backend");
+    expect(sub).toBeTruthy();
+    expect(sub!.textContent).toContain("1 Backend");
+    expect(sub!.textContent).toContain("70%");
+    await click(sub);
+    expect(useNavState.getState().values["mentor.areas.path"]).toBe("Programación|Programación/1 Backend");
+    expect(byId("area-page")).toBeTruthy();
+    expect(byId("area-page")!.textContent).toContain("1 Backend");
+    expect(host.querySelectorAll("[data-testid=topic-card]")).toHaveLength(3);
+
+    // Pestaña Resumen de la sub-área
+    await click(byId("area-tab-resumen"));
+    expect(byId("area-summary")).toBeTruthy();
+    expect(byId("area-tile-done")!.textContent).toContain("3/6");
+    expect(byId("area-going")!.textContent).toContain("REST");
+    expect(byId("area-due")!.textContent).toContain("REST");
   });
 });

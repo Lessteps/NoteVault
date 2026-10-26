@@ -51,6 +51,7 @@ export function Ring({ pct, size = 52 }: { pct: number; size?: number }) {
 type Level = "spaces" | "areas" | "topics";
 export interface Loaded<T> {
   rows: T[];
+  areas?: AreaRow[];
   loading: boolean;
   error: string;
 }
@@ -71,7 +72,7 @@ function useLevel<T>(level: Level, space: string, area: string, version: number,
             timer = setTimeout(run, 1500);
             return;
           }
-          setState({ rows: r.rows as T[], loading: false, error: "" });
+          setState({ rows: r.rows as T[], areas: (r as { areas?: AreaRow[] }).areas, loading: false, error: "" });
         })
         .catch((e: unknown) => live && setState({ rows: [], loading: false, error: (e as Error).message }));
     };
@@ -91,26 +92,43 @@ export function useSpaces(enabled: boolean): Loaded<SpaceRow> {
   return useLevel<SpaceRow>("spaces", "", "", version, enabled);
 }
 
-/** Los ítems de la barra lateral en «Áreas»: «Todas las áreas» y una tarjeta compacta por materia (anillo, nombre, áreas y temas). */
+/** Los ítems de la barra lateral en «Áreas»: «Todas las áreas», cada materia y sus sub-áreas anidadas con su propio avance. */
 export function areasSidebarItems(spaces: Loaded<SpaceRow>): SidebarItem[] {
+  const bySpace = new Map<string, AreaRow[]>();
+  for (const a of spaces.areas ?? []) {
+    const list = bySpace.get(a.space);
+    if (list) list.push(a);
+    else bySpace.set(a.space, [a]);
+  }
   return [
     { id: AREAS_NAV_PREFIX, label: "Todas las áreas", hint: "Resumen de todas las materias", icon: <LayoutGrid /> },
-    ...spaces.rows.map((r): SidebarItem => ({
-      id: `${AREAS_NAV_PREFIX}${r.space}`,
-      label: r.space,
-      hint: `${r.areas} ${r.areas === 1 ? "área" : "áreas"} · ${r.topics} temas · ${r.completed}/${r.topics}`,
-      icon: <Ring pct={r.pct} size={26} />,
-      badge: r.reviewsDue,
-      badgeTone: "danger",
-      ...(r === spaces.rows[0] ? { sectionLabel: "Materias" } : {}),
-    })),
+    ...spaces.rows.map((r): SidebarItem => {
+      const spaceAreas = bySpace.get(r.space) ?? [];
+      return {
+        id: `${AREAS_NAV_PREFIX}${r.space}`,
+        label: r.space,
+        hint: `${r.areas} ${r.areas === 1 ? "área" : "áreas"} · ${r.topics} temas · ${r.completed}/${r.topics}`,
+        icon: <Ring pct={r.pct} size={26} />,
+        badge: r.reviewsDue,
+        badgeTone: "danger",
+        ...(r === spaces.rows[0] ? { sectionLabel: "Materias" } : {}),
+        subItems: spaceAreas.map((a): SidebarItem => ({
+          id: `${AREAS_NAV_PREFIX}${joinPath(r.space, a.area)}`,
+          label: a.name,
+          hint: `${a.completed}/${a.topics} temas · ${a.pct}%`,
+          icon: <Ring pct={a.pct} size={20} />,
+          badge: a.reviewsDue,
+          badgeTone: "danger",
+        })),
+      };
+    }),
   ];
 }
 
-/** Pulsar un ítem de la barra de «Áreas»: abre la página de esa materia (o el resumen de todas). */
+/** Pulsar un ítem de la barra de «Áreas»: abre la página de esa materia o sub-área (o el resumen de todas). */
 export function selectAreasItem(id: string): void {
   if (!id.startsWith(AREAS_NAV_PREFIX)) return;
-  useNavState.getState().set(AREAS_PATH_KEY, joinPath(id.slice(AREAS_NAV_PREFIX.length)));
+  useNavState.getState().set(AREAS_PATH_KEY, id.slice(AREAS_NAV_PREFIX.length));
 }
 
 /** La ruta del plan en curso (si hay), para la insignia «En tu plan»: una sola lectura del plan ya existente. */
@@ -169,7 +187,7 @@ export function AreasOverview({ spaces }: { spaces: Loaded<SpaceRow> }) {
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {level === "spaces" && <SpacesLevel s={spaces} onOpen={(s) => go(s)} />}
         {level === "areas" && <SpacePage space={space} row={spaces.rows.find((r) => r.space === space)} version={version} badge={badge} onOpenArea={(a) => go(space, a)} />}
-        {level === "topics" && <TopicsLevel space={space} area={area} version={version} badge={badge} />}
+        {level === "topics" && <AreaPage space={space} area={area} version={version} badge={badge} onBackToSpace={() => go(space)} />}
       </div>
     </div>
   );
@@ -358,6 +376,132 @@ function AreasLevel({ space, version, badge, onOpen }: { space: string; version:
         ))}
       </ul>
     </>
+  );
+}
+
+const AREA_TABS = [
+  { id: "temas", label: "Temas" },
+  { id: "resumen", label: "Resumen" },
+  { id: "repasos", label: "Repasos" },
+] as const;
+type AreaTab = (typeof AREA_TABS)[number]["id"];
+
+/** La página propia de una sub-área (ej. Backend, Frontend, Álgebra), con su avance, métricas y temas. */
+function AreaPage({
+  space,
+  area,
+  version,
+  badge,
+  onBackToSpace,
+}: {
+  space: string;
+  area: string;
+  version: number;
+  badge: PlanMembership | null;
+  onBackToSpace: () => void;
+}) {
+  const [storedTab, setTab] = usePersistedNav<string>("mentor.areas.areatab", "temas");
+  const tab: AreaTab = AREA_TABS.some((t) => t.id === storedTab) ? (storedTab as AreaTab) : "temas";
+  const areasState = useLevel<AreaRow>("areas", space, "", version);
+  const row = useMemo(() => areasState.rows.find((r) => r.area === area), [areasState.rows, area]);
+  const areaName = row?.name || area.split("/").pop() || area;
+
+  const topicsState = useLevel<TopicRow>("topics", space, area, version);
+  const inProgress = useMemo(() => topicsState.rows.filter((t) => t.state === "en_curso").slice(0, 6), [topicsState.rows]);
+  const due = useMemo(() => topicsState.rows.filter((t) => t.reviewDue).slice(0, 6), [topicsState.rows]);
+
+  const tiles = row
+    ? [
+        { id: "done", label: "Temas completos", value: `${row.completed}/${row.topics}` },
+        { id: "going", label: "En curso", value: String(Math.max(0, row.started - row.completed)) },
+        { id: "todo", label: "Sin tratar", value: String(Math.max(0, row.topics - row.started)) },
+        { id: "ex", label: "Ejercicios", value: `${row.exercisesDone}${row.exercisesTotal ? `/${row.exercisesTotal}` : ""}` },
+        { id: "rev", label: "Repasos pendientes", value: String(row.reviewsDue) },
+      ]
+    : [];
+
+  return (
+    <div data-testid="area-page" data-space={space} data-area={area}>
+      <div className="mb-4 flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-card p-4">
+        <Ring pct={row?.pct ?? 0} size={64} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-[20px] font-bold text-text">{areaName}</h2>
+            {badge?.areas.has(area) && <Chip colour="var(--nv-mint)">En tu plan: {badge.planName}</Chip>}
+            {row && <Chip colour={STATE_COLOUR[row.state]}>{STATE_LABEL[row.state]}</Chip>}
+          </div>
+          <p className="mt-0.5 text-[12.5px] text-faint">
+            Materia: <button type="button" onClick={onBackToSpace} className="text-accent-text hover:underline">{space}</button>
+            {row ? ` · ${row.topics} temas · ${row.completed}/${row.topics} completos` : ""}
+          </p>
+          {row && <Counts r={row} />}
+          {row?.lastActivity ? <p className="text-[11px] text-faint">Última actividad: {fmtDate(row.lastActivity)}</p> : null}
+        </div>
+      </div>
+
+      <div role="tablist" aria-label={`Vistas de ${areaName}`} className="mb-4 flex flex-wrap gap-1 border-b border-line">
+        {AREA_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            data-testid={`area-tab-${t.id}`}
+            className={cn("-mb-px min-h-9 border-b-2 px-3 text-[13.5px]", tab === t.id ? "border-accent font-semibold text-text" : "border-transparent text-dim hover:text-text")}
+          >
+            {t.label}
+            {t.id === "repasos" && row?.reviewsDue ? <span className="ml-1.5 rounded-md bg-danger-soft px-1.5 font-mono text-[10.5px] text-danger">{row.reviewsDue}</span> : null}
+          </button>
+        ))}
+      </div>
+
+      {tab === "resumen" && (
+        <div className="space-y-4" data-testid="area-summary">
+          <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
+            {tiles.map((t) => (
+              <li key={t.id} className="rounded-xl border border-line bg-card p-3" data-testid={`area-tile-${t.id}`}>
+                <p className="text-[11.5px] text-faint">{t.label}</p>
+                <p className="text-[20px] font-bold text-text">{t.value}</p>
+              </li>
+            ))}
+          </ul>
+          <Status s={topicsState} empty="Esta área aún no tiene temas." />
+          <div className="grid gap-3 @3xl:grid-cols-2">
+            <section className="rounded-xl border border-line bg-card p-3.5" data-testid="area-going">
+              <h3 className="mb-2 text-[13.5px] font-semibold text-text">Por dónde seguir</h3>
+              {!inProgress.length ? <p className="text-[12.5px] text-faint">Nada en curso todavía en esta área.</p> : (
+                <ul className="space-y-1.5">
+                  {inProgress.map((t) => (
+                    <li key={t.folder} className="flex flex-wrap items-center gap-2 text-[13px]">
+                      <span className="min-w-0 flex-1 truncate" title={t.folder}>{t.code ? `${t.code} ` : ""}{t.title}</span>
+                      {badge?.folders.has(t.folder) && <Chip colour="var(--nv-mint)">En tu plan</Chip>}
+                      <GhostButton onClick={() => void openTopic(t.folder)}>Abrir</GhostButton>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section className="rounded-xl border border-line bg-card p-3.5" data-testid="area-due">
+              <h3 className="mb-2 text-[13.5px] font-semibold text-text">Repasos pendientes</h3>
+              {!due.length ? <p className="text-[12.5px] text-faint">No tienes repasos pendientes en esta área.</p> : (
+                <ul className="space-y-1.5">
+                  {due.map((t) => (
+                    <li key={t.folder} className="flex flex-wrap items-center gap-2 text-[13px]">
+                      <span className="min-w-0 flex-1 truncate" title={t.folder}>{t.code ? `${t.code} ` : ""}{t.title}</span>
+                      <GhostButton onClick={() => void openTopic(t.folder)}>Abrir</GhostButton>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+        </div>
+      )}
+
+      {tab === "temas" && <TopicsLevel space={space} area={area} version={version} badge={badge} />}
+      {tab === "repasos" && <TopicsLevel space={space} area={area} version={version} badge={badge} initialFilter="repaso" />}
+    </div>
   );
 }
 

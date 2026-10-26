@@ -15,7 +15,8 @@ import { useMentor } from "../../store/mentor";
 import { PracticeProjectDialog } from "../practice/PracticeProjectDialog";
 import { MentorDayClose } from "./MentorDayClose";
 import { MentorGoals } from "./MentorGoals";
-import { AreasOverview } from "./AreasOverview";
+import { AREAS_NAV_PREFIX, AREAS_PATH_KEY, areasSidebarItems, AreasOverview, selectAreasItem, useSpaces } from "./AreasOverview";
+import { parsePath } from "../../lib/mentorAreasOverview";
 import { MentorPlan } from "./MentorPlan";
 import { MentorSidebar } from "./MentorSidebar";
 import { PlanBuilder } from "./PlanBuilder";
@@ -45,6 +46,11 @@ export function MentorModule() {
   // el plan al que vuelven «Volver a mi plan» y el interruptor de modo desde fuera de un plan: el que está en curso, o el primero
   const home = plansLoaded ? plans.find((p) => p.status === "activo") ?? plans[0] : undefined;
   const homeView = home ? `${PLAN_PREFIX}${home.id}` : "plan";
+  // «Áreas»: una sola lectura de las materias, compartida por la barra lateral (una tarjeta por materia) y la pantalla
+  const inAreas = route.kind === "areas";
+  const spaces = useSpaces(inAreas);
+  const areasPath = usePersistedNav(AREAS_PATH_KEY, "")[0];
+  const areasActive = `${AREAS_NAV_PREFIX}${parsePath(areasPath).space}`;
 
   if (route.kind === "plan") {
     return (
@@ -57,9 +63,9 @@ export function MentorModule() {
   return (
     <div className="flex min-w-0 flex-1">
       <MentorSidebar
-        items={[]}
-        active=""
-        onSelect={setView}
+        items={inAreas ? areasSidebarItems(spaces) : []}
+        active={inAreas ? areasActive : ""}
+        onSelect={inAreas ? selectAreasItem : setView}
         mode={mode}
         onMode={(m) => {
           setMode(m);
@@ -79,7 +85,7 @@ export function MentorModule() {
             {route.view === "hoy" ? <MentorToday /> : route.view === "cierre" ? <MentorDayClose /> : route.view === "metas" ? <MentorGoals /> : route.view === "proyectos" ? <MentorProjects /> : <MentorStudy />}
           </>
         )}
-        {route.kind === "areas" && <AreasOverview />}
+        {route.kind === "areas" && <AreasOverview spaces={spaces} />}
         {route.kind === "build" && <PlanBuilder key={route.buildId} buildId={route.buildId} />}
         {route.kind === "overview" && <MentorPlan key={route.creating ? "nuevo" : "resumen"} creating={route.creating} />}
       </main>

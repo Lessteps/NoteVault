@@ -33,8 +33,8 @@ let root: Root;
 let overview: ReturnType<typeof vi.spyOn>;
 
 const flush = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
-async function mount(view = "areas", path = "") {
-  useNavState.setState({ values: { "mentor.view": view, ...(path ? { "mentor.areas.path": path } : {}) } });
+async function mount(view = "areas", path = "", tab = "areas") {
+  useNavState.setState({ values: { "mentor.view": view, "mentor.areas.tab": tab, ...(path ? { "mentor.areas.path": path } : {}) } });
   await act(async () => { root.render(<MentorModule />); });
   await flush();
 }
@@ -172,7 +172,7 @@ describe("Áreas: niveles", () => {
 
   it("más de 100 temas: pinta por tandas", async () => {
     const many = Array.from({ length: 130 }, (_, i) => topic(`1.${i + 1}`, `T${i + 1}`, "sin_tratar"));
-    overview.mockImplementation((async () => ({ level: "topics", rows: many })) as never);
+    overview.mockImplementation((async (o: { level?: string }) => (o.level === "topics" ? { level: "topics", rows: many } : { level: "spaces", rows: SPACES })) as never);
     await mount("areas", "Programación|Programación/1 Backend");
     expect(host.querySelectorAll("[data-testid=topic-card]")).toHaveLength(100);
     await click(byId("topics-more"));
@@ -183,5 +183,45 @@ describe("Áreas: niveles", () => {
     overview.mockImplementation((async () => ({ level: "spaces", rows: [] })) as never);
     await mount();
     expect(byId("areas-empty")).toBeTruthy();
+  });
+});
+
+describe("Áreas: barra lateral y página de cada materia", () => {
+  it("la barra lista las materias con su anillo y avance; pulsar una abre su página", async () => {
+    await mount("areas", "", "resumen");
+    expect(byId("nav-areas:")).toBeTruthy();
+    const side = byId("nav-areas:Programación")!;
+    expect(side.textContent).toContain("Programación");
+    expect(side.textContent).toContain("10 temas");
+    expect(side.querySelector("[data-testid=ring]")).toBeTruthy();
+    expect(byId("nav-areas:Matemáticas")).toBeTruthy();
+    await click(side);
+    expect(useNavState.getState().values["mentor.areas.path"]).toBe("Programación");
+    expect(byId("space-page")!.getAttribute("data-space")).toBe("Programación");
+    expect(side.getAttribute("aria-current")).toBe("page");
+    await click(byId("nav-areas:"));
+    expect(byId("space-Matemáticas")).toBeTruthy();
+  });
+
+  it("la página de la materia abre en Resumen con cifras, lo que está en curso y los repasos", async () => {
+    await mount("areas", "Programación", "resumen");
+    expect(overview).toHaveBeenCalledWith({ level: "topics", space: "Programación", area: "" });
+    expect(byId("space-tile-done")!.textContent).toContain("4/10");
+    expect(byId("space-tile-rev")!.textContent).toContain("2");
+    expect(byId("space-going")!.textContent).toContain("REST");
+    expect(byId("space-due")!.textContent).toContain("REST");
+    expect(byId("space-due")!.textContent).not.toContain("HTTP");
+  });
+
+  it("pestañas: Áreas lleva a los temas del área; Temas y Repasos filtran todo el espacio", async () => {
+    await mount("areas", "Programación", "resumen");
+    await click(byId("space-tab-temas"));
+    expect(host.querySelectorAll("[data-testid=topic-card]")).toHaveLength(3);
+    await click(byId("space-tab-repasos"));
+    const titles = [...host.querySelectorAll("[data-testid=topic-card]")].map((c) => c.querySelector("p.font-semibold")?.textContent);
+    expect(titles).toEqual(["REST"]);
+    await click(byId("space-tab-areas"));
+    await click(byId("area-1 Backend"));
+    expect(useNavState.getState().values["mentor.areas.path"]).toBe("Programación|Programación/1 Backend");
   });
 });

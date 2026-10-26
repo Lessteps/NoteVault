@@ -173,8 +173,12 @@ export function areaRows(rows: ReadonlyArray<TopicRow>, space: string): AreaRow[
     })
     .sort((a, b) => natural(a.name, b.name));
 }
+/** Los temas de un área; sin `area`, todos los del espacio (la página del espacio: Temas y Repasos). */
 export function topicsOf(rows: ReadonlyArray<TopicRow>, space: string, area: string): TopicRow[] {
-  return rows.filter((r) => r.space === space && r.area === norm(area)).sort((a, b) => natural(a.code || a.title, b.code || b.title) || natural(a.title, b.title));
+  const a = norm(area);
+  return rows
+    .filter((r) => r.space === space && (!a || r.area === a))
+    .sort((x, y) => natural(x.area, y.area) || natural(x.code || x.title, y.code || y.title) || natural(x.title, y.title));
 }
 
 // ── Del lado de la pantalla ─────────────────────────────────────────────

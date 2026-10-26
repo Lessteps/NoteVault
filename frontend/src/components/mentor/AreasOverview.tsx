@@ -2,7 +2,7 @@
 // (espacios -> áreas -> temas) con migas de pan; el desglose se recuerda en `mentor.areas.path`. Los datos salen de una sola llamada por nivel
 // (`mentor_areas_overview`) y las acciones abren las vistas de siempre de Notas: aquí no se edita ni se genera nada.
 
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight, LayoutGrid, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import {
@@ -11,12 +11,25 @@ import {
 } from "../../lib/mentorAreasOverview";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
-import { usePersistedNav } from "../../store/navState";
+import { useNavState, usePersistedNav } from "../../store/navState";
 import { Chip, GhostButton } from "../common/forms";
+import type { SidebarItem } from "../ModuleSidebar";
 import { cn } from "../ui";
 import { openTopic, openTopicNote } from "./openTopic";
 
 export const AREAS_PATH_KEY = "mentor.areas.path";
+export const AREAS_TAB_KEY = "mentor.areas.tab";
+/** Prefijo de los ítems de la barra lateral de «Áreas»: `areas:` = todas, `areas:<espacio>` = la página de esa materia. */
+export const AREAS_NAV_PREFIX = "areas:";
+
+/** Las pestañas de la página de un espacio (como las de un área de un plan). */
+const SPACE_TABS = [
+  { id: "resumen", label: "Resumen" },
+  { id: "areas", label: "Áreas" },
+  { id: "temas", label: "Temas" },
+  { id: "repasos", label: "Repasos" },
+] as const;
+type SpaceTab = (typeof SPACE_TABS)[number]["id"];
 const PAGE = 100;
 
 const STATE_COLOUR: Record<TopicState, string> = { sin_tratar: "var(--nv-faint)", en_curso: "var(--nv-accent)", completo: "var(--nv-mint)" };
@@ -36,15 +49,16 @@ export function Ring({ pct, size = 52 }: { pct: number; size?: number }) {
 }
 
 type Level = "spaces" | "areas" | "topics";
-interface Loaded<T> {
+export interface Loaded<T> {
   rows: T[];
   loading: boolean;
   error: string;
 }
-/** Una llamada por nivel; se repite mientras el índice de la vault aún se calienta. */
-function useLevel<T>(level: Level, space: string, area: string, version: number): Loaded<T> {
+/** Una llamada por nivel; se repite mientras el índice de la vault aún se calienta. `enabled=false` no lee nada. */
+function useLevel<T>(level: Level, space: string, area: string, version: number, enabled = true): Loaded<T> {
   const [state, setState] = useState<Loaded<T>>({ rows: [], loading: true, error: "" });
   useEffect(() => {
+    if (!enabled) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let tries = 0;
@@ -67,8 +81,36 @@ function useLevel<T>(level: Level, space: string, area: string, version: number)
       live = false;
       if (timer) clearTimeout(timer);
     };
-  }, [level, space, area, version]);
+  }, [level, space, area, version, enabled]);
   return state;
+}
+
+/** Los espacios (materias): UNA sola lectura, compartida por la barra lateral y la pantalla. */
+export function useSpaces(enabled: boolean): Loaded<SpaceRow> {
+  const version = useMentor((s) => s.planVersion);
+  return useLevel<SpaceRow>("spaces", "", "", version, enabled);
+}
+
+/** Los ítems de la barra lateral en «Áreas»: «Todas las áreas» y una tarjeta compacta por materia (anillo, nombre, áreas y temas). */
+export function areasSidebarItems(spaces: Loaded<SpaceRow>): SidebarItem[] {
+  return [
+    { id: AREAS_NAV_PREFIX, label: "Todas las áreas", hint: "Resumen de todas las materias", icon: <LayoutGrid /> },
+    ...spaces.rows.map((r): SidebarItem => ({
+      id: `${AREAS_NAV_PREFIX}${r.space}`,
+      label: r.space,
+      hint: `${r.areas} ${r.areas === 1 ? "área" : "áreas"} · ${r.topics} temas · ${r.completed}/${r.topics}`,
+      icon: <Ring pct={r.pct} size={26} />,
+      badge: r.reviewsDue,
+      badgeTone: "danger",
+      ...(r === spaces.rows[0] ? { sectionLabel: "Materias" } : {}),
+    })),
+  ];
+}
+
+/** Pulsar un ítem de la barra de «Áreas»: abre la página de esa materia (o el resumen de todas). */
+export function selectAreasItem(id: string): void {
+  if (!id.startsWith(AREAS_NAV_PREFIX)) return;
+  useNavState.getState().set(AREAS_PATH_KEY, joinPath(id.slice(AREAS_NAV_PREFIX.length)));
 }
 
 /** La ruta del plan en curso (si hay), para la insignia «En tu plan»: una sola lectura del plan ya existente. */
@@ -95,7 +137,7 @@ function usePlanBadge(): PlanMembership | null {
 
 const fmtDate = (d: string): string => d || "sin actividad";
 
-export function AreasOverview() {
+export function AreasOverview({ spaces }: { spaces: Loaded<SpaceRow> }) {
   const [raw, setRaw] = usePersistedNav<string>(AREAS_PATH_KEY, "");
   const { space, area } = parsePath(raw);
   const level: Level = !space ? "spaces" : !area ? "areas" : "topics";
@@ -125,8 +167,8 @@ export function AreasOverview() {
         <p className="mt-1 text-[12px] text-faint">Resumen de solo lectura del avance real en tus notas; no depende de ningún plan.</p>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        {level === "spaces" && <SpacesLevel version={version} onOpen={(s) => go(s)} />}
-        {level === "areas" && <AreasLevel space={space} version={version} badge={badge} onOpen={(a) => go(space, a)} />}
+        {level === "spaces" && <SpacesLevel s={spaces} onOpen={(s) => go(s)} />}
+        {level === "areas" && <SpacePage space={space} row={spaces.rows.find((r) => r.space === space)} version={version} badge={badge} onOpenArea={(a) => go(space, a)} />}
         {level === "topics" && <TopicsLevel space={space} area={area} version={version} badge={badge} />}
       </div>
     </div>
@@ -158,8 +200,7 @@ function Counts({ r }: { r: { topics: number; completed: number; exercisesDone: 
   );
 }
 
-function SpacesLevel({ version, onOpen }: { version: number; onOpen: (space: string) => void }) {
-  const s = useLevel<SpaceRow>("spaces", "", "", version);
+function SpacesLevel({ s, onOpen }: { s: Loaded<SpaceRow>; onOpen: (space: string) => void }) {
   return (
     <>
       <Status s={s} empty="Aún no hay espacios de estudio con temas en tu vault." />
@@ -180,6 +221,100 @@ function SpacesLevel({ version, onOpen }: { version: number; onOpen: (space: str
         ))}
       </ul>
     </>
+  );
+}
+
+/** La página de una materia, como la de un área de un plan: cabecera con su avance y pestañas Resumen · Áreas · Temas · Repasos (solo lectura). */
+function SpacePage({ space, row, version, badge, onOpenArea }: { space: string; row: SpaceRow | undefined; version: number; badge: PlanMembership | null; onOpenArea: (area: string) => void }) {
+  const [stored, setTab] = usePersistedNav<string>(AREAS_TAB_KEY, "resumen");
+  const tab: SpaceTab = SPACE_TABS.some((t) => t.id === stored) ? (stored as SpaceTab) : "resumen";
+  return (
+    <div data-testid="space-page" data-space={space}>
+      <div className="mb-4 flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-card p-4">
+        <Ring pct={row?.pct ?? 0} size={64} />
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-[20px] font-bold text-text">{space}</h2>
+          {row ? (
+            <>
+              <p className="text-[13px] text-dim">{row.areas} {row.areas === 1 ? "área" : "áreas"} · {row.topics} temas</p>
+              <Counts r={row} />
+              <p className="text-[11px] text-faint">Última actividad: {fmtDate(row.lastActivity)}</p>
+            </>
+          ) : (
+            <p className="text-[13px] text-faint">Leyendo tus notas…</p>
+          )}
+        </div>
+      </div>
+      <div role="tablist" aria-label={`Vistas de ${space}`} className="mb-4 flex flex-wrap gap-1 border-b border-line">
+        {SPACE_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            data-testid={`space-tab-${t.id}`}
+            className={cn("-mb-px min-h-9 border-b-2 px-3 text-[13.5px]", tab === t.id ? "border-accent font-semibold text-text" : "border-transparent text-dim hover:text-text")}
+          >
+            {t.label}
+            {t.id === "repasos" && row?.reviewsDue ? <span className="ml-1.5 rounded-md bg-danger-soft px-1.5 font-mono text-[10.5px] text-danger">{row.reviewsDue}</span> : null}
+          </button>
+        ))}
+      </div>
+      {tab === "resumen" && <SpaceSummary space={space} row={row} version={version} badge={badge} />}
+      {tab === "areas" && <AreasLevel space={space} version={version} badge={badge} onOpen={onOpenArea} />}
+      {tab === "temas" && <TopicsLevel key="temas" space={space} area="" version={version} badge={badge} showArea />}
+      {tab === "repasos" && <TopicsLevel key="repasos" space={space} area="" version={version} badge={badge} showArea initialFilter="repaso" />}
+    </div>
+  );
+}
+
+/** «Resumen» de una materia: cifras, por dónde seguir (en curso) y repasos pendientes. */
+function SpaceSummary({ space, row, version, badge }: { space: string; row: SpaceRow | undefined; version: number; badge: PlanMembership | null }) {
+  const s = useLevel<TopicRow>("topics", space, "", version);
+  const inProgress = useMemo(() => s.rows.filter((t) => t.state === "en_curso").slice(0, 6), [s.rows]);
+  const due = useMemo(() => s.rows.filter((t) => t.reviewDue).slice(0, 6), [s.rows]);
+  const tiles = row
+    ? [
+        { id: "done", label: "Temas completos", value: `${row.completed}/${row.topics}` },
+        { id: "going", label: "En curso", value: String(Math.max(0, row.started - row.completed)) },
+        { id: "todo", label: "Sin tratar", value: String(Math.max(0, row.topics - row.started)) },
+        { id: "ex", label: "Ejercicios", value: `${row.exercisesDone}${row.exercisesTotal ? `/${row.exercisesTotal}` : ""}` },
+        { id: "rev", label: "Repasos pendientes", value: String(row.reviewsDue) },
+      ]
+    : [];
+  const list = (title: string, rows: TopicRow[], empty: string, testid: string) => (
+    <section className="rounded-xl border border-line bg-card p-3.5" data-testid={testid}>
+      <h3 className="mb-2 text-[13.5px] font-semibold text-text">{title}</h3>
+      {!rows.length ? <p className="text-[12.5px] text-faint">{empty}</p> : (
+        <ul className="space-y-1.5">
+          {rows.map((t) => (
+            <li key={t.folder} className="flex flex-wrap items-center gap-2 text-[13px]">
+              <span className="min-w-0 flex-1 truncate" title={t.folder}>{t.code ? `${t.code} ` : ""}{t.title}</span>
+              {badge?.folders.has(t.folder) && <Chip colour="var(--nv-mint)">En tu plan</Chip>}
+              <GhostButton onClick={() => void openTopic(t.folder)}>Abrir</GhostButton>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+  return (
+    <div className="space-y-4" data-testid="space-summary">
+      <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
+        {tiles.map((t) => (
+          <li key={t.id} className="rounded-xl border border-line bg-card p-3" data-testid={`space-tile-${t.id}`}>
+            <p className="text-[11.5px] text-faint">{t.label}</p>
+            <p className="text-[20px] font-bold text-text">{t.value}</p>
+          </li>
+        ))}
+      </ul>
+      <Status s={s} empty="Esta materia aún no tiene temas." />
+      <div className="grid gap-3 @3xl:grid-cols-2">
+        {list("Por dónde seguir", inProgress, "Nada en curso todavía.", "space-going")}
+        {list("Repasos pendientes", due, "No tienes repasos pendientes.", "space-due")}
+      </div>
+    </div>
   );
 }
 
@@ -226,9 +361,9 @@ function AreasLevel({ space, version, badge, onOpen }: { space: string; version:
   );
 }
 
-function TopicsLevel({ space, area, version, badge }: { space: string; area: string; version: number; badge: PlanMembership | null }) {
+function TopicsLevel({ space, area, version, badge, showArea = false, initialFilter = "todos" }: { space: string; area: string; version: number; badge: PlanMembership | null; /** rotula cada tema con su área (página de la materia) */ showArea?: boolean; initialFilter?: TopicFilter }) {
   const s = useLevel<TopicRow>("topics", space, area, version);
-  const [filter, setFilter] = useState<TopicFilter>("todos");
+  const [filter, setFilter] = useState<TopicFilter>(initialFilter);
   const [q, setQ] = useState("");
   const [shown, setShown] = useState(PAGE);
   const rows = useMemo(() => filterTopics(s.rows, filter, q), [s.rows, filter, q]);
@@ -257,7 +392,7 @@ function TopicsLevel({ space, area, version, badge }: { space: string; area: str
             <div className="flex items-start gap-3">
               <Ring pct={t.pct} />
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-[11px] text-faint">{t.code || "—"}</p>
+                <p className="font-mono text-[11px] text-faint">{t.code || "—"}{showArea && t.area !== space ? ` · ${t.area.split("/").pop()}` : ""}</p>
                 <p className="break-words text-[13.5px] font-semibold text-text" title={t.title}>{t.title}</p>
                 <p className="text-[12px] text-dim">
                   {t.exercisesDone}

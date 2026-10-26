@@ -23,7 +23,14 @@ import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
+import { curriculumGapsPrompt } from "./curriculumCoverage.js";
 import { askStructured, clearStudySnapshotCache, reevaluateTopic } from "./study.js";
+
+/** Huecos de las áreas de referencia (catálogo de currículo) para el prompt del temario de Programación; vacío si no hay. */
+function referenceGapsSection(app: AppState, space: string): string {
+  const gaps = curriculumGapsPrompt(app, 15, space);
+  return gaps ? `\nReference catalog gaps (missing or only partially covered groups, essential first; propose these, keep the exact titles and numbers):\n${gaps}\n` : "";
+}
 
 export interface SpaceTopic {
   name: string;
@@ -285,7 +292,7 @@ export const theoryMessagesFor = (
       content:
         "You are a rigorous programming teacher writing NoteVault's theory notes, ALL IN ENGLISH (explanations, code comments and cards). Follow this vault skill TO THE LETTER: " +
         "it is a contract (same headings, same fields), because the topic map is generated automatically from the note.\n\n" +
-        skillText(app, spaceFolder, "resumen_teorico_skill"),
+        skillText(app, spaceFolder, "resumen_teorico_skill", 12000),
     },
     {
       role: "user",
@@ -600,13 +607,16 @@ export function studySpaceApi(app: AppState) {
         if (!areas.length) throw new ApiError("Esas ramas ya existen en este espacio.");
         return { areas, conversationId: chat.id };
       }
-      const skill = skillText(app, space || name, "temario_skill", 3000);
       const programming = domainOfSubject(name) === "programming";
+      // el skill de programación incluye la política de profundidad y cobertura (áreas de referencia): no se recorta a 3000
+      const skill = skillText(app, space || name, "temario_skill", programming ? 9000 : 3000);
       const system = programming
         ? "You are a curriculum designer. You propose the syllabus of a programming area, in English. Answer ONLY with JSON: " +
           '{"areas":[{"name":"1 Area name","topics":[{"name":"1.1 Topic name"}]}]}. ' +
-          "Numbered areas and topics in natural learning order, 12-20 topics per area, short names in English " +
+          "Numbered areas and topics in natural learning order, 12-20 topics per conceptual area, short names in English " +
           'without / \\ : * ? " < > |. ' +
+          "REFERENCE areas (HTML, CSS, JavaScript Reference, Java) follow the skill's «Depth and coverage» policy instead: category order, small GROUP topics, up to ~150 topics, " +
+          "and you must propose the MISSING groups listed under «Reference catalog gaps» in the request (exact titles), never duplicates and never nested inside existing topics. " +
           (skill ? `\nFollow this vault skill:\n${skill}` : "")
         :
         "Eres un diseñador curricular. Propones el temario de una materia en español. Responde SOLO con JSON: " +
@@ -618,7 +628,8 @@ export function studySpaceApi(app: AppState) {
         `Materia: ${name}.\n` +
         (scope.trim() ? `Alcance: ${scope.trim()}.\n` : "Alcance: las áreas principales de la materia.\n") +
         (objective.trim() ? `Objetivo del estudiante: ${objective.trim()}.\n` : "") +
-        (existing.length ? `Áreas que YA existen en «${space}» (no las repitas; continúa la numeración): ${existing.join("; ")}.\n` : "");
+        (existing.length ? `Áreas que YA existen en «${space}» (no las repitas; continúa la numeración): ${existing.join("; ")}.\n` : "") +
+        (programming ? referenceGapsSection(app, space || name) : "");
       const reply = await askStructured(cfg, [{ role: "system", content: system }, { role: "user", content: user }]);
       const areas = parseProposal(reply);
       const chat = new ChatLog(undefined, `Espacio de estudio: ${space || name}`, cfg.model);

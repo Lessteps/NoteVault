@@ -19,12 +19,17 @@ import {
   topicPct,
   type OverviewGroup,
 } from "../../lib/areaOverview";
+import { pendingAreas, relatedCoverage } from "../../lib/curriculumView";
+import type { AreaCoverage } from "../../lib/curriculum";
 import type { TopicDashboardData, TopicDashboardItem } from "../../lib/types";
+import { useCoverage } from "../../store/curriculum";
 import { useApp, type OpenNote } from "../../store/app";
 import { Donut } from "../common/charts";
 import { cn } from "../ui";
 import { useStudyVersion } from "./StudyPanel";
 import { RouteNow } from "./RouteUi";
+import { CoverageChip, PendingAreaCard } from "./CurriculumBadges";
+import { CurriculumGaps } from "./CurriculumGaps";
 
 const DIFFICULTY_COLOURS = ["var(--nv-mint)", "var(--nv-accent)", "var(--nv-info)"];
 const DIFFICULTY_LABELS = ["★ Fácil", "★★ Med", "★★★ Dif"];
@@ -51,6 +56,10 @@ export function ResumenView({ note }: { note: OpenNote }) {
   // arrives instead of freezing on the cold read.
   const retryRef = useRef(0);
   const retryTimer = useRef<number | null>(null);
+
+  // «Temas por crear» del currículo de referencia: se abre aquí mismo, en lugar del panel, y «Volver» regresa a él
+  const [gapsId, setGapsId] = useState<string | null>(null);
+  const { areas: coverage } = useCoverage();
 
   const scope = String(note.frontmatter?.scope ?? "").trim();
   const subject = String(note.frontmatter?.subject ?? "").trim();
@@ -97,6 +106,10 @@ export function ResumenView({ note }: { note: OpenNote }) {
   const inScope = useCallback((folder: string) => folderInScope(folder, scope), [scope]);
   const title = String(note.frontmatter?.title ?? note.title ?? "");
   const atSubjectRoot = groups.length > 0 && groups.some((g) => !g.isTopic);
+  const space = (scope || title).replace(/\\/g, "/").split("/")[0] ?? "";
+  // áreas del currículo que aún no existen en la vault («Por crear») y, por área existente, las que tienen poco desarrollo
+  const pendingCards = useMemo(() => (atSubjectRoot || scope === space ? pendingAreas(coverage.filter((c) => c.level !== "ok"), space, groups.map((g) => g.key)) : []), [coverage, space, groups, atSubjectRoot, scope]);
+  const areaCoverage: AreaCoverage[] = useMemo(() => (atSubjectRoot ? [] : relatedCoverage(coverage, space, scope)), [coverage, space, scope, atSubjectRoot]);
 
   /** A topic's own view file holds its practice; open it (si falta, se pide permiso para crearla). */
   const openTopicView = async (item: TopicDashboardItem) => {
@@ -128,6 +141,14 @@ export function ResumenView({ note }: { note: OpenNote }) {
       setBusy(false);
     }
   };
+
+  if (gapsId) {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="resumen-gaps">
+        <CurriculumGaps areaId={gapsId} onBack={() => setGapsId(null)} />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full min-h-0 overflow-y-auto">
@@ -162,6 +183,13 @@ export function ResumenView({ note }: { note: OpenNote }) {
 
       {/* Qué estudiar ahora: los temas exactos de tu ruta del Mentor dentro de esta parte */}
       <RouteNow inScope={inScope} onOpen={(folder) => void openTopicView({ folder } as TopicDashboardItem)} />
+
+      {/* Falta de desarrollo: este área está por debajo de lo que el currículo de referencia pide */}
+      {areaCoverage.length > 0 && (
+        <section className="flex flex-col gap-1.5 rounded-xl border border-line bg-card px-3.5 py-3" data-testid="resumen-lacking" aria-label="Falta de desarrollo">
+          {areaCoverage.map((c) => <CoverageChip key={c.areaId} coverage={c} showTitle onOpen={setGapsId} />)}
+        </section>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(132px,1fr))] gap-3">
@@ -203,8 +231,15 @@ export function ResumenView({ note }: { note: OpenNote }) {
                 openTopics={openTopics}
                 onToggleTopic={(folder) => setOpenTopics((s) => ({ ...s, [folder]: !s[folder] }))}
                 onOpenTopicView={(item) => void openTopicView(item)}
+                coverage={atSubjectRoot ? relatedCoverage(coverage, space, group.key) : []}
+                onOpenGaps={setGapsId}
               />
             ))}
+          </div>
+        )}
+        {pendingCards.length > 0 && (
+          <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,340px),1fr))] items-start gap-3" data-testid="resumen-pending-areas">
+            {pendingCards.map((c) => <PendingAreaCard key={c.areaId} coverage={c} onOpen={setGapsId} />)}
           </div>
         )}
       </section>
@@ -262,7 +297,11 @@ function GroupCard({
   openTopics,
   onToggleTopic,
   onOpenTopicView,
+  coverage,
+  onOpenGaps,
 }: {
+  coverage: AreaCoverage[];
+  onOpenGaps: (areaId: string) => void;
   group: OverviewGroup;
   open: boolean;
   onToggle: () => void;
@@ -325,6 +364,12 @@ function GroupCard({
           </button>
         )}
       </div>
+
+      {coverage.length > 0 && (
+        <div className="mt-2 flex flex-col gap-1" data-testid="group-lacking">
+          {coverage.map((c) => <CoverageChip key={c.areaId} coverage={c} showTitle onOpen={onOpenGaps} />)}
+        </div>
+      )}
 
       {open && group.isTopic && (
         <div className="mt-3 border-t border-line pt-3">

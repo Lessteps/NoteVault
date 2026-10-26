@@ -36,6 +36,8 @@ import { studyApi, setWarmApp, warmStudyIndex } from "./modules/study.js";
 import { studySpaceApi } from "./modules/studySpace.js";
 import { topicRegenerateApi } from "./modules/topicRegenerate.js";
 import { topicRegenerateHandoffApi } from "./modules/topicRegenerateHandoff.js";
+import { curriculumCoverageApi } from "./modules/curriculumCoverage.js";
+import { curriculumHandoffApi } from "./modules/curriculumHandoff.js";
 import { tasksApi } from "./modules/tasks.js";
 import { vaultsApi } from "./modules/vaults.js";
 import { webApi } from "./modules/web.js";
@@ -75,6 +77,8 @@ export function buildRegistry(app: AppState): Registry {
     ...studySpaceApi(app),
     ...topicRegenerateApi(app),
     ...topicRegenerateHandoffApi(app),
+    ...curriculumCoverageApi(app),
+    ...curriculumHandoffApi(app),
     ...practiceApi(app),
     ...ladderApi(app),
     ...canvasApi(app),

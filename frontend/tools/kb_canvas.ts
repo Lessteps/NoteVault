@@ -38,6 +38,7 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as os from "node:os";
 import * as cf from "../src/core/canvas/canvasFormat";
 import { requiredTextHeight } from "../src/core/canvas/boxSizing";
 import { parseFrontmatter } from "../src/core/frontmatter";
@@ -323,15 +324,24 @@ export function readConcept(folder: string, vaultRoot: string): Concept {
 
 /* ── vault lookup ────────────────────────────────────────────────────────── */
 
-/** Vault root = the folder that holds `.notevault`. */
+/**
+ * Vault root = the folder that holds `.notevault` or `.obsidian` (highest ancestor if nested).
+ * The user's home folder is never a vault: `~/.notevault` is the app's own settings folder.
+ */
 export function findVaultRoot(from: string): string {
   let dir = path.resolve(from);
+  let found: string | null = null;
+  const home = path.resolve(os.homedir());
   for (;;) {
-    if (fs.existsSync(path.join(dir, ".notevault"))) return dir;
+    if (dir !== home && (fs.existsSync(path.join(dir, ".notevault")) || fs.existsSync(path.join(dir, ".obsidian")))) {
+      found = dir;
+    }
     const parent = path.dirname(dir);
-    if (parent === dir) throw new Error(`no encuentro la raíz del vault (.notevault) desde ${from}`);
+    if (parent === dir) break;
     dir = parent;
   }
+  if (found) return found;
+  throw new Error(`no encuentro la raíz del vault (.notevault) desde ${from}`);
 }
 
 function walkNotes(root: string, out: string[] = []): string[] {

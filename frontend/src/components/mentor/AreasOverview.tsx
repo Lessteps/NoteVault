@@ -16,6 +16,11 @@ import { Chip, GhostButton } from "../common/forms";
 import type { SidebarItem } from "../ModuleSidebar";
 import { cn } from "../ui";
 import { openTopic, openTopicNote } from "./openTopic";
+import type { AreaCoverage } from "../../lib/curriculum";
+import { isLacking, pendingAreas, relatedCoverage } from "../../lib/curriculumView";
+import { useCoverage } from "../../store/curriculum";
+import { CoverageChip, PendingAreaCard } from "../study/CurriculumBadges";
+import { CurriculumGaps } from "../study/CurriculumGaps";
 
 export const AREAS_PATH_KEY = "mentor.areas.path";
 export const AREAS_TAB_KEY = "mentor.areas.tab";
@@ -163,6 +168,17 @@ export function AreasOverview({ spaces }: { spaces: Loaded<SpaceRow> }) {
   const badge = usePlanBadge();
   const go = useCallback((s: string, a = ""): void => setRaw(joinPath(s, a)), [setRaw]);
   const areaName = area.split("/").pop() ?? area;
+  // «Temas por crear» del currículo de referencia: un cuarto nivel que se abre aquí mismo y vuelve con «Volver»
+  const [gapsId, setGapsId] = useState<string | null>(null);
+  const { areas: coverage } = useCoverage();
+
+  if (gapsId) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col" data-testid="areas-overview" data-view="gaps">
+        <CurriculumGaps areaId={gapsId} onBack={() => setGapsId(null)} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="areas-overview">
@@ -185,9 +201,9 @@ export function AreasOverview({ spaces }: { spaces: Loaded<SpaceRow> }) {
         <p className="mt-1 text-[12px] text-faint">Resumen de solo lectura del avance real en tus notas; no depende de ningún plan.</p>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        {level === "spaces" && <SpacesLevel s={spaces} onOpen={(s) => go(s)} />}
-        {level === "areas" && <SpacePage space={space} row={spaces.rows.find((r) => r.space === space)} version={version} badge={badge} onOpenArea={(a) => go(space, a)} />}
-        {level === "topics" && <AreaPage space={space} area={area} version={version} badge={badge} onBackToSpace={() => go(space)} />}
+        {level === "spaces" && <SpacesLevel s={spaces} onOpen={(s) => go(s)} coverage={coverage} onGaps={setGapsId} />}
+        {level === "areas" && <SpacePage space={space} row={spaces.rows.find((r) => r.space === space)} version={version} badge={badge} onOpenArea={(a) => go(space, a)} coverage={coverage} onGaps={setGapsId} />}
+        {level === "topics" && <AreaPage space={space} area={area} version={version} badge={badge} onBackToSpace={() => go(space)} coverage={coverage} onGaps={setGapsId} />}
       </div>
     </div>
   );
@@ -218,7 +234,7 @@ function Counts({ r }: { r: { topics: number; completed: number; exercisesDone: 
   );
 }
 
-function SpacesLevel({ s, onOpen }: { s: Loaded<SpaceRow>; onOpen: (space: string) => void }) {
+function SpacesLevel({ s, onOpen, coverage, onGaps }: { s: Loaded<SpaceRow>; onOpen: (space: string) => void; coverage: AreaCoverage[]; onGaps: (areaId: string) => void }) {
   return (
     <>
       <Status s={s} empty="Aún no hay espacios de estudio con temas en tu vault." />
@@ -235,6 +251,7 @@ function SpacesLevel({ s, onOpen }: { s: Loaded<SpaceRow>; onOpen: (space: strin
               </span>
               <ChevronRight size={16} className="flex-none text-faint" aria-hidden />
             </button>
+            <LackingChips list={coverage.filter((c) => c.space === r.space && isLacking(c))} onGaps={onGaps} />
           </li>
         ))}
       </ul>
@@ -242,8 +259,18 @@ function SpacesLevel({ s, onOpen }: { s: Loaded<SpaceRow>; onOpen: (space: strin
   );
 }
 
+/** Las marcas de «falta de desarrollo» de un renglón (espacio o área) con su acción «Ver temas por crear». */
+function LackingChips({ list, onGaps }: { list: AreaCoverage[]; onGaps: (areaId: string) => void }) {
+  if (!list.length) return null;
+  return (
+    <div className="mt-1.5 flex flex-col gap-1 px-1" data-testid="lacking-chips">
+      {list.map((c) => <CoverageChip key={c.areaId} coverage={c} showTitle onOpen={onGaps} />)}
+    </div>
+  );
+}
+
 /** La página de una materia, como la de un área de un plan: cabecera con su avance y pestañas Resumen · Áreas · Temas · Repasos (solo lectura). */
-function SpacePage({ space, row, version, badge, onOpenArea }: { space: string; row: SpaceRow | undefined; version: number; badge: PlanMembership | null; onOpenArea: (area: string) => void }) {
+function SpacePage({ space, row, version, badge, onOpenArea, coverage, onGaps }: { space: string; row: SpaceRow | undefined; version: number; badge: PlanMembership | null; onOpenArea: (area: string) => void; coverage: AreaCoverage[]; onGaps: (areaId: string) => void }) {
   const [stored, setTab] = usePersistedNav<string>(AREAS_TAB_KEY, "resumen");
   const tab: SpaceTab = SPACE_TABS.some((t) => t.id === stored) ? (stored as SpaceTab) : "resumen";
   return (
@@ -280,7 +307,7 @@ function SpacePage({ space, row, version, badge, onOpenArea }: { space: string; 
         ))}
       </div>
       {tab === "resumen" && <SpaceSummary space={space} row={row} version={version} badge={badge} />}
-      {tab === "areas" && <AreasLevel space={space} version={version} badge={badge} onOpen={onOpenArea} />}
+      {tab === "areas" && <AreasLevel space={space} version={version} badge={badge} onOpen={onOpenArea} coverage={coverage} onGaps={onGaps} />}
       {tab === "temas" && <TopicsLevel key="temas" space={space} area="" version={version} badge={badge} showArea />}
       {tab === "repasos" && <TopicsLevel key="repasos" space={space} area="" version={version} badge={badge} showArea initialFilter="repaso" />}
     </div>
@@ -336,11 +363,13 @@ function SpaceSummary({ space, row, version, badge }: { space: string; row: Spac
   );
 }
 
-function AreasLevel({ space, version, badge, onOpen }: { space: string; version: number; badge: PlanMembership | null; onOpen: (area: string) => void }) {
+function AreasLevel({ space, version, badge, onOpen, coverage, onGaps }: { space: string; version: number; badge: PlanMembership | null; onOpen: (area: string) => void; coverage: AreaCoverage[]; onGaps: (areaId: string) => void }) {
   const s = useLevel<AreaRow>("areas", space, "", version);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<AreaSort>("nombre");
   const rows = useMemo(() => sortAreas(s.rows.filter((r) => !q.trim() || r.name.toLowerCase().includes(q.trim().toLowerCase())), sort), [s.rows, q, sort]);
+  // áreas del currículo que aún no existen en la vault: tarjetas «Por crear» con borde discontinuo
+  const toCreate = useMemo(() => (s.loading && !s.rows.length ? [] : pendingAreas(coverage.filter((c) => c.level !== "ok"), space, s.rows.map((r) => r.area))), [coverage, space, s.rows, s.loading]);
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -372,6 +401,12 @@ function AreasLevel({ space, version, badge, onOpen }: { space: string; version:
               </span>
               <ChevronRight size={16} className="flex-none text-faint" aria-hidden />
             </button>
+            <LackingChips list={relatedCoverage(coverage, space, r.area)} onGaps={onGaps} />
+          </li>
+        ))}
+        {toCreate.map((c) => (
+          <li key={c.areaId} data-testid="pending-area-item">
+            <PendingAreaCard coverage={c} onOpen={onGaps} />
           </li>
         ))}
       </ul>
@@ -393,7 +428,11 @@ function AreaPage({
   version,
   badge,
   onBackToSpace,
+  coverage,
+  onGaps,
 }: {
+  coverage: AreaCoverage[];
+  onGaps: (areaId: string) => void;
   space: string;
   area: string;
   version: number;
@@ -436,6 +475,7 @@ function AreaPage({
           </p>
           {row && <Counts r={row} />}
           {row?.lastActivity ? <p className="text-[11px] text-faint">Última actividad: {fmtDate(row.lastActivity)}</p> : null}
+          <LackingChips list={relatedCoverage(coverage, space, area)} onGaps={onGaps} />
         </div>
       </div>
 

@@ -1882,6 +1882,48 @@ export interface RegenHandoff {
   ready: { found: number; expected: number };
 }
 
+/** «Crear con Antigravity» (ver api/modules/curriculumHandoff.ts). */
+export interface CurriculumProgress {
+  folder: boolean;
+  note: boolean;
+  manifest: boolean;
+  map: boolean;
+  exercises: number;
+  temario: boolean;
+}
+export interface CurriculumHandoffEntry {
+  entryId: string;
+  title: string;
+  category: string;
+  importance: string;
+  number: string;
+  name: string;
+  folder: string;
+  state: "pending" | "created" | "error";
+  problems: string[];
+  warnings: string[];
+  progress: CurriculumProgress;
+}
+export interface CurriculumHandoff {
+  id: string;
+  kind: "curriculum";
+  areaId: string;
+  areaTitle: string;
+  space: string;
+  areaFolder: string;
+  withExercises: boolean;
+  createdAt: string;
+  taskPath: string;
+  taskAbs: string;
+  folder: string;
+  shortPrompt: string;
+  prompt: string;
+  status: "waiting" | "validated" | "failed";
+  entries: CurriculumHandoffEntry[];
+  log: string[];
+  ready: { found: number; expected: number };
+}
+
 /** Estado de un trabajo de `study_topic_regenerate` (teoría, práctica o ejercicios de un tema). */
 export interface TopicRegenerateJob {
   id: string;

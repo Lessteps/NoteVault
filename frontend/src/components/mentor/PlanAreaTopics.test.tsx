@@ -15,6 +15,8 @@ import type { MentorPlan } from "../../lib/types";
 const openTopic = vi.fn();
 vi.mock("./openTopic", () => ({ openTopic: (f: string) => openTopic(f), openTopicNote: vi.fn(), openTopicCanvas: vi.fn() }));
 import { PlanAreaTopics } from "./PlanAreaTopics";
+import { useNavState } from "../../store/navState";
+import { TOPIC_HIGHLIGHT_KEY } from "./mentorNav";
 
 const topic = (folder: string, week: number, over: Record<string, unknown> = {}) => ({ folder, title: folder.split("/").pop()!, targetWeek: week, estMinutes: 30, ...over });
 const sub = (id: string, area: string, topics: unknown[], groups?: unknown[]) => ({ id, area, objective: "", topics, weeks: [], requiredGoals: [], ...(groups ? { groups } : {}) });
@@ -43,6 +45,9 @@ const click = async (id: string) => { await act(async () => { byTest(id)!.click(
 const mount = async (plan: MentorPlan) => { await act(async () => { root.render(<PlanAreaTopics plan={plan} />); }); await flush(); await flush(); };
 
 beforeEach(() => {
+  if (!window.HTMLElement.prototype.scrollIntoView) {
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  }
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
@@ -54,6 +59,23 @@ afterEach(() => {
   host.remove();
   vi.restoreAllMocks();
   openTopic.mockClear();
+  useNavState.getState().clear();
+});
+
+describe("PlanAreaTopics — tareas externas", () => {
+  const t = { id: "h1", what: "theory", createdAt: "2026-10-23T10:20:30.000Z", task: "x.md", taskAbs: "x.md", resultDir: "r", folder: "f", prompt: "p", status: "waiting", log: [], ready: { found: 0, expected: 1 }, topics: [] };
+  it("«Tareas externas (N)» solo se ve si hay tareas guardadas", async () => {
+    vi.spyOn(api, "studyTopicRegenerateHandoffList").mockResolvedValue([]);
+    await mount(PLAN);
+    await flush();
+    expect(byTest("external-tasks")).toBeNull();
+  });
+  it("con tareas guardadas enseña «Tareas externas (1)»", async () => {
+    vi.spyOn(api, "studyTopicRegenerateHandoffList").mockResolvedValue([t] as never);
+    await mount(PLAN);
+    await flush();
+    expect(byTest("external-tasks-toggle")!.textContent).toContain("Tareas externas (1)");
+  });
 });
 
 describe("PlanAreaTopics", () => {
@@ -85,7 +107,7 @@ describe("PlanAreaTopics", () => {
     expect(titles()).toEqual(["4.2 REST"]); // al volver, el grupo se reinicia a «Todos»
     // pulsar el tema ofrece sus opciones: apunte, archivo de práctica, canvas y Pomodoro
     await click("area-open");
-    expect([...document.querySelectorAll("[data-testid=board-menu] [role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica", "Abrir canvas explicativo", "Asignar al Pomodoro"]);
+    expect([...document.querySelectorAll("[data-testid=board-menu] [role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica", "Abrir canvas explicativo", "Asignar al Pomodoro", "Ir a la planeación"]);
     await click("board-open-practice");
     expect(openTopic).toHaveBeenCalledWith("P/4/4.2 REST");
   });
@@ -118,6 +140,12 @@ describe("PlanAreaTopics", () => {
     expect(titles()).toEqual(["4.2 REST"]);
   });
 });
+
+const BRIDGE_ENGINES = { mode: "bridge", provider: "bridge_claude", providerLabel: "Claude web (sin API)", model: "", hasKey: false, isClaude: false, recommended: "handoff", engines: [
+  { id: "app", label: "Con la app", available: false, reason: "La IA de la app está en modo puente (sin API): no puede regenerar sola.", detail: "d" },
+  { id: "claude", label: "Con Claude (API key)", available: false, reason: "La IA de la app está en modo puente (sin API): no puede regenerar sola.", detail: "d" },
+  { id: "handoff", label: "Con Antigravity / Claude Code", available: true, reason: "", detail: "d" },
+] };
 
 describe("PlanAreaTopics — panel desplegable «Regenerar»", () => {
   const job = (over: Record<string, unknown> = {}) => ({ id: "j1", folder: "P/4/4.2 REST", what: "theory", log: ["✓ Teoría regenerada."], done: true, error: "", finished: 3, total: 3, backup: ".trash/regenerar/x_4.2 REST", restored: false, created: [], archived: [], ...over });
@@ -172,18 +200,19 @@ describe("PlanAreaTopics — panel desplegable «Regenerar»", () => {
     await click("regen-practice-button");
     await click("regen-confirm");
     await flush(); await flush();
-    expect(start).toHaveBeenCalledWith("P/4/4.2 REST", "practice", true);
+    expect(start).toHaveBeenCalledWith("P/4/4.2 REST", "practice", true, "app");
     expect(status).toHaveBeenCalledWith("j1");
   });
 
-  it("con la IA en modo puente, o en un tema fuera del plan, las acciones están desactivadas con su explicación", async () => {
+  it("con la IA en modo puente las acciones siguen activas (queda el agente externo); en un tema fuera del plan están desactivadas con su explicación", async () => {
     ai(true);
+    vi.spyOn(api, "studyRegenEngines").mockResolvedValue(BRIDGE_ENGINES as never);
     await mount(PLAN);
     await click("row-expand");
     await flush();
     for (const w of ["theory", "map", "practice", "exercises"]) {
-      expect((byTest(`regen-${w}-button`) as HTMLButtonElement).disabled).toBe(true);
-      expect(byTest(`regen-${w}-hint`)!.textContent).toContain("modo puente");
+      expect((byTest(`regen-${w}-button`) as HTMLButtonElement).disabled).toBe(false);
+      expect(byTest(`regen-${w}-hint`)).toBeNull();
     }
     // tema fuera del plan
     const skipped = { ...PLAN, subplans: [sub("s1", "Backend", [topic("P/4/4.2 REST", 2, { route: "skipped" })])] } as unknown as MentorPlan;
@@ -202,4 +231,35 @@ describe("PlanAreaTopics — panel desplegable «Regenerar»", () => {
     expect(byTest("regen-exercises-hint")!.textContent).toContain("práctica");
     expect((byTest("regen-theory-button") as HTMLButtonElement).disabled).toBe(false);
   });
+
+  it("Ir a la planeación despliega 3 sub-opciones en hover/click", async () => {
+    await mount(PLAN);
+    await click("area-open");
+    const planTrigger = document.querySelector<HTMLElement>("[data-testid=board-go-planning]")!;
+    expect(planTrigger).toBeTruthy();
+    await act(async () => {
+      planTrigger.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    });
+    await flush();
+    const subOpts = [...document.querySelectorAll("[data-testid=board-menu-sub] [role=menuitem]")].map((b) => b.textContent?.trim());
+    expect(subOpts).toEqual([
+      "Ir al tema en específico",
+      "Ir a la vista general",
+      "Ir al calendario de planeación",
+    ]);
+  });
+
+  it("resalta el tema en amarillo si viene de navegación y lo desactiva al pasar el mouse por encima", async () => {
+    useNavState.getState().set(TOPIC_HIGHLIGHT_KEY, "P/4/4.2 REST");
+    await mount(PLAN);
+    const rowEl = host.querySelector<HTMLElement>("[data-testid=area-row]")!;
+    expect(rowEl.className).toContain("bg-amber-300/35");
+
+    await act(async () => {
+      rowEl.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    });
+    await flush();
+    expect(rowEl.className).not.toContain("bg-amber-300/35");
+  });
 });
+

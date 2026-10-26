@@ -2,7 +2,8 @@
 // archivo de práctica) y el avance de cada área (`ProgressOverview`). Solo lectura: marcar un tema como completado lo decide la práctica.
 // Respeta la ruta sólida (`lib/planGate.ts`): los temas repartidos después del primer día sin terminar salen bloqueados.
 
-import { BookOpen, Dumbbell, Lock, Network, Timer } from "lucide-react";
+import { BookOpen, CalendarDays, Compass, Dumbbell, LayoutDashboard, Lock, Network, Target, Timer } from "lucide-react";
+import { useId, useState } from "react";
 import { usePomodoro } from "../../store/pomodoro";
 import { mentorAssignment } from "../../lib/pomodoro";
 import type { WorkKind } from "../../lib/timeLog";
@@ -14,7 +15,9 @@ import { cn } from "../ui";
 import { focusColour } from "./agendaKit";
 import { ExtraTag } from "./extraKit";
 import { openTopic, openTopicCanvas, openTopicNote } from "./openTopic";
+import { openPlanAgenda, openPlanGeneral, openPlanTopic } from "./mentorNav";
 import { TopicNoteLinks } from "./TopicNoteLinks";
+import { InsightToggle, TopicInsight } from "./TopicInsight";
 import { ProgressBar } from "./parts";
 import type { AreaPracticeState } from "./PracticeCard";
 import { RowMenu } from "./RowMenu";
@@ -62,8 +65,8 @@ export function TimeChip({ time }: { time: TopicTimeTag }) {
   );
 }
 
-/** El menú de un tema: apunte (.md), archivo de práctica, canvas explicativo o asignarlo al Pomodoro. */
-export function TopicMenu({ folder, title, trigger, className, work, areaKey }: { folder: string; title: string; trigger?: React.ReactNode; className?: string; /** tipo de trabajo de la fila (Teoría / Práctica) y área del Mentor: el bloque del Pomodoro nace ya con ellos */ work?: WorkKind; areaKey?: string }) {
+/** El menú de un tema: apunte (.md), archivo de práctica, canvas explicativo, asignarlo al Pomodoro o ir a la planeación. */
+export function TopicMenu({ folder, title, trigger, className, work, areaKey, planId }: { folder: string; title: string; trigger?: React.ReactNode; className?: string; /** tipo de trabajo de la fila (Teoría / Práctica) y área del Mentor: el bloque del Pomodoro nace ya con ellos */ work?: WorkKind; areaKey?: string; planId?: string }) {
   const assignTopic = usePomodoro((s) => s.assignTopic);
   return (
     <RowMenu
@@ -75,21 +78,36 @@ export function TopicMenu({ folder, title, trigger, className, work, areaKey }: 
         { id: "practice", label: "Abrir archivo de práctica", icon: <Dumbbell size={16} aria-hidden className="text-mint" />, onClick: () => void openTopic(folder), testid: "board-open-practice" },
         { id: "canvas", label: "Abrir canvas explicativo", icon: <Network size={16} aria-hidden className="text-accent-text" />, onClick: () => void openTopicCanvas(folder), testid: "board-open-canvas" },
         { id: "pomodoro", label: "Asignar al Pomodoro", icon: <Timer size={16} aria-hidden className="text-warn" />, onClick: () => assignTopic(work || areaKey ? mentorAssignment(work ?? "theory", { folder, title, ...(areaKey ? { areaKey } : {}) }) : { folder, title }), testid: "board-assign-pomodoro" },
+        {
+          id: "planning",
+          label: "Ir a la planeación",
+          icon: <Compass size={16} aria-hidden className="text-accent-text" />,
+          testid: "board-go-planning",
+          children: [
+            { id: "planning-topic", label: "Ir al tema en específico", icon: <Target size={15} aria-hidden className="text-accent-text" />, onClick: () => void openPlanTopic(planId, folder, areaKey), testid: "board-go-planning-topic" },
+            { id: "planning-general", label: "Ir a la vista general", icon: <LayoutDashboard size={15} aria-hidden className="text-dim" />, onClick: () => void openPlanGeneral(planId), testid: "board-go-planning-general" },
+            { id: "planning-agenda", label: "Ir al calendario de planeación", icon: <CalendarDays size={15} aria-hidden className="text-mint" />, onClick: () => void openPlanAgenda(planId, areaKey), testid: "board-go-planning-agenda" },
+          ],
+        },
       ]}
     />
   );
 }
 
-export function TopicRow({ r, colour, areaKey }: { r: BoardRow; colour: string; /** área del Mentor de la lista que la pinta (para el Pomodoro) */ areaKey?: string }) {
+export function TopicRow({ r, colour, areaKey, planId }: { r: BoardRow; colour: string; /** área del Mentor de la lista que la pinta (para el Pomodoro) */ areaKey?: string; planId?: string }) {
   const locked = !!r.unlockOn;
   const assigned = usePomodoro((s) => s.p.assignedTopics.some((t) => t.folder === r.folder));
   const working = !r.done && !locked && r.state !== "sin_tratar";
+  // detalle del tema (teoría, ejercicios, última práctica, repaso) desplegado bajo la fila; no lee nada hasta abrirse
+  const [insight, setInsight] = useState(false);
+  const insightId = useId();
   return (
     <li
-      className={cn("flex items-center gap-2.5 rounded-xl border px-2.5 py-1.5 transition-colors", locked ? "border-transparent opacity-55" : "border-transparent hover:border-line hover:bg-surface", working && "border-line bg-surface")}
+      className={cn("flex flex-wrap items-center gap-2.5 rounded-xl border px-2.5 py-1.5 transition-colors", locked ? "border-transparent opacity-55" : "border-transparent hover:border-line hover:bg-surface", working && "border-line bg-surface")}
       data-testid="board-topic"
       data-state={locked ? "bloqueado" : r.done ? "completo" : r.state}
     >
+      {!locked && <InsightToggle open={insight} onToggle={() => setInsight((v) => !v)} title={r.title} controls={insightId} className="-mr-1" />}
       <span
         aria-hidden
         className="grid h-5 w-5 flex-none place-items-center rounded-md border text-[12px] font-bold text-white"
@@ -106,8 +124,8 @@ export function TopicRow({ r, colour, areaKey }: { r: BoardRow; colour: string; 
           </>
         );
         const cls = cn("min-w-0 flex-1 text-[15px] leading-snug", r.done && "text-faint line-through decoration-faint/60");
-        // pulsar el tema abre sus opciones: apunte (.md), archivo de práctica, canvas y Pomodoro
-        return locked ? <span className={cls}>{label}</span> : <span className={cls}><TopicMenu folder={r.folder} title={r.title} trigger={label} {...(r.work ? { work: r.work } : {})} {...(areaKey ? { areaKey } : {})} className="w-full rounded-md hover:text-accent-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" /></span>;
+        // pulsar el tema abre sus opciones: apunte (.md), archivo de práctica, canvas, Pomodoro y planeación
+        return locked ? <span className={cls}>{label}</span> : <span className={cls}><TopicMenu folder={r.folder} title={r.title} trigger={label} {...(r.work ? { work: r.work } : {})} {...(areaKey ? { areaKey } : {})} planId={planId} className="w-full rounded-md hover:text-accent-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" /></span>;
       })()}
       {r.extra && <ExtraTag title={r.title} {...(r.extra.remove ? { onRemove: r.extra.remove } : {})} />}
       {r.time && <TimeChip time={r.time} />}
@@ -136,7 +154,12 @@ export function TopicRow({ r, colour, areaKey }: { r: BoardRow; colour: string; 
           <Lock size={14} aria-hidden />
         </span>
       ) : (
-        <TopicMenu folder={r.folder} title={r.title} {...(r.work ? { work: r.work } : {})} {...(areaKey ? { areaKey } : {})} />
+        <TopicMenu folder={r.folder} title={r.title} {...(r.work ? { work: r.work } : {})} {...(areaKey ? { areaKey } : {})} planId={planId} />
+      )}
+      {insight && !locked && (
+        <div id={insightId} className="basis-full pb-1 pl-8" data-testid="board-topic-insight">
+          <TopicInsight folder={r.folder} title={r.title} {...(planId ? { planId } : {})} compact />
+        </div>
       )}
     </li>
   );

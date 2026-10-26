@@ -15,6 +15,7 @@ import { useMentor } from "../../store/mentor";
 import { PracticeProjectDialog } from "../practice/PracticeProjectDialog";
 import { MentorDayClose } from "./MentorDayClose";
 import { MentorGoals } from "./MentorGoals";
+import { AreasOverview } from "./AreasOverview";
 import { MentorPlan } from "./MentorPlan";
 import { MentorSidebar } from "./MentorSidebar";
 import { PlanBuilder } from "./PlanBuilder";
@@ -62,8 +63,9 @@ export function MentorModule() {
         mode={mode}
         onMode={(m) => {
           setMode(m);
-          if (route.kind !== "build") setView(homeView);
+          if (route.kind !== "build" && route.kind !== "areas") setView(homeView);
         }}
+        areasActive={route.kind === "areas"}
         {...(route.kind === "build" ? { currentBuildId: route.buildId } : {})}
       />
       <main className="@container flex min-w-0 flex-1 flex-col bg-surface" aria-label={`Mentor: ${route.kind === "aux" ? route.view : route.kind}`}>
@@ -77,6 +79,7 @@ export function MentorModule() {
             {route.view === "hoy" ? <MentorToday /> : route.view === "cierre" ? <MentorDayClose /> : route.view === "metas" ? <MentorGoals /> : route.view === "proyectos" ? <MentorProjects /> : <MentorStudy />}
           </>
         )}
+        {route.kind === "areas" && <AreasOverview />}
         {route.kind === "build" && <PlanBuilder key={route.buildId} buildId={route.buildId} />}
         {route.kind === "overview" && <MentorPlan key={route.creating ? "nuevo" : "resumen"} creating={route.creating} />}
       </main>

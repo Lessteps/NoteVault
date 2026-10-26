@@ -14,6 +14,7 @@ import { areaSets } from "../../lib/planAreaLists";
 import { planGateByArea } from "../../lib/planGate";
 import { catchUpOf } from "../../lib/planCatchUp";
 import { bucketReviews, dueText, reviewsOfTopics, type ReviewRow } from "../../lib/planReviews";
+import { addDays } from "../../lib/planTime";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
 import { dailyProjectOf, weeklyProjectOf } from "../../lib/planCurriculum";
 import { areaRouteTopics, basesClassifier, basesRouteTopics, dayBases, dayByArea, orderedAreas, type DayAreaEntry } from "../../lib/planTopicsByArea";
@@ -192,10 +193,23 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const routeOf = useCallback((subplanId: string): BoardRow[] => areaRouteTopics(plan, subplanId).map(routeRowOf), [plan, routeRowOf]);
   // Repaso espaciado (el mismo calendario del módulo de estudio): los repasos de cada área, unidos con los temas del plan
   const reviewsOf = useCallback((subplanId: string): ReviewRow[] => reviewsOfTopics(areaRouteTopics(plan, subplanId), reviewItems), [plan, reviewItems]);
-  // la semana en curso día a día: los temas de un área (o, sin área, los fundamentos) repartidos cada día de estudio
-  const weekDaysOf = useCallback((subplanId: string | null): WeekDayView[] =>
-    m.schedule.days
-      .filter((d) => d.week === currentWeek && d.study)
+  // la semana del área de aprendizaje se mide por el avance de la ruta (si no se ha completado nada, hoy es Semana 1)
+  const learningWeekOf = useCallback((subplanId: string | null): number => {
+    const topics = subplanId ? areaRouteTopics(plan, subplanId) : basesRouteTopics(plan);
+    if (!topics.length) return 1;
+    const done = topics.filter((t) => t.completedAt || topicByFolder.get(t.folder)?.state === "completo").length;
+    if (done === 0) return 1;
+    const firstIncomplete = topics.find((t) => !t.completedAt && topicByFolder.get(t.folder)?.state !== "completo");
+    if (!firstIncomplete) return Math.max(1, m.schedule?.weeks ?? 12);
+    const minWeek = Math.min(...topics.map((t) => t.targetWeek || 1));
+    return Math.max(1, (firstIncomplete.targetWeek ?? minWeek) - minWeek + 1);
+  }, [plan, topicByFolder, m.schedule]);
+
+  // la semana en curso día a día: ventana de 7 días de estudio desde hoy mostrando temas actuales y prediciendo siguientes
+  const weekDaysOf = useCallback((subplanId: string | null): WeekDayView[] => {
+    const endOfCurWeek = addDays(date, 6);
+    return m.schedule.days
+      .filter((d) => d.study && d.date >= date && d.date <= endOfCurWeek)
       .map((d) => {
         const seen = new Set<string>();
         const rows: BoardRow[] = [];
@@ -208,14 +222,20 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         // la Semana enseña lo MISMO que la Agenda (Semana): cada día con sus temas repartidos, también los de días anteriores (lo no terminado va además a «Pendientes»)
         return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows };
       })
-      .filter((d) => d.rows.length > 0 || d.date >= date), [m.schedule, currentWeek, isBases, rowOf, date]);
-  // lo que viene: las semanas siguientes a la actual, tal como las reparte el plan (proyección; no se bloquea por la ruta sólida)
+      .filter((d) => d.rows.length > 0 || d.date >= date);
+  }, [m.schedule, date, isBases, rowOf]);
+
+  // lo que viene: las semanas siguientes a la actual, por bloques de 7 días de estudio numeradas por avance
   const upcomingWeeksOf = useCallback((subplanId: string | null): UpcomingWeekView[] => {
-    const byWeek = new Map<number, ScheduleDay[]>();
-    for (const d of m.schedule.days) if (d.week > currentWeek && d.study) byWeek.set(d.week, [...(byWeek.get(d.week) ?? []), d]);
+    const endOfCurWeek = addDays(date, 6);
+    const futureDays = m.schedule.days.filter((d) => d.study && d.date > endOfCurWeek);
+    const currentLrnWeek = learningWeekOf(subplanId);
     const out: UpcomingWeekView[] = [];
-    for (const [week, days] of [...byWeek].sort((a, b) => a[0] - b[0])) {
-      const views = days
+    const CHUNK_DAYS = 7;
+    for (let i = 0; i < futureDays.length; i += CHUNK_DAYS) {
+      const chunk = futureDays.slice(i, i + CHUNK_DAYS);
+      const weekNum = currentLrnWeek + Math.floor(i / CHUNK_DAYS) + 1;
+      const views = chunk
         .map((d) => {
           const seen = new Set<string>();
           const rows: BoardRow[] = [];
@@ -224,15 +244,15 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
             if (seen.has(t.folder)) continue;
             seen.add(t.folder);
             const { unlockOn: _unlock, ...row } = rowOf(t, subplanId === null, undefined, d.date);
-            rows.push({ ...row, week });
+            rows.push({ ...row, week: weekNum });
           }
           return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows };
         })
         .filter((d) => d.rows.length > 0);
-      if (views.length) out.push({ week, start: days[0]!.date, end: days[days.length - 1]!.date, days: views });
+      if (views.length) out.push({ week: weekNum, start: chunk[0]!.date, end: chunk[chunk.length - 1]!.date, days: views });
     }
     return out;
-  }, [m.schedule, currentWeek, isBases, rowOf]);
+  }, [m.schedule, date, learningWeekOf, isBases, rowOf]);
   const basesTopicList = useMemo(() => basesRouteTopics(plan), [plan]);
   const basesRoute: BoardRow[] = useMemo(() => basesTopicList.map(routeRowOf).sort((a, b) => a.week - b.week), [basesTopicList, routeRowOf]);
   const basesReviews = useMemo(() => reviewsOfTopics(basesTopicList, reviewItems), [basesTopicList, reviewItems]);
@@ -253,12 +273,12 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const areaView = useMemo(() => {
     if (!areaTab) return undefined;
     const id = areaTab.subplanId;
-    return { routeRows: routeOf(id), weekDays: weekDaysOf(id), upcoming: upcomingWeeksOf(id), sets: areaSets(m.schedule.days, id, date, currentWeek, started, notBases), reviews: reviewsOf(id) };
-  }, [areaTab, routeOf, weekDaysOf, upcomingWeeksOf, m.schedule, date, currentWeek, started, notBases, reviewsOf]);
+    return { routeRows: routeOf(id), weekDays: weekDaysOf(id), upcoming: upcomingWeeksOf(id), sets: areaSets(m.schedule.days, id, date, currentWeek, started, notBases), reviews: reviewsOf(id), weekNumber: learningWeekOf(id) };
+  }, [areaTab, routeOf, weekDaysOf, upcomingWeeksOf, m.schedule, date, currentWeek, started, notBases, reviewsOf, learningWeekOf]);
   const basesView = useMemo(() => {
     if (tab !== "bases") return undefined;
-    return { weekDays: weekDaysOf(null), upcoming: upcomingWeeksOf(null), sets: areaSets(m.schedule.days, null, date, currentWeek, started, isBases) };
-  }, [tab, weekDaysOf, upcomingWeeksOf, m.schedule, date, currentWeek, started, isBases]);
+    return { weekDays: weekDaysOf(null), upcoming: upcomingWeeksOf(null), sets: areaSets(m.schedule.days, null, date, currentWeek, started, isBases), weekNumber: learningWeekOf(null) };
+  }, [tab, weekDaysOf, upcomingWeeksOf, m.schedule, date, currentWeek, started, isBases, learningWeekOf]);
 
   const planned = day ? day.topicMinutes + day.practiceMinutes : 0;
   const capacity = day?.capacityMinutes ?? 0;
@@ -288,7 +308,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const lateAreas: LateArea[] = overflowByArea.map((a) => {
     const topics = overflow.filter((l) => l.area === a.area);
     const sp = plan.subplans.find((x) => x.area === a.area);
-    return { area: a.area, colour: focusColour(sp?.areaId), topics: topics.map((t) => ({ folder: t.folder, title: t.title })), minutes: Math.round(topics.reduce((n, t) => n + (lateMinutes.get(t.folder) ?? 0), 0)) };
+    return { area: a.area, subplanId: sp?.id, planId: plan.id, colour: focusColour(sp?.areaId), topics: topics.map((t) => ({ folder: t.folder, title: t.title })), minutes: Math.round(topics.reduce((n, t) => n + (lateMinutes.get(t.folder) ?? 0), 0)) };
   });
 
   return (
@@ -362,7 +382,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                         <span className="flex-1" />
                         <Chip colour="var(--nv-faint)">{plural(todayFolds.length, "módulo", "módulos")} · {plural(topicsToday.length, "tema", "temas")}</Chip>
                       </p>
-                      <AreaFolds items={hoyFolds} />
+                      <AreaFolds items={hoyFolds} planId={plan.id} />
                     </div>
                   )}
                   <div className="space-y-2">
@@ -521,6 +541,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
           dailyProject={day ? dailyProjectOf(plan, m.schedule, day) : null}
           {...(day && weeklyProjectOf(plan, m.schedule, day.week) ? { weeklyProjectTitle: weeklyProjectOf(plan, m.schedule, day.week)!.title } : {})}
           onGoProjects={() => go("proyectos")}
+          weekNumber={areaView.weekNumber}
         />
       )}
 

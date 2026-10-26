@@ -12,10 +12,11 @@
 
 import { Check, ChevronDown, ChevronRight, RefreshCw, X } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useState } from "react";
-import { api } from "../../lib/bridge";
 import { matchesStatus, planBulk, regenBlockedReason, STATUS_FILTERS, type BulkPlan, type RegenKind, type StatusFilter } from "../../lib/topicSelection";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
+import { useNavState } from "../../store/navState";
+import { TOPIC_HIGHLIGHT_KEY } from "./mentorNav";
 import { type AreaTopicRow, areaTabsOf, areaTopicRows, basesTopicRows, BASES_KEY, groupTabsOf, pendingGenerate, rowsOfGroup, type AreaTab, type GroupTab } from "../../lib/planAreaTopics";
 import { ROUTE_LABEL } from "../../lib/planRoute";
 import { buildSchedule, progressPlan, type PlanSchedule } from "../../lib/planSchedule";
@@ -29,8 +30,10 @@ import { LoadState, ProgressBar } from "./parts";
 import { SectionHeading } from "./planKit";
 import { usePlanTopicCatalog } from "./PlanTopicCatalog";
 import { ExecuteDialog } from "./PlanExecution";
+import { ExternalTasks } from "./ExternalTasks";
 import { BulkConfirm, BulkProgress, BulkToolbar, RowQuickActions, useRegenQueue, type SelectHelper } from "./TopicBulk";
 import { areaScope, GenerateButton, GenerateTopicButton, topicScope } from "./TopicGenerate";
+import { TopicInsight } from "./TopicInsight";
 import { RegeneratePanel } from "./TopicRegenerate";
 
 /** Una sub-barra de pestañas (botones con `aria-pressed`) que se desplaza en horizontal en anchos estrechos. */
@@ -97,13 +100,13 @@ const OUTDATED_KINDS = [
 ] as const;
 
 /** Botones verdes junto al tema: la skill cambió después de generar esa pieza. Pulsar pide confirmar y regenera (con copia de seguridad). */
-function OutdatedButtons({ row, bridge, busy, onAsk }: { row: AreaTopicRow; bridge: boolean; busy: boolean; onAsk: (what: RegenKind, row: AreaTopicRow) => void }) {
+function OutdatedButtons({ row, busy, onAsk }: { row: AreaTopicRow; busy: boolean; onAsk: (what: RegenKind, row: AreaTopicRow) => void }) {
   const list = OUTDATED_KINDS.filter((k) => row.outdated?.[k.key]);
   if (list.length === 0) return null;
   return (
     <span className="mt-1 flex flex-wrap gap-1" data-testid="outdated-buttons">
       {list.map((k) => {
-        const why = busy ? "Hay una regeneración en curso." : regenBlockedReason(row, k.what, bridge);
+        const why = busy ? "Hay una regeneración en curso." : regenBlockedReason(row, k.what);
         return (
           <button
             key={k.key}
@@ -135,7 +138,8 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
   const uid = useId();
   const day = today ?? todayIso();
   const begun = started ?? plan.subplans.some((s) => s.topics.some((t) => t.completedAt));
-  const times = useMemo(() => topicTimes((schedule ?? (plan.start && plan.end ? buildSchedule(progressPlan(plan, { today: day })) : null))?.days ?? []), [schedule, plan, day]);
+  const activeSchedule = useMemo(() => schedule ?? (plan.start && plan.end ? buildSchedule(progressPlan(plan, { today: day })) : undefined), [schedule, plan, day]);
+  const times = useMemo(() => topicTimes(activeSchedule?.days ?? []), [activeSchedule]);
   const { rows: catalog, error, warming, reload } = usePlanTopicCatalog(plan.id);
   const [areaKey, setAreaKey] = useState("");
   const [groupId, setGroupId] = useState("");
@@ -145,23 +149,24 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
   // selección para el lote, filtro por estado, modo puente de la IA y la cola
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [bridge, setBridge] = useState(false);
   const [asking, setAsking] = useState<BulkPlan | null>(null);
   const [genChain, setGenChain] = useState<AreaTopicRow[]>([]);
   const { queue, start, stop, dismiss } = useRegenQueue();
   const queueBusy = !!queue?.running;
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const targetHighlight = useNavState((s) => s.values[TOPIC_HIGHLIGHT_KEY] as string | undefined);
+
   useEffect(() => {
-    let alive = true;
-    api.aiSettings().then((s) => alive && setBridge(!!s?.config?.is_bridge)).catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, []);
+    if (targetHighlight) {
+      setHighlighted(targetHighlight);
+      useNavState.getState().set(TOPIC_HIGHLIGHT_KEY, undefined);
+    }
+  }, [targetHighlight]);
 
   const cat = catalog ?? [];
   const baseTabs = useMemo(() => areaTabsOf(plan, cat), [plan, cat]);
   // Bases: los fundamentos no son de la ruta de ningún área; van juntos, sin repetirse, en su propia pestaña
-  const basesRows = useMemo(() => basesTopicRows(plan, cat), [plan, cat]);
+  const basesRows = useMemo(() => basesTopicRows(plan, cat, activeSchedule), [plan, cat, activeSchedule]);
   const basesTab: AreaTab | undefined = basesRows.length
     ? { key: BASES_KEY, area: "Bases", subplanId: BASES_KEY, total: basesRows.length, done: basesRows.filter((r) => r.completed).length, missing: basesRows.filter(pendingGenerate).length }
     : undefined;
@@ -170,7 +175,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
   const active = only ? tabs.find((t) => t.key === only || t.subplanId === only) : tabs.find((t) => t.key === areaKey) ?? tabs[0];
   const isBases = active?.key === BASES_KEY;
   const sub = active && !isBases ? plan.subplans.find((s) => s.id === active.subplanId) : undefined;
-  const areaRows = useMemo(() => (isBases ? basesRows : sub ? areaTopicRows(sub, cat) : []), [isBases, basesRows, sub, cat]);
+  const areaRows = useMemo(() => (isBases ? basesRows : sub ? areaTopicRows(sub, cat, false, activeSchedule) : []), [isBases, basesRows, sub, cat, activeSchedule]);
   const groups = useMemo(() => (sub ? groupTabsOf(sub, areaRows) : [{ id: "", title: "Todos", total: areaRows.length, missing: areaRows.filter(pendingGenerate).length }]), [sub, areaRows]);
   const group = groups.find((g) => g.id === groupId) ?? groups[0];
   const shown = useMemo(() => (sub && group ? rowsOfGroup(sub, areaRows, group.id) : areaRows), [sub, areaRows, group]);
@@ -189,6 +194,17 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
   const allOn = visible.length > 0 && selectedRows.length === visible.length;
   const statusCounts = useMemo(() => new Map(STATUS_FILTERS.map((f) => [f.key, shown.filter((r) => matchesStatus(r, f.key)).length])), [shown]);
 
+  useEffect(() => {
+    if (highlighted) {
+      if (groupId && !shown.some((r) => r.folder === highlighted)) {
+        setGroupId("");
+      }
+      if (statusFilter !== "all" && !visible.some((r) => r.folder === highlighted)) {
+        setStatusFilter("all");
+      }
+    }
+  }, [highlighted, shown, visible, groupId, statusFilter]);
+
   const pickArea = (k: string): void => {
     setAreaKey(k);
     setGroupId("");
@@ -205,7 +221,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
     else if (h === "missing") setSelected(new Set(visible.filter(pendingGenerate).map((r) => r.folder)));
     else setSelected(new Set(visible.filter((r) => r.exercises === 0).map((r) => r.folder)));
   };
-  const ask = (what: RegenKind, rows: ReadonlyArray<AreaTopicRow>): void => setAsking(planBulk(rows, what, bridge));
+  const ask = (what: RegenKind, rows: ReadonlyArray<AreaTopicRow>): void => setAsking(planBulk(rows, what, false));
   const confirmBulk = (): void => {
     const p = asking;
     setAsking(null);
@@ -224,6 +240,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
       <SectionHeading id={`${uid}-h`} hint="Cada área del plan con todos sus temas en el orden de la ruta y lo que existe de cada uno. Elige un área arriba y, dentro de ella, un grupo.">
         {only ? `Temas de ${tabs.find((t) => t.key === only || t.subplanId === only)?.area ?? "el área"}` : "Temas por área"}
       </SectionHeading>
+      <ExternalTasks />
       <LoadState warming={warming} error={error} empty={!catalog} onRetry={reload} />
 
       {tabs.length === 0 && <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim">Este plan todavía no tiene áreas.</p>}
@@ -281,7 +298,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                   {visible.every((r) => openRows.has(r.folder)) ? "Contraer todo" : "Expandir todo"}
                 </button>
               </div>
-              <BulkToolbar count={selectedRows.length} busy={queueBusy} bridge={bridge} onAsk={(w) => ask(w, selectedRows)} onGenerateMissing={generateMissing} onHelper={helper} />
+              <BulkToolbar count={selectedRows.length} busy={queueBusy} onAsk={(w) => ask(w, selectedRows)} onGenerateMissing={generateMissing} onHelper={helper} />
               {queue && <BulkProgress queue={queue} onStop={stop} onClose={dismiss} />}
             </>
           )}
@@ -316,7 +333,32 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                 <tbody>
                   {visible.map((r) => (
                     <Fragment key={r.folder}>
-                    <tr className={cn("border-t border-line align-top", r.route === "skipped" && "opacity-60")} data-testid="area-row" data-folder={r.folder} data-selected={selected.has(r.folder) || undefined}>
+                    <tr
+                      ref={(el) => {
+                        if (el && r.folder === highlighted) {
+                          el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }
+                      }}
+                      className={cn(
+                        "border-t border-line align-top transition-colors duration-300",
+                        r.route === "skipped" && "opacity-60",
+                        r.folder === highlighted && "bg-amber-300/35 dark:bg-amber-400/25 border-l-4 border-l-amber-500 dark:border-l-amber-400 shadow-[inset_0_0_12px_rgba(245,158,11,0.25)]"
+                      )}
+                      data-testid="area-row"
+                      data-folder={r.folder}
+                      data-highlighted={r.folder === highlighted ? "true" : undefined}
+                      data-selected={selected.has(r.folder) || undefined}
+                      onMouseEnter={() => {
+                        if (r.folder === highlighted) {
+                          setHighlighted(null);
+                        }
+                      }}
+                      onMouseOver={() => {
+                        if (r.folder === highlighted) {
+                          setHighlighted(null);
+                        }
+                      }}
+                    >
                       <td className="px-3 py-2">
                         <input type="checkbox" aria-label={`Seleccionar ${r.title}`} checked={selected.has(r.folder)} onChange={() => toggleSel(r.folder)} disabled={queueBusy} data-testid="row-select" className="mt-1 h-4 w-4 accent-[var(--nv-accent)]" />
                       </td>
@@ -327,7 +369,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                           type="button"
                           className="mt-0.5 inline-grid h-6 w-6 flex-none place-items-center rounded-md text-dim hover:bg-hover hover:text-text"
                           aria-expanded={openRows.has(r.folder)}
-                          aria-label={`${openRows.has(r.folder) ? "Contraer" : "Desplegar"} las acciones de ${r.title}`}
+                          aria-label={`${openRows.has(r.folder) ? "Contraer" : "Desplegar"} el detalle y las acciones de ${r.title}`}
                           onClick={() => toggleRow(r.folder)}
                           data-testid="row-expand"
                         >
@@ -336,7 +378,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                         <span className="min-w-0 flex-1">
                         <TopicMenu folder={r.folder} title={r.title} trigger={<span className="block truncate" title={r.folder} data-testid="area-open">{r.title}</span>} className="font-semibold text-accent-text underline-offset-2 hover:underline" />
                         {!r.exists && <span className="block text-[12.5px] text-faint">Aún no existe en la vault</span>}
-                        <OutdatedButtons row={r} bridge={bridge} busy={queueBusy} onAsk={(w, row) => ask(w, [row])} />
+                        <OutdatedButtons row={r} busy={queueBusy} onAsk={(w, row) => ask(w, [row])} />
                         </span>
                         </span>
                       </th>
@@ -361,14 +403,19 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                         })()}
                         {r.route !== "core" && <span className="block text-dim">{ROUTE_LABEL[r.route]}</span>}
                       </td>
-                      <td className="px-3 py-2"><RowQuickActions row={r} bridge={bridge} busy={queueBusy} onAsk={(w, row) => ask(w, [row])} /></td>
+                      <td className="px-3 py-2"><RowQuickActions row={r} busy={queueBusy} onAsk={(w, row) => ask(w, [row])} /></td>
                       <td className="px-3 py-2">
                         <GenerateTopicButton planId={plan.id} proposed={!!plan.proposed} folder={r.folder} title={r.title} inPlan={r.route !== "skipped"} incomplete={pendingGenerate({ ...r, completed: false })} />
                       </td>
                     </tr>
                     {openRows.has(r.folder) && (
                       <tr className="border-t border-line bg-surface/40" data-testid="area-row-expanded" data-folder={r.folder}>
-                        <td colSpan={12}><RegeneratePanel row={r} /></td>
+                        <td colSpan={12}>
+                          <div className="space-y-2 px-3 py-2">
+                            <TopicInsight folder={r.folder} title={r.title} planId={plan.id} />
+                            <RegeneratePanel row={r} />
+                          </div>
+                        </td>
                       </tr>
                     )}
                     </Fragment>

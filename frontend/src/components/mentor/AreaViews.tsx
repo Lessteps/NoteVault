@@ -145,7 +145,7 @@ function TopicLine({ m, t }: { m: AgendaModel; t: WeekAreaTopic }) {
   const time = timeTagFor(m, t.folder, state === "completo");
   return (
     <li className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px]" data-testid="area-topic">
-      <span className="flex min-w-0 flex-1 basis-44" title={t.folder}><TopicMenu folder={t.folder} title={t.title} trigger={<span className="break-words font-medium">{t.title}</span>} className="hover:text-accent-text hover:underline" /></span>
+      <span className="flex min-w-0 flex-1 basis-44" title={t.folder}><TopicMenu folder={t.folder} title={t.title} planId={m.plan.id} trigger={<span className="break-words font-medium">{t.title}</span>} className="hover:text-accent-text hover:underline" /></span>
       <span className="whitespace-nowrap text-dim" aria-label={`Día asignado: ${t.dates.map(dayLong).join(", ")}`}>{t.dates.map(dayWord).join(", ")}</span>
       <span className="whitespace-nowrap text-dim">{hm(t.minutes)}</span>
       {time && <TimeChip time={time} />}
@@ -321,7 +321,7 @@ export function AreaTopicsTable({ m, currentWeek, headingId }: { m: AgendaModel;
                               <ul className="mt-1.5 space-y-1">
                                 {c.topics.map((t) => (
                                   <li key={t.folder} className="flex flex-wrap items-baseline gap-x-2 text-[13.5px]">
-                                    <span className="min-w-0 flex-1 basis-36 break-words">{t.done ? "● " : "○ "}<TopicMenu folder={t.folder} title={t.title} trigger={<span className="break-words">{t.title}</span>} className="inline hover:text-accent-text hover:underline" /><span className="sr-only">{t.done ? " (hecho)" : ` (${(timeTagFor(m, t.folder, false)?.text ?? "programado").toLowerCase()})`}</span></span>
+                                    <span className="min-w-0 flex-1 basis-36 break-words">{t.done ? "● " : "○ "}<TopicMenu folder={t.folder} title={t.title} planId={m.plan.id} areaKey={c.subplanId} trigger={<span className="break-words">{t.title}</span>} className="inline hover:text-accent-text hover:underline" /><span className="sr-only">{t.done ? " (hecho)" : ` (${(timeTagFor(m, t.folder, false)?.text ?? "programado").toLowerCase()})`}</span></span>
                                     <span className="whitespace-nowrap text-dim">{t.dates.map(dayWord).join(", ")}</span>
                                   </li>
                                 ))}

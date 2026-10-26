@@ -12,18 +12,22 @@ import { api } from "../../lib/bridge";
 import { copyText, readClipboard } from "../../lib/clipboard";
 import { splitAction, vaultMode, VAULT_MODES } from "../../lib/assistantModes";
 import { renderMarkdown } from "../../lib/markdown";
+import { generateTopicFromChat } from "../../lib/chatTopicActions";
+import { BUSY_MESSAGE, CONTENT_BADGE, planImpact, STRUCTURE_BADGE, structureBadge, type PlanImpact } from "../../lib/planImpact";
+import { loadLivePlans } from "../../lib/planImpactGuard";
 import type { AiConfig, AiProvider } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useAssistant, type ChatContext, type ChatMessage } from "../../store/assistant";
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
 import { askText, cn, IconButton, openMenu } from "../ui";
-import { generateTopicFrom, useStudySpaceDialog } from "../study/StudySpaceDialog";
+import { useStudySpaceDialog } from "../study/StudySpaceDialog";
 import { isPracticePath, usePracticeDialog } from "../practice/PracticeProjectDialog";
 import { MentorAssistant } from "../mentor/MentorAssistant";
 import { ExerciseCoachAssistant } from "../exercise/ExerciseCoachAssistant";
 import { FinanceCoachAssistant } from "../finance/FinanceCoachAssistant";
 import { NutritionCoachAssistant } from "../nutrition/NutritionCoachAssistant";
 import { ActionCard } from "./ActionCard";
+import { ChatHandoffs, ChatTopicDialog } from "./ChatTopicHost";
 import { AskCard, SkillsCard } from "./ChatCards";
 import { ConversationHistory } from "./ConversationHistory";
 import { editorSelection, insertAtCursor } from "./SourceEditor";
@@ -365,6 +369,10 @@ function Composer() {
       toast("error", "Selecciona la carpeta de un tema (clic derecho → Añadir al chat de IA) o abre una de sus notas.");
       return;
     }
+    if (await api.assistantGenerationBusy().catch(() => false)) {
+      toast("error", BUSY_MESSAGE);
+      return;
+    }
     setEvaluating(true);
     const name = target.split("/").pop();
     const chat = useAssistant.getState();
@@ -391,22 +399,44 @@ function Composer() {
       toast("error", "Selecciona la carpeta de un tema (clic derecho → Añadir al chat de IA) o abre una de sus notas.");
       return;
     }
-    void generateTopicFrom(target);
+    void generateTopicFromChat(target);
   };
 
-  const openModes = (e: ReactMouseEvent<HTMLButtonElement>) => {
+  /** Los planes del Mentor que cambiarían si se añaden temas al espacio de la nota abierta (para el aviso del menú). */
+  const contextImpact = async (): Promise<PlanImpact[]> => {
+    const space = (topicTarget() || useApp.getState().active || "").split("/")[0] ?? "";
+    if (!space) return [];
+    try {
+      return planImpact("add_topics", { space }, await loadLivePlans()).impacted;
+    } catch {
+      return [];
+    }
+  };
+
+  const openModes = async (e: ReactMouseEvent<HTMLButtonElement>) => {
+    const at = { clientX: e.clientX, clientY: e.clientY, preventDefault: () => undefined };
+    e.preventDefault();
     const target = topicTarget();
     const shown = target ? target.split("/").pop() : "";
-    openMenu(e, [
+    // Mientras corre una generación del Mentor (turno compartido) las acciones de generar esperan: no se compite por la misma carpeta.
+    const [busy, impact] = await Promise.all([api.assistantGenerationBusy().catch(() => false), contextImpact()]);
+    const waiting = busy ? BUSY_MESSAGE : "";
+    const structure = structureBadge(impact);
+    const spaceImpact = (id: string) => (id === "tema" || id === "temario" ? structure : STRUCTURE_BADGE);
+    openMenu(at, [
       {
         label: "Generar tema completo",
-        description: `Escribe la teoría, el mapa, la práctica y la matriz de competencias${shown ? ` de «${shown}»` : " de la carpeta seleccionada"}.`,
+        description: waiting || `Escribe la teoría, el mapa, la práctica y la matriz de competencias${shown ? ` de «${shown}»` : " de la carpeta seleccionada"}.`,
+        hint: busy ? "ocupado" : CONTENT_BADGE,
+        disabled: busy,
         icon: <Sparkles size={13} />,
         onSelect: generateTopic,
       },
       {
         label: "Re-evaluar práctica del tema",
-        description: "La IA relee la teoría y vuelve a elegir competencias y cantidades.",
+        description: waiting || "La IA relee la teoría y vuelve a elegir competencias y cantidades.",
+        hint: busy ? "ocupado" : CONTENT_BADGE,
+        disabled: busy,
         icon: <Wand2 size={13} />,
         onSelect: () => void reevaluate(),
       },
@@ -414,7 +444,7 @@ function Composer() {
       ...VAULT_MODES.map((m) => ({
         label: m.label,
         description: m.hint,
-        hint: mode === m.id ? "activo" : "",
+        hint: `${m.kind === "structure" ? spaceImpact(m.id) : CONTENT_BADGE}${mode === m.id ? " · activo" : ""}`,
         icon: <Layers size={13} />,
         onSelect: () => setMode(m.id),
       })),
@@ -433,12 +463,14 @@ function Composer() {
       {
         label: "Generar espacio de estudio",
         description: "Temario, teoría, práctica y mapas de una materia entera.",
+        hint: STRUCTURE_BADGE,
         icon: <GraduationCap size={13} />,
         onSelect: () => useStudySpaceDialog.getState().openWith("space"),
       },
       {
         label: "Crear área nueva",
         description: "Añade un área (con sus temas) a un espacio que ya existe.",
+        hint: structure,
         icon: <FolderPlus size={13} />,
         onSelect: () => useStudySpaceDialog.getState().openWith("area"),
       },
@@ -540,7 +572,7 @@ function Composer() {
             title="Modos y acciones de estudio"
             aria-label="Modos del asistente"
             disabled={evaluating}
-            onClick={openModes}
+            onClick={(e) => void openModes(e)}
             className={cn(
               "grid h-7 w-7 place-items-center rounded-md hover:bg-hover hover:text-text disabled:opacity-50",
               mode ? "bg-accent-soft text-accent-text" : "text-dim",
@@ -746,6 +778,7 @@ function NotesAssistantPanel() {
             {messages.map((m, i) => (
               <Message key={m.id} m={m} live={i === messages.length - 1} />
             ))}
+            <ChatHandoffs />
           </div>
 
           {awaiting && (
@@ -762,6 +795,7 @@ function NotesAssistantPanel() {
           <Composer />
         </>
       )}
+      <ChatTopicDialog />
     </aside>
   );
 }

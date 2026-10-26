@@ -294,7 +294,7 @@ describe("vista de ejecución", () => {
     await click(work().querySelector("[data-testid=board-arrow]"));
     const menu = byTest("board-menu")!;
     expect(menu.getAttribute("role")).toBe("menu");
-    expect([...menu.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica", "Abrir canvas explicativo", "Asignar al Pomodoro"]);
+    expect([...menu.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica", "Abrir canvas explicativo", "Asignar al Pomodoro", "Ir a la planeación"]);
     await click(byTest("board-open-practice"));
     expect(ensure).toHaveBeenCalledWith(F1);
     expect(byTest("board-menu")).toBeNull();

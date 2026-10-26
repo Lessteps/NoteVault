@@ -1,11 +1,12 @@
 // Mentor — navegación pura: la ruta recordada y sus valores antiguos, el modo por defecto y los ítems de la barra de cada modo.
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useNavState } from "../../store/navState";
+import { api } from "../../lib/bridge";
 import {
-  activePlaneacionId, asMode, defaultModeOf, ejecucionLinks, hasBasesRoute, modeSubject, normalizeTab, planeacionLinks, resolvePlanPage, resolveRoute, selectEjecucion, selectPlaneacion,
+  activePlaneacionId, asMode, defaultModeOf, ejecucionLinks, hasBasesRoute, modeSubject, normalizeTab, openPlanAgenda, openPlanGeneral, openPlanTopic, planeacionLinks, resolvePlanPage, resolveRoute, selectEjecucion, selectPlaneacion, TOPIC_HIGHLIGHT_KEY,
 } from "./mentorNav";
-import { agendaAreaKey, planSectionKey, planTabKey } from "./planShared";
+import { agendaAreaKey, agendaViewKey, pageTabKey, planSectionKey, planTabKey } from "./planShared";
 
 const plans = [
   { id: "a", status: "futuro" as const },
@@ -193,3 +194,46 @@ describe("ítems de Ejecución", () => {
     expect(ejecucionLinks(plan).map((x) => x.label)).toEqual(["Hoy", "Backend", "Proyectos", "Registros"]);
   });
 });
+
+describe("openPlanTopic, openPlanAgenda, openPlanGeneral", () => {
+  beforeEach(() => {
+    useNavState.getState().clear();
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue({
+      loading: false,
+      plan: {
+        id: "p1",
+        subplans: [
+          { id: "sub-1", area: "Backend", areaId: "backend", topics: [{ folder: "P/4/4.1 HTTP" }] },
+          { id: "sub-2", area: "Frontend", areaId: "frontend", topics: [{ folder: "P/5/5.1 DOM" }] },
+        ],
+      },
+    } as never);
+  });
+
+  it("openPlanTopic resuelve el subplanId correcto a partir del folder y activa temas del área", async () => {
+    await openPlanTopic("p1", "P/4/4.1 HTTP");
+    const v = useNavState.getState().values;
+    expect(v["mentor.mode"]).toBe("planeacion");
+    expect(v[agendaAreaKey("p1")]).toBe("sub-1");
+    expect(v[pageTabKey("p1", "sub-1")]).toBe("temas");
+    expect(v[TOPIC_HIGHLIGHT_KEY]).toBe("P/4/4.1 HTTP");
+  });
+
+  it("openPlanAgenda activa el calendario en vista general y área", () => {
+    openPlanAgenda("p1", "sub-1");
+    const v = useNavState.getState().values;
+    expect(v["mentor.mode"]).toBe("planeacion");
+    expect(v[planTabKey("p1")]).toBe("agenda");
+    expect(v[pageTabKey("p1", "all")]).toBe("calendario");
+    expect(v[pageTabKey("p1", "sub-1")]).toBe("calendario");
+  });
+
+  it("openPlanGeneral activa la vista general en semana", () => {
+    openPlanGeneral("p1");
+    const v = useNavState.getState().values;
+    expect(v["mentor.mode"]).toBe("planeacion");
+    expect(v[planTabKey("p1")]).toBe("plan");
+    expect(v[pageTabKey("p1", "all")]).toBe("semana");
+  });
+});
+

@@ -18,6 +18,8 @@ export interface AddExtraTopicProps {
   date: string;
   /** abre el panel en las semanas de esta área (id de subplan); sin él, de todas las áreas */
   area?: string;
+  /** si true, solo permite ver y adelantar temas de esta área (oculta selector todas las áreas) */
+  lockArea?: boolean;
   /** límites del selector de fecha (los del plan) */
   minDate?: string;
   maxDate?: string;
@@ -67,18 +69,18 @@ function TopicRow({ c, day, busy, onAdd, dayText }: { c: MentorTopicCandidate; d
   );
 }
 
-export function AddExtraTopic({ planId, date, area, minDate, maxDate, onChanged, label = "Próximos temas", className }: AddExtraTopicProps) {
+export function AddExtraTopic({ planId, date, area, lockArea, minDate, maxDate, onChanged, label = "Próximos temas", className }: AddExtraTopicProps) {
   const toast = useApp((s) => s.toast);
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState(date);
-  const [allAreas, setAllAreas] = useState(!area);
+  const [allAreas, setAllAreas] = useState(!area && !lockArea);
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const seq = useRef(0);
   useEffect(() => setDay(date), [date]);
 
-  const scope = allAreas ? undefined : area;
+  const scope = (allAreas && !lockArea) ? undefined : area;
   const load = useCallback(async () => {
     const mine = ++seq.current;
     setError("");
@@ -137,7 +139,7 @@ export function AddExtraTopic({ planId, date, area, minDate, maxDate, onChanged,
 
   return (
     <>
-      <GhostButton large="md" className={cn(className)} onClick={() => { setDay(date); setAllAreas(!area); setOpen(true); }} aria-expanded={open} data-testid="add-extra-topic">
+      <GhostButton large="md" className={cn(className)} onClick={() => { setDay(date); setAllAreas(!area && !lockArea); setOpen(true); }} aria-expanded={open} data-testid="add-extra-topic">
         <ArrowUpRight size={15} aria-hidden /> {label}
       </GhostButton>
       {open && (
@@ -147,7 +149,7 @@ export function AddExtraTopic({ planId, date, area, minDate, maxDate, onChanged,
             <Field label="Día">
               <input type="date" className={input} value={day} min={minDate} max={maxDate} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Día" />
             </Field>
-            {area && (
+            {area && !lockArea && (
               <div className="flex flex-wrap items-center gap-2">
                 <GhostButton large="md" aria-pressed={!allAreas} onClick={() => setAllAreas(false)} className={cn(!allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Esta área</GhostButton>
                 <GhostButton large="md" aria-pressed={allAreas} onClick={() => setAllAreas(true)} className={cn(allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Todas las áreas</GhostButton>

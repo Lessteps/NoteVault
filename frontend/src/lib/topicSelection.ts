@@ -41,11 +41,14 @@ export const OBJECT: Record<RegenKind, string> = { theory: "la teoría", map: "e
 /** Forma corta para el progreso («teoría…»). */
 export const SHORT: Record<RegenKind, string> = { theory: "teoría", map: "mapa", practice: "práctica", exercises: "ejercicios", all: "todo" };
 
-/** Por qué NO se puede regenerar eso de ese tema ("" si se puede). */
-export function regenBlockedReason(row: AreaTopicRow, what: RegenKind, bridge: boolean): string {
+/**
+ * Por qué NO se puede regenerar eso de ese tema ("" si se puede). La IA en modo puente YA NO bloquea: queda el motor «agente externo»
+ * (Antigravity / Claude Code), que no usa la IA de la app; el selector de motor del diálogo desactiva los que no se pueden. _bridge se conserva
+ * por compatibilidad con quien aún lo pasa.
+ */
+export function regenBlockedReason(row: AreaTopicRow, what: RegenKind, _bridge = false): string {
   if (row.route === "skipped") return "El tema está fuera del plan: no se regenera.";
   if (!row.exists) return "El tema aún no existe en la vault: usa «Generar todo».";
-  if (bridge) return "La IA está en modo puente: no puede regenerar automáticamente. Cambia de proveedor en los ajustes de IA.";
   if ((what === "theory" || what === "map") && !row.theory) return "Este tema no tiene teoría todavía: usa «Generar todo».";
   if (what === "exercises" && !row.manifest) return "Primero genera la práctica (.practica) del tema: de ahí salen las competencias.";
   return "";

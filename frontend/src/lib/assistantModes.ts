@@ -9,6 +9,11 @@ export interface VaultModeInfo {
   id: VaultModeId;
   label: string;
   hint: string;
+  /**
+   * `content`: solo toca el contenido de un tema (canvas, matriz). `structure`: añade temas y puede cambiar la ruta del plan del Mentor
+   * (ver `planImpact.ts`).
+   */
+  kind: "content" | "structure";
   placeholder: string;
   /** What the assistant shows when the mode is switched on. */
   opener: string;
@@ -17,6 +22,7 @@ export interface VaultModeInfo {
 export const VAULT_MODES: readonly VaultModeInfo[] = [
   {
     id: "temario",
+    kind: "structure",
     label: "Generar temario",
     hint: "Área, objetivo, diagnóstico y extensiones",
     placeholder: "¿Sobre qué área quieres el temario? (p. ej. JavaScript, Cálculo diferencial)",
@@ -26,6 +32,7 @@ export const VAULT_MODES: readonly VaultModeInfo[] = [
   },
   {
     id: "canvas",
+    kind: "content",
     label: "Generar canvas",
     hint: "Sigue la skill de canvas; usa un canvas de ejemplo como plantilla",
     placeholder: "¿De qué tema quieres el canvas? Puedes adjuntar uno de ejemplo como plantilla.",
@@ -35,6 +42,7 @@ export const VAULT_MODES: readonly VaultModeInfo[] = [
   },
   {
     id: "matriz",
+    kind: "content",
     label: "Ajustar matriz de competencias",
     hint: "Cambia las skills y cantidades del tema abierto",
     placeholder: "¿Qué quieres cambiar de la matriz de este tema? (p. ej. quita «Cálculo rápido»)",
@@ -44,6 +52,7 @@ export const VAULT_MODES: readonly VaultModeInfo[] = [
   },
   {
     id: "tema",
+    kind: "structure",
     label: "Nuevo tema en un área",
     hint: "Crea la teoría y la vista de práctica de un tema que falta",
     placeholder: "¿Qué tema falta en esta área?",

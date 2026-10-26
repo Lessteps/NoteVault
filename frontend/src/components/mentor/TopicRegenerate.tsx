@@ -8,11 +8,14 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
 import type { AreaTopicRow } from "../../lib/planAreaTopics";
-import { LABEL, OBJECT, regenBlockedReason, type RegenKind } from "../../lib/topicSelection";
+import { estimateAiCalls, LABEL, OBJECT, regenBlockedReason, type RegenKind } from "../../lib/topicSelection";
 import type { TopicRegenerateJob } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
+import { useRegenEngine } from "../../store/regenEngine";
 import { GhostButton, Modal, PrimaryButton } from "../common/forms";
+import { RegenEngineChoice } from "./RegenEngineChoice";
+import { RegenHandoffPanel } from "./RegenHandoffPanel";
 
 export type RegenWhat = RegenKind;
 
@@ -70,10 +73,10 @@ export function confirmCopy(what: RegenWhat, row: Pick<AreaTopicRow, "title" | "
  * Lanza la regeneración y la sigue hasta el final. Vive FUERA de React: si el panel se pliega a mitad, el aviso final sale igual.
  * `onProgress` se llama con cada estado (la interfaz lo ignora si ya se desmontó).
  */
-export async function runRegeneration(folder: string, what: RegenWhat, onProgress?: (job: TopicRegenerateJob) => void, opts: { /** sin avisos propios (lo hace quien lanza el lote) */ quiet?: boolean } = {}): Promise<TopicRegenerateJob> {
+export async function runRegeneration(folder: string, what: RegenWhat, onProgress?: (job: TopicRegenerateJob) => void, opts: { /** sin avisos propios (lo hace quien lanza el lote) */ quiet?: boolean; /** con qué IA: la de la app (por defecto) o Claude */ engine?: "app" | "claude" } = {}): Promise<TopicRegenerateJob> {
   const toast = opts.quiet ? () => undefined : useApp.getState().toast;
   try {
-    const { jobId } = await api.studyTopicRegenerate(folder, what, true);
+    const { jobId } = await api.studyTopicRegenerate(folder, what, true, opts.engine ?? "app");
     for (;;) {
       const st = await api.studyTopicRegenerateStatus(jobId);
       onProgress?.(st);
@@ -96,30 +99,42 @@ function Artifact({ ok, children }: { ok: boolean; children: ReactNode }) {
 }
 
 export function RegeneratePanel({ row }: { row: AreaTopicRow }) {
-  const [bridge, setBridge] = useState(false);
   const [asking, setAsking] = useState<RegenWhat | null>(null);
   const [busy, setBusy] = useState<RegenWhat | null>(null);
   const [job, setJob] = useState<TopicRegenerateJob | null>(null);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
-    api.aiSettings().then((s) => alive.current && setBridge(!!s?.config?.is_bridge)).catch(() => undefined);
     return () => {
       alive.current = false;
     };
   }, []);
+  const handoffs = useRegenEngine((s) => s.handoffs);
+  const putHandoff = useRegenEngine((s) => s.putHandoff);
+  const effective = useRegenEngine((s) => s.effective);
+  const mine = Object.values(handoffs).filter((h) => h.topics.some((t) => t.folder === row.folder));
 
-  const reason = (what: RegenWhat): string => (busy ? "Hay una regeneración en curso de este tema." : regenBlockedReason(row, what, bridge));
+  const reason = (what: RegenWhat): string => (busy ? "Hay una regeneración en curso de este tema." : regenBlockedReason(row, what));
 
   const start = async (): Promise<void> => {
     const what = asking;
     setAsking(null);
     if (!what) return;
+    // el mapa no usa IA: no hay motor que elegir
+    const engine = what === "map" ? "app" : useRegenEngine.getState().effective;
     setBusy(what);
     setJob(null);
     try {
-      await runRegeneration(row.folder, what, (j) => alive.current && setJob(j));
-    } catch {
+      if (engine === "handoff") {
+        // sin IA de la app: se respalda y se escribe la tarea para el agente (Antigravity / Claude Code)
+        const h = await api.studyTopicRegenerateHandoff(row.folder, what as Exclude<RegenWhat, "map">, true);
+        putHandoff(h);
+        useApp.getState().toast("info", "Tarea creada. Pásasela a tu agente y, cuando termine, pulsa «Ya terminó — validar».");
+        return;
+      }
+      await runRegeneration(row.folder, what, (j) => alive.current && setJob(j), { engine });
+    } catch (e) {
+      if (engine === "handoff") useApp.getState().toast("error", (e as Error).message);
       /* ya avisado con un mensaje */
     } finally {
       if (alive.current) setBusy(null);
@@ -144,6 +159,7 @@ export function RegeneratePanel({ row }: { row: AreaTopicRow }) {
       <p className="text-[13.5px] text-dim">
         Regenerar <strong>reemplaza</strong> lo que ya existe: antes se respalda en <code>.trash</code> y, si falla, se restaura. No se hace nada sin confirmar.
       </p>
+      {mine.map((h) => <RegenHandoffPanel key={h.id} handoff={h} />)}
       <ul className="grid gap-3 @xl:grid-cols-4">
         {action("theory", <><strong>Teoría:</strong> <Artifact ok={row.theory}>{row.theory ? "con nota" : "sin nota"}</Artifact></>)}
         {action("map", <><strong>Mapa (canvas):</strong> <Artifact ok={row.canvas}>{row.canvas ? "con mapa" : "sin mapa"}</Artifact></>)}
@@ -166,7 +182,7 @@ export function RegeneratePanel({ row }: { row: AreaTopicRow }) {
             <>
               <span className="flex-1" />
               <GhostButton onClick={() => setAsking(null)} data-testid="regen-cancel">Cancelar</GhostButton>
-              <PrimaryButton onClick={() => void start()} data-testid="regen-confirm">{LABEL[asking]}</PrimaryButton>
+              <PrimaryButton onClick={() => void start()} data-testid="regen-confirm">{asking !== "map" && effective === "handoff" ? "Crear tarea para el agente" : LABEL[asking]}</PrimaryButton>
             </>
           }
         >
@@ -175,6 +191,7 @@ export function RegeneratePanel({ row }: { row: AreaTopicRow }) {
             <ul className="list-disc space-y-1 pl-5 text-dim">
               {confirmCopy(asking, row).points.map((p) => <li key={p}>{p}</li>)}
             </ul>
+            {asking !== "map" && <RegenEngineChoice aiCalls={estimateAiCalls(row, asking)} />}
           </div>
         </Modal>
       )}

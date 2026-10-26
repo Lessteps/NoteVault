@@ -433,6 +433,9 @@ export const api = {
     call<{ route: string; skeleton: string[]; projects: Array<{ areaKey: string; area: string; dir: string; readme: string; created: string[]; existed: string[] }>; created: string[]; existed: string[] }>("mentor_projects_scaffold", opts),
   mentorExecutionCancel: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_cancel", { id }),
   /** Sistema de práctica por área: katas, habilidades y proyectos de cada área del plan. */
+  /** «Áreas» del Mentor: avance de solo lectura por espacio / área / tema (una llamada por nivel). */
+  mentorAreasOverview: (opts: { level?: "spaces" | "areas" | "topics"; space?: string; area?: string } = {}) =>
+    call<{ level: string; space?: string; area?: string; rows: unknown[]; loading?: boolean }>("mentor_areas_overview", opts),
   mentorAreaPractice: (id: string) => call<import("./types").MentorAreaPractice>("mentor_area_practice", { id }),
   mentorAreaPracticeOn: (id: string, date: string) => call<{ items: Array<{ areaId: string; label: string; day: number; rel: string; title: string; skill: string; level: number; minutes: number }> }>("mentor_area_practice_on", { id, date }),
   /** Acceso directo al kata de un área: lo crea si falta (nunca sobrescribe) y devuelve su ruta en la vault. */
@@ -629,7 +632,11 @@ export const api = {
     ),
   /** Runs an action the user accepted. */
   assistantActionApply: (action: unknown) =>
-    call<{ ok: boolean; written: string[]; skipped: string[]; open: string }>("assistant_action_apply", action),
+    call<{ ok: boolean; written: string[]; skipped: string[]; open: string; backedUp?: string[] }>("assistant_action_apply", action),
+  /** ¿Hay una generación del Mentor / un «Regenerar» en curso (turno compartido)? */
+  assistantGenerationBusy: () => call<boolean>("assistant_generation_busy"),
+  /** Anota en el historial de cambios del plan que una acción del chat tocó su ruta (no modifica el plan). */
+  assistantPlanNote: (planId: string, comment: string, summary = "") => call<{ ok: boolean; n: number }>("assistant_plan_note", planId, comment, summary),
   aiChatCancel: (id: string) => call<{ ok: boolean }>("ai_chat_cancel", id),
   onAiStream: (cb: (ev: AiStreamEvent) => void): (() => void) => {
     if (typeof window !== "undefined" && window.nv?.onAiStream) {
@@ -751,7 +758,16 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studySpaceStatus: (jobId: string) =>
     call<{ id: string; folder: string; log: string[]; done: boolean; error: string; finished: number; total: number; conversationId: string }>("study_space_status", jobId),
   /** Regenera la teoría / práctica / ejercicios de un tema (respalda antes lo que reemplaza). Exige `confirm: true`. */
-  studyTopicRegenerate: (folder: string, what: "theory" | "map" | "practice" | "exercises" | "all", confirm: boolean) => call<{ jobId: string }>("study_topic_regenerate", folder, what, confirm),
+  studyTopicRegenerate: (folder: string, what: "theory" | "map" | "practice" | "exercises" | "all", confirm: boolean, engine?: "app" | "claude") => call<{ jobId: string }>("study_topic_regenerate", folder, what, confirm, engine ?? "app"),
+  /** Motores con los que se puede regenerar ahora mismo (la IA de la app, Claude o un agente externo), según los ajustes de IA. */
+  studyRegenEngines: () => call<import("./types").RegenEnginesView>("study_regen_engines"),
+  /** Tarea para un agente externo (Antigravity / Claude Code): respalda y escribe el archivo de la tarea en la vault. `folders`: un tema o un lote. */
+  studyTopicRegenerateHandoff: (folders: string | string[], what: "theory" | "practice" | "exercises" | "all", confirm: boolean) => call<import("./types").RegenHandoff>("study_topic_regenerate_handoff", folders, what, confirm),
+  studyTopicRegenerateHandoffStatus: (id: string) => call<import("./types").RegenHandoff>("study_topic_regenerate_handoff_status", id),
+  /** Las tareas para agentes externos guardadas en la vault (reabrirlas tras reiniciar la app). */
+  studyTopicRegenerateHandoffList: () => call<import("./types").RegenHandoff[]>("study_topic_regenerate_handoff_list"),
+  /** Valida lo que escribió el agente y lo aplica; con `restore` (confirmado) devuelve las copias de los temas con error. */
+  studyTopicRegenerateValidate: (id: string, restore = false) => call<import("./types").RegenHandoff>("study_topic_regenerate_validate", id, restore),
   studyTopicRegenerateStatus: (jobId: string) =>
     call<import("./types").TopicRegenerateJob>("study_topic_regenerate_status", jobId),
   studySpaceList: () => call<string[]>("study_space_list"),

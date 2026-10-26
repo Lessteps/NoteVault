@@ -74,7 +74,7 @@ const MAX_TOPICS = 40;
  * A theory note is complete when it reaches its last section («Tarjetas», or «Cards» in the English programming notes); a cut-off one stops
  * mid-way. (Without «Cards», a complete English draft looked cut-off and "Generar tema completo" would have rewritten it.)
  */
-const isCompleteTheory = (text: string): boolean => /##\s*(?:Tarjetas|Cards)[\s\S]{80,}/.test(text);
+export const isCompleteTheory = (text: string): boolean => /##\s*(?:Tarjetas|Cards)[\s\S]{80,}/.test(text);
 /** A note this generator wrote (status: draft) that never got its last section. */
 const isCutDraft = (text: string): boolean => /^status:\s*draft\s*$/m.test(text) && !isCompleteTheory(text);
 
@@ -271,8 +271,9 @@ export class ChatLog {
   }
 }
 
-export function studySpaceApi(app: AppState) {
-  const theoryMessages = (
+/** The exact prompt that writes a topic's theory (the app's AI and the regeneration handoff for an external agent both use it). */
+export const theoryMessagesFor = (
+    app: AppState,
     spaceFolder: string,
     subjectName: string,
     areaName: string,
@@ -313,6 +314,10 @@ export function studySpaceApi(app: AppState) {
         "Incluye 3 ejemplos y 4–5 errores, cada uno con sus cuatro campos exactos.",
     },
   ];
+
+export function studySpaceApi(app: AppState) {
+  const theoryMessages = (spaceFolder: string, subjectName: string, areaName: string, topic: string, previous: string[]): Array<{ role: string; content: string }> =>
+    theoryMessagesFor(app, spaceFolder, subjectName, areaName, topic, previous);
 
   const frontmatter = (subjectId: string, areaName: string, topic: string): string => {
     const number = /^(\d+(?:\.\d+)*)\s/.exec(topic)?.[1] ?? "";

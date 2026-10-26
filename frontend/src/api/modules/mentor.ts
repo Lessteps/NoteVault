@@ -75,6 +75,7 @@ import { generateByParts, PipelineCancel } from "../../core/mentor/planPipeline.
 import { canReorganize, reorganizeByAreas } from "../../core/mentor/planReorganize.js";
 import { PLAN_DELIVERABLE_STATUSES, resolveAreaMode, sanitizeGroups } from "../../lib/planAreas.js";
 import { buildSchedule, deliverablesOf, progressPlan } from "../../lib/planSchedule.js";
+import { basesClassifier } from "../../lib/planTopicsByArea.js";
 import { CurriculumCancel, generateCurriculum } from "../../core/mentor/planCurriculumAi.js";
 import { areaKeyOf, computeCoverage, COVERAGE_DISCLAIMER, MAX_PROFILE_CHARS, parseCoverageReply, sanitizeCriteria } from "../../lib/planCoverage.js";
 import { buildPlanTopicRows } from "../../lib/planTopicCatalog.js";
@@ -780,6 +781,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
     if (!isIsoDate(date)) throw new ApiError("Fecha inválida (AAAA-MM-DD).");
     const horizon = Math.max(1, Math.min(26, Math.round(Number(o.horizon)) || 4));
     const { sch, placed, weeks } = placementOf(plan);
+    const isBases = basesClassifier(plan);
     const added = new Map<string, string[]>();
     for (const e of plan.extraTopics ?? []) added.set(e.folder, [...(added.get(e.folder) ?? []), e.date]);
     const weekOfDate = (d: string): number | undefined => sch?.byDate.get(d)?.week;
@@ -789,35 +791,54 @@ export function mentorApi(app: AppState, send?: SendFn) {
     for (const s of plan.subplans) {
       if (area && s.id !== area) continue;
       plannedByArea[s.id] = (sch?.byDate.get(date)?.topics ?? []).filter((t) => t.subplanId === s.id).length;
-      const live = s.topics.filter((t) => isLive(t));
-      let blocker: string | undefined;
+      let live = s.topics.filter((t) => isLive(t) && (area === "bases" || !isBases({ subplanId: s.id, ...(t.group ? { group: t.group } : {}) })));
+      const origIndex = new Map(live.map((t, idx) => [t.folder, idx]));
+      live = live.slice().sort((a, b) => {
+        const pa = placed.get(a.folder);
+        const pb = placed.get(b.folder);
+        if (pa?.date && pb?.date) {
+          const c = pa.date.localeCompare(pb.date);
+          if (c !== 0) return c;
+        } else if (pa?.date) {
+          return -1;
+        } else if (pb?.date) {
+          return 1;
+        }
+        return (origIndex.get(a.folder) ?? 0) - (origIndex.get(b.folder) ?? 0);
+      });
+      const blockerByGroup = new Map<string, string>();
       live.forEach((t, i) => {
         if (t.completedAt) return;
         const dates = added.get(t.folder) ?? [];
         const p = placed.get(t.folder);
-        const week = p?.week ?? (dates[0] ? weekOfDate(dates[0]) : undefined) ?? t.targetWeek;
+        const rawWeek = p?.week ?? (dates[0] ? weekOfDate(dates[0]) : undefined) ?? t.targetWeek;
         const onDay = dates.includes(date) || p?.date === date;
         const satisfied = dates.some((d) => d <= date) || (!!p && p.date <= date);
         const state = dates.length ? "adelantado" : p && p.date <= date ? "planeado" : "pendiente";
-        if (week >= nowWeek && week <= nowWeek + horizon) {
+        if (rawWeek >= nowWeek && rawWeek <= nowWeek + horizon) {
+          const relWeek = Math.max(1, rawWeek - nowWeek + 1);
           const group = t.group ? s.groups?.find((g) => g.id === t.group)?.title : undefined;
+          const groupKey = t.group ?? "default";
+          const blocker = blockerByGroup.get(groupKey);
           ahead.push({
             folder: t.folder, title: t.title, inPlan: true, area: s.area, subplanId: s.id, position: i + 1, total: live.length, estMinutes: t.estMinutes,
-            targetWeek: t.targetWeek, addedDates: dates, week, state, onDay,
+            targetWeek: t.targetWeek, addedDates: dates, week: relWeek, rawWeek, state, onDay,
             ...(p?.date ? { plannedDate: p.date } : {}),
             ...(group ? { group } : {}),
             ...(!satisfied && blocker ? { blockedBy: blocker } : {}),
           });
         }
-        if (!satisfied && !blocker) blocker = t.title;
+        const groupKey = t.group ?? "default";
+        if (!satisfied && !blockerByGroup.has(groupKey)) blockerByGroup.set(groupKey, t.title);
       });
     }
     const range: Record<string, { from: string; to: string }> = {};
     for (const r of ahead) {
-      const w = weeks.get(r.week as number);
+      const rawW = (r.rawWeek as number | undefined) ?? (r.week as number);
+      const w = weeks.get(rawW);
       if (w) range[String(r.week)] = w;
     }
-    return { loading: false as const, ahead, vault: [] as unknown[], weeks: range, plannedByArea, date, currentWeek: nowWeek };
+    return { loading: false as const, ahead, vault: [] as unknown[], weeks: range, plannedByArea, date, currentWeek: 1 };
   };
   /** El plan de una petición de cobertura (`{ id }`), o error claro. */
   const coveragePlan = (opts: unknown): Plan => {

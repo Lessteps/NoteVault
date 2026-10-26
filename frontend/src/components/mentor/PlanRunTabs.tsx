@@ -33,7 +33,7 @@ export interface TodayCard {
 export const areaDefaultWork = (o: { pendingTopics: boolean; project: boolean }): "theory" | "practice" | "project" => (o.pendingTopics ? "theory" : o.project ? "project" : "practice");
 
 /** La pestaña de un área: su trabajo (hoy, semana, pendientes, repasos) a la izquierda y su sesión (Pomodoro y horas) a la derecha. */
-export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets, reviews, date, practice, dailyProject, weeklyProjectTitle, onGoProjects }: {
+export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets, reviews, date, practice, dailyProject, weeklyProjectTitle, onGoProjects, weekNumber }: {
   plan: MentorPlan;
   area: { subplanId: string; areaId?: string; area: string };
   card: TodayCard | undefined;
@@ -49,6 +49,7 @@ export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets,
   dailyProject?: DayProject | null;
   weeklyProjectTitle?: string;
   onGoProjects: () => void;
+  weekNumber?: number;
 }) {
   const colour = card?.colour ?? "var(--nv-accent)";
   const areaKey = area.areaId ?? area.subplanId;
@@ -79,6 +80,7 @@ export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets,
           practice={practice}
           reviews={reviews}
           plannedMinutes={planned}
+          weekNumber={weekNumber}
           onStartBlock={() => { if (!startAreaBlock(plan.id, areaKey)) toast("info", "Ya hay un Pomodoro en marcha: termínalo o detenlo primero."); }}
         />
         {card?.entry.project && (

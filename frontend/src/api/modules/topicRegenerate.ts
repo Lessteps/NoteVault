@@ -1,7 +1,8 @@
 // «Regenerar» un tema desde el Mentor (Plan > Temas por área): rehace la TEORÍA (y su canvas), la PRÁCTICA (la matriz .practica) o los EJERCICIOS.
 //
-//  - study_topic_regenerate(folder, what, confirm) -> { jobId }: trabajo largo en segundo plano. Exige `confirm: true` (la persona lo confirmó en el
-//    diálogo) e IA configurada (no en modo puente). Es el ÚNICO camino que reemplaza contenido que ya existe, y SIEMPRE lo respalda antes:
+//  - study_topic_regenerate(folder, what, confirm, engine?) -> { jobId }: trabajo largo en segundo plano. Exige `confirm: true` (la persona lo confirmó en el
+//    diálogo) y un motor que pueda correr: «app» (la IA configurada; no en modo puente) o «claude» (igual, pero el proveedor tiene que ser Claude). El tercer
+//    motor, el agente externo (Antigravity / Claude Code), va por `topicRegenerateHandoff.ts` (study_topic_regenerate_handoff / _validate). Es el ÚNICO camino que reemplaza contenido que ya existe, y SIEMPRE lo respalda antes:
 //      · teoría  -> copia la nota (y los canvas del tema) a `<vault>/.trash/regenerar/<fecha>_<tema>/`, genera de nuevo con `force` (el canvas lo
 //                   rehace `generateConcept`: uno editado a mano se conserva y el nuevo va a `.nuevo.canvas`). Si falla, RESTAURA la copia.
 //      · práctica -> copia `<tema>.practica.md`, re-evalúa con la IA. Si falla, restaura la copia.
@@ -17,6 +18,7 @@ import * as path from "node:path";
 import { withAiSignal } from "../../core/aiAbort.js";
 import { AIConfig } from "../../core/aiClient.js";
 import { ApiError } from "../../core/errors.js";
+import { engineBlockedReason, REGEN_ENGINES, type RegenEngine } from "./regenEngines.js";
 import { generateConcept } from "../../../tools/kb_canvas";
 import { diskExercises, scanTopicDesigns } from "../../core/mentor/topicDesignScan.js";
 import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
@@ -63,12 +65,12 @@ export interface RegenHooks {
   now?: () => Date;
 }
 
-const posix = (p: string): string => p.split(path.sep).join("/");
-const stamp = (d: Date): string => d.toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
+export const posix = (p: string): string => p.split(path.sep).join("/");
+export const stamp = (d: Date): string => d.toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
 const sleep = (ms: number): Promise<void> => new Promise((ok) => setTimeout(ok, ms));
 
 /** Copia `file` a `dest` (creando carpetas); nunca pisa una copia anterior. */
-function copyInto(file: string, destDir: string, name = path.basename(file)): string {
+export function copyInto(file: string, destDir: string, name = path.basename(file)): string {
   fs.mkdirSync(destDir, { recursive: true });
   const dest = path.join(destDir, name);
   fs.copyFileSync(file, dest);
@@ -76,7 +78,7 @@ function copyInto(file: string, destDir: string, name = path.basename(file)): st
 }
 
 /** Mueve `file` a `destDir` (sin pisar nada: añade `_n` si ya hay uno igual). */
-function moveInto(file: string, destDir: string): string {
+export function moveInto(file: string, destDir: string): string {
   fs.mkdirSync(destDir, { recursive: true });
   const parsed = path.parse(file);
   let dest = path.join(destDir, parsed.base);
@@ -85,7 +87,7 @@ function moveInto(file: string, destDir: string): string {
   return dest;
 }
 
-const sameFile = (a: string, b: string): boolean => {
+export const sameFile = (a: string, b: string): boolean => {
   try {
     return fs.readFileSync(a).equals(fs.readFileSync(b));
   } catch {
@@ -100,9 +102,10 @@ export function topicRegenerateApi(app: AppState, hooks: RegenHooks = {}) {
   const space = studySpaceApi(app);
   const rel = (abs: string): string => posix(app.rel(abs));
 
-  const aiCheck = (): void => {
-    const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
-    if (cfg.is_bridge) throw new ApiError("El proveedor de IA está en modo puente; no se puede regenerar automáticamente.");
+  const aiCheck = (engine: RegenEngine): void => {
+    if (engine === "handoff") throw new ApiError("Con Antigravity / Claude Code no se regenera aquí: crea la tarea con «study_topic_regenerate_handoff» y valida el resultado después.");
+    const why = engineBlockedReason(AIConfig.fromDict(AppConfig.get_ai_config()), engine);
+    if (why) throw new ApiError(why);
   };
 
   const defaults: Required<Pick<RegenHooks, "generateTheory" | "reevaluate" | "buildExercises">> = {
@@ -338,7 +341,7 @@ export function topicRegenerateApi(app: AppState, hooks: RegenHooks = {}) {
 
   return {
     /** Regenera la teoría / práctica / ejercicios de UN tema (`Espacio/Área/Tema`). Exige `confirm: true`. */
-    study_topic_regenerate(folderRel: string, what: string, confirm?: boolean): { jobId: string } {
+    study_topic_regenerate(folderRel: string, what: string, confirm?: boolean, engine?: string): { jobId: string } {
       if (confirm !== true) throw new ApiError("Falta la confirmación: regenerar reemplaza contenido y solo se hace cuando la persona la da.");
       if (!WHATS.includes(what as RegenWhat)) throw new ApiError("Elige qué regenerar: teoría, mapa, práctica, ejercicios o todo.");
       const parts = String(folderRel ?? "").replace(/\\/g, "/").split("/").filter(Boolean);
@@ -346,7 +349,10 @@ export function topicRegenerateApi(app: AppState, hooks: RegenHooks = {}) {
       if (parts.length !== 3 || !fs.existsSync(topicAbs) || !fs.statSync(topicAbs).isDirectory()) throw new ApiError("Selecciona la carpeta de un tema (Espacio / Área / Tema).");
       // la ruta no puede salir de la vault
       if (path.relative(app.root, topicAbs).startsWith("..")) throw new ApiError("Esa carpeta no está en la vault.");
-      aiCheck();
+      const eng = (engine ?? "app") as RegenEngine;
+      if (!REGEN_ENGINES.includes(eng)) throw new ApiError("Motor desconocido: elige «app», «claude» o «handoff».");
+      // el mapa no usa IA (sale de la nota): se puede regenerar con cualquier motor, también con la IA en modo puente
+      if (what !== "map") aiCheck(eng);
       const folder = parts.join("/");
       const key = folder;
       if (running.has(key)) throw new ApiError("Ya hay una regeneración en curso de este tema.");

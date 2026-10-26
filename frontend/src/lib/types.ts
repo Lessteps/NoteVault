@@ -1837,6 +1837,51 @@ export type MentorDayView =
 export * from "./nutritionTypes";
 
 
+/** Motores de regeneración (ver api/modules/regenEngines.ts). */
+export type RegenEngineId = "app" | "claude" | "handoff";
+export interface RegenEngineInfo {
+  id: RegenEngineId;
+  label: string;
+  available: boolean;
+  reason: string;
+  detail: string;
+}
+export interface RegenEnginesView {
+  mode: "bridge" | "connection" | "api";
+  provider: string;
+  providerLabel: string;
+  model: string;
+  hasKey: boolean;
+  isClaude: boolean;
+  engines: RegenEngineInfo[];
+  recommended: RegenEngineId;
+}
+/** La tarea para un agente externo (ver api/modules/topicRegenerateHandoff.ts). */
+export interface RegenHandoffTopic {
+  folder: string;
+  title: string;
+  backup: string;
+  state: "pending" | "ok" | "error" | "restored";
+  done: string[];
+  problems: string[];
+  created: string[];
+  restored: boolean;
+}
+export interface RegenHandoff {
+  id: string;
+  what: "theory" | "practice" | "exercises" | "all";
+  createdAt: string;
+  task: string;
+  taskAbs: string;
+  resultDir: string;
+  folder: string;
+  prompt: string;
+  status: "waiting" | "validated" | "failed" | "restored";
+  topics: RegenHandoffTopic[];
+  log: string[];
+  ready: { found: number; expected: number };
+}
+
 /** Estado de un trabajo de `study_topic_regenerate` (teoría, práctica o ejercicios de un tema). */
 export interface TopicRegenerateJob {
   id: string;

@@ -117,7 +117,7 @@ function studyRel(app: AppState, p: string | null | undefined): string {
 }
 
 /** The `_skills/` templates that guide the AI's exercise design (see core/practice/skillTemplates). */
-function skillTemplates(app: AppState, topicFolderRel: string): TheoryNoteContext[] {
+export function skillTemplates(app: AppState, topicFolderRel: string): TheoryNoteContext[] {
   return readSkillTemplates(app.root, topicFolderRel);
 }
 
@@ -252,7 +252,7 @@ function resolveTopicDir(app: AppState, relPath: string): string {
   }
 }
 
-function findTopicManifest(
+export function findTopicManifest(
   app: AppState,
   topicFolder: string,
 ): { path: string; manifest: TopicManifest } | null {
@@ -303,7 +303,7 @@ export async function askStructured(
 }
 
 /** The topic's own theory notes (everything that is not a view file or the manifest). */
-function readTheoryNotes(app: AppState, absDir: string): TheoryNoteContext[] {
+export function readTheoryNotes(app: AppState, absDir: string): TheoryNoteContext[] {
   const out: TheoryNoteContext[] = [];
   let files: fs.Dirent[] = [];
   try {
@@ -329,7 +329,7 @@ function readTheoryNotes(app: AppState, absDir: string): TheoryNoteContext[] {
  * An English topic with no branch is NOT given a default: it is logged as pending and this throws,
  * so the user resolves it explicitly (`study_topic_classify`).
  */
-function classifyForTopic(app: AppState, normFolder: string, manifest: TopicManifest): Classification {
+export function classifyForTopic(app: AppState, normFolder: string, manifest: TopicManifest): Classification {
   const subject = manifest.subject || "mathematics";
   const r = classifyTopic({
     subject,
@@ -464,7 +464,7 @@ function makeSessionAiClient(): SessionAIClient {
 }
 
 /** English vocabulary skills are built around the shared word bank: the words due first, then the topic's own. */
-function vocabularyWords(app: AppState, subject: string, skill: string, topicTitle: string): { words?: string[]; wordIds?: string[] } {
+export function vocabularyWords(app: AppState, subject: string, skill: string, topicTitle: string): { words?: string[]; wordIds?: string[] } {
   if (!isEnglishSubject(subject) || !isVocabularySkill(skill)) return {};
   const picked = new EnglishVocabularyManager(app.root).sessionWords(topicTitle, 10, isoDate(new Date())!);
   return picked.length

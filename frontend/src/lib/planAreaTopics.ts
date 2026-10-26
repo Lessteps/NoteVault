@@ -47,6 +47,10 @@ export interface AreaTopicRow {
   outdated?: OutdatedSkills;
 }
 
+import type { PlanSchedule } from "./planSchedule.js";
+
+const naturalCmp = (a: string, b: string): number => a.localeCompare(b, "es", { numeric: true, sensitivity: "base" });
+
 const routeOf = (r: string | undefined): AreaTopicRow["route"] => (r === "optional" || r === "skipped" ? r : "core");
 
 /** Lo que le falta a una fila para poder generarse (el catálogo ya dice si está «completo» según el diseño). */
@@ -58,20 +62,40 @@ const basesGroupOf = (sub: MentorSubplan): string | undefined => (sub.groups ?? 
 /** Clave de la pestaña virtual de Bases. */
 export const BASES_KEY = "__bases";
 
-/** Las filas de un área, en el orden de la ruta (semana y luego orden del plan). Sin los temas de Bases, salvo que se pidan. */
-export function areaTopicRows(sub: MentorSubplan, catalog: ReadonlyArray<PlanTopicRow>, withBases = false): AreaTopicRow[] {
+/** Las filas de un área, en el orden progresivo de la ruta (según el reparto en ejecución, o por semana y orden natural). Sin Bases salvo que se pidan. */
+export function areaTopicRows(sub: MentorSubplan, catalog: ReadonlyArray<PlanTopicRow>, withBases = false, schedule?: PlanSchedule): AreaTopicRow[] {
   const by = new Map(catalog.map((r) => [r.folder, r] as const));
   const bases = withBases ? undefined : basesGroupOf(sub);
+  const schedOrder = new Map<string, { dayIndex: number; orderInDay: number; week: number }>();
+  if (schedule) {
+    schedule.days.forEach((d, dayIndex) => {
+      d.topics.forEach((t, orderInDay) => {
+        if (!schedOrder.has(t.folder)) {
+          schedOrder.set(t.folder, { dayIndex, orderInDay, week: d.week });
+        }
+      });
+    });
+  }
   return sub.topics
     .filter((t) => !(bases && t.group === bases))
     .map((t, i) => ({ t, i }))
-    .sort((a, b) => a.t.targetWeek - b.t.targetWeek || a.i - b.i)
+    .sort((a, b) => {
+      const soA = schedOrder.get(a.t.folder);
+      const soB = schedOrder.get(b.t.folder);
+      if (soA && soB) {
+        return soA.dayIndex - soB.dayIndex || soA.orderInDay - soB.orderInDay || naturalCmp(a.t.folder, b.t.folder);
+      }
+      if (soA) return -1;
+      if (soB) return 1;
+      return a.t.targetWeek - b.t.targetWeek || naturalCmp(a.t.folder, b.t.folder) || a.i - b.i;
+    })
     .map(({ t }) => {
       const c = by.get(t.folder);
+      const so = schedOrder.get(t.folder);
       return {
         folder: t.folder,
         title: t.title,
-        week: t.targetWeek,
+        week: so?.week ?? t.targetWeek,
         group: t.group ?? "",
         completed: !!t.completedAt,
         route: routeOf(t.route),
@@ -91,18 +115,18 @@ export function areaTopicRows(sub: MentorSubplan, catalog: ReadonlyArray<PlanTop
 export const pendingGenerate = (r: AreaTopicRow): boolean => r.route !== "skipped" && !r.completed && r.incomplete;
 
 /** Las filas de Bases de todo el plan, juntas y sin repetirse (un mismo tema de Bases suele estar en varias áreas). */
-export function basesTopicRows(plan: Pick<MentorPlan, "subplans">, catalog: ReadonlyArray<PlanTopicRow>): AreaTopicRow[] {
+export function basesTopicRows(plan: Pick<MentorPlan, "subplans">, catalog: ReadonlyArray<PlanTopicRow>, schedule?: PlanSchedule): AreaTopicRow[] {
   const seen = new Set<string>();
   const out: AreaTopicRow[] = [];
   for (const s of plan.subplans) {
     const id = basesGroupOf(s);
     if (!id) continue;
-    for (const r of areaTopicRows({ ...s, topics: s.topics.filter((t) => t.group === id && !seen.has(t.folder)) }, catalog, true)) {
+    for (const r of areaTopicRows({ ...s, topics: s.topics.filter((t) => t.group === id && !seen.has(t.folder)) }, catalog, true, schedule)) {
       seen.add(r.folder);
       out.push(r);
     }
   }
-  return out.sort((a, b) => a.week - b.week);
+  return out.sort((a, b) => a.week - b.week || naturalCmp(a.folder, b.folder));
 }
 
 /** Las pestañas de área, en el orden del plan (sin Bases: esa tiene su pestaña aparte, `BASES_KEY`). */
@@ -128,12 +152,12 @@ export function groupTabsOf(sub: MentorSubplan, rows: ReadonlyArray<AreaTopicRow
   return [all, ...tabs.filter((t) => t.total > 0)];
 }
 
-/** Las filas de un grupo (`""` = todas). */
+/** Las filas de un grupo (`""` = todas, en orden progresivo de ejecución; un grupo concreto, en su orden natural). */
 export function rowsOfGroup(sub: MentorSubplan, rows: ReadonlyArray<AreaTopicRow>, groupId: string): AreaTopicRow[] {
   if (!groupId) return [...rows];
   if (groupId === "__otros") {
     const known = new Set((sub.groups ?? []).map((g) => g.id));
-    return rows.filter((r) => !known.has(r.group));
+    return rows.filter((r) => !known.has(r.group)).sort((a, b) => naturalCmp(a.folder, b.folder));
   }
-  return rows.filter((r) => r.group === groupId);
+  return rows.filter((r) => r.group === groupId).sort((a, b) => naturalCmp(a.folder, b.folder));
 }

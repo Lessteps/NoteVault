@@ -120,7 +120,7 @@ export interface UpcomingWeekView {
 const UPCOMING_STEP = 4;
 
 /** «Lo que viene»: los temas de las semanas siguientes, con su etiqueta de tiempo. Es la proyección del plan: se ve aunque la ruta sólida aún no los desbloquee. */
-function UpcomingWeeks({ weeks, colour, areaKey }: { weeks: UpcomingWeekView[]; colour: string; areaKey: string }) {
+function UpcomingWeeks({ weeks, colour, areaKey, planId }: { weeks: UpcomingWeekView[]; colour: string; areaKey: string; planId?: string }) {
   const [shown, setShown] = useState(UPCOMING_STEP);
   if (!weeks.length) return null;
   return (
@@ -138,7 +138,7 @@ function UpcomingWeeks({ weeks, colour, areaKey }: { weeks: UpcomingWeekView[]; 
             <div key={d.date} data-date={d.date}>
               <p className="px-1 pt-1 text-[12.5px] font-medium text-dim first-letter:uppercase">{d.label}</p>
               <ul className="space-y-0.5" aria-label={`Temas de ${d.label}`}>
-                {d.rows.map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} />)}
+                {d.rows.map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} planId={planId} />)}
               </ul>
             </div>
           ))}
@@ -152,7 +152,7 @@ function UpcomingWeeks({ weeks, colour, areaKey }: { weeks: UpcomingWeekView[]; 
 }
 
 /** La semana en curso: un cajón por día, lo completado y el nivel de avance (media del avance de cada tema; un tema hecho cuenta 100 %). */
-function WeekView({ days, today, colour, upcoming, areaKey }: { days: WeekDayView[]; today: string; colour: string; upcoming?: UpcomingWeekView[]; areaKey: string }) {
+function WeekView({ days, today, colour, upcoming, areaKey, planId, weekNumber }: { days: WeekDayView[]; today: string; colour: string; upcoming?: UpcomingWeekView[]; areaKey: string; planId?: string; weekNumber?: number }) {
   const unique = new Map<string, BoardRow>();
   for (const d of days) for (const r of d.rows) if (!unique.has(r.folder) || r.done) unique.set(r.folder, r);
   const all = [...unique.values()];
@@ -162,6 +162,7 @@ function WeekView({ days, today, colour, upcoming, areaKey }: { days: WeekDayVie
     <div className="space-y-4" data-testid="work-week">
       <div className="rounded-2xl border border-line bg-card p-4" data-testid="week-summary">
         <p className="flex flex-wrap items-baseline gap-x-3 text-[15px]">
+          {weekNumber ? <strong className="text-[18px]">Semana {weekNumber} · </strong> : null}
           <strong className="text-[18px]">{done} de {all.length}</strong> temas completados esta semana
           <span className="flex-1" />
           <span className="text-dim">Nivel de avance <strong className="text-text">{level} %</strong></span>
@@ -187,18 +188,18 @@ function WeekView({ days, today, colour, upcoming, areaKey }: { days: WeekDayVie
               <p className="px-2 py-1.5 text-[13.5px] text-faint">Sin temas de esta ruta este día.</p>
             ) : (
               <ul className="space-y-0.5" aria-label={`Temas de ${d.label}`}>
-                {rows.map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} />)}
+                {rows.map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} planId={planId} />)}
               </ul>
             )}
           </section>
         );
       })}
-      {upcoming && <UpcomingWeeks weeks={upcoming} colour={colour} areaKey={areaKey} />}
+      {upcoming && <UpcomingWeeks weeks={upcoming} colour={colour} areaKey={areaKey} planId={planId} />}
     </div>
   );
 }
 
-export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, loggedMinutes = 0, rows, todayRows, weekDays, upcoming, sets, today, colour, practice, reviews, plannedMinutes, onStartBlock }: {
+export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, loggedMinutes = 0, rows, todayRows, weekDays, upcoming, sets, today, colour, practice, reviews, plannedMinutes, onStartBlock, weekNumber }: {
   /** el plan y el área (id de subplan): con ellos la Ejecución deja añadir temas y práctica extra a hoy */
   plan?: MentorPlan;
   subplanId?: string;
@@ -225,8 +226,9 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
   reviews: ReviewRow[];
   plannedMinutes: number;
   onStartBlock?: () => void;
+  weekNumber?: number;
 }) {
-  const areaKey = areaId ?? subplanId ?? "bases";
+  const areaKey = subplanId ?? areaId ?? "bases";
   const buckets = useMemo(() => bucketReviews(reviews, today), [reviews, today]);
   const todayTag = { text: "Hoy", colour };
   const lists = useMemo(() => {
@@ -293,10 +295,10 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
         weekCount === 0 ? (
           <div className="space-y-4">
             <p className="rounded-2xl border border-dashed border-line p-5 text-[14.5px] text-dim" data-testid="work-empty">Esta semana no hay temas repartidos en esta ruta.</p>
-            {upcoming && <UpcomingWeeks weeks={upcoming} colour={colour} areaKey={areaKey} />}
+            {upcoming && <UpcomingWeeks weeks={upcoming} colour={colour} areaKey={areaKey} planId={planId} />}
           </div>
         ) : (
-          <WeekView days={weekDays} today={today} colour={colour} areaKey={areaKey} {...(upcoming ? { upcoming } : {})} />
+          <WeekView days={weekDays} today={today} colour={colour} areaKey={areaKey} planId={planId} weekNumber={weekNumber} {...(upcoming ? { upcoming } : {})} />
         )
       ) : view !== "repasos" ? (
         lists[view].length === 0 ? (
@@ -313,7 +315,7 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
               </p>
             )}
             <ul className="space-y-1" aria-label={VIEWS.find((v) => v.id === view)!.label} data-testid="work-list">
-              {lists[view].map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} />)}
+              {lists[view].map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} planId={planId} />)}
             </ul>
           </div>
         )
@@ -333,7 +335,7 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
 
       {view === "hoy" && plan && subplanId && (
         <div className="flex flex-wrap items-center gap-2" data-testid="work-add-topic">
-          <AddExtraTopic planId={planId} date={today} area={subplanId} minDate={plan.start} maxDate={plan.end} label="Próximos temas" onChanged={bumpPlanVersion} />
+          <AddExtraTopic planId={planId} date={today} area={subplanId} lockArea minDate={plan.start} maxDate={plan.end} label="Próximos temas" onChanged={bumpPlanVersion} />
           <span className="text-[13px] text-dim">Mira los temas de las próximas semanas y adelanta el siguiente de la ruta.</span>
         </div>
       )}

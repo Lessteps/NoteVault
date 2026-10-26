@@ -236,13 +236,13 @@ describe("Temas por área — lote", () => {
     expect(all("bulk-summary-item").map((e) => e.dataset.state)).toEqual(["error", "ok"]);
   });
 
-  it("con la IA en modo puente los botones de regenerar están desactivados", async () => {
+  it("con la IA en modo puente los botones de regenerar siguen activos (el motor es el agente externo)", async () => {
     vi.mocked(api.aiSettings).mockResolvedValue({ config: { is_bridge: true }, providers: [], models: [] } as never);
     await mount();
     await check("B");
-    for (const w of ["theory", "map", "practice", "exercises", "all"]) expect(bulk(`bulk-${w}`).disabled).toBe(true);
-    expect(bulk("bulk-theory").title).toContain("puente");
-    expect((rowEl("B").querySelector("[data-testid=quick-map]") as HTMLButtonElement).disabled).toBe(true);
+    for (const w of ["theory", "map", "practice", "exercises", "all"]) expect(bulk(`bulk-${w}`).disabled).toBe(false);
+    expect(bulk("bulk-theory").title).not.toContain("puente");
+    expect((rowEl("B").querySelector("[data-testid=quick-map]") as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("una acción rápida de fila pasa por el mismo diálogo y la misma cola", async () => {
@@ -253,7 +253,7 @@ describe("Temas por área — lote", () => {
     expect(byTest("bulk-confirm-lead")!.textContent).toContain("la práctica de 1 tema");
     await click("bulk-confirm-run");
     await flush(); await flush(); await flush();
-    expect(start).toHaveBeenCalledWith(F("C"), "practice", true);
+    expect(start).toHaveBeenCalledWith(F("C"), "practice", true, "app");
   });
 
   it("«Generar lo que falta» abre el diálogo de «Ejecutar plan» con el alcance del primer tema elegido", async () => {
@@ -293,10 +293,10 @@ describe("topicSelection (puro)", () => {
     expect(estimateAiCalls(r({ planExercises: 8 }), "exercises")).toBe(8);
     expect(estimateAiCalls(r({ planExercises: 8 }), "all")).toBe(10);
   });
-  it("planBulk omite fuera de plan, inexistentes y modo puente", () => {
+  it("planBulk omite fuera de plan e inexistentes (el modo puente ya no omite: queda el agente externo)", () => {
     const p = planBulk([r({ folder: "a" }), r({ folder: "b", route: "skipped" }), r({ folder: "c", exists: false })], "theory", false);
     expect(p.run.map((x) => x.folder)).toEqual(["a"]);
     expect(p.skipped.map((x) => x.row.folder)).toEqual(["b", "c"]);
-    expect(planBulk([r()], "theory", true).run).toEqual([]);
+    expect(planBulk([r()], "theory", true).run).toHaveLength(1);
   });
 });

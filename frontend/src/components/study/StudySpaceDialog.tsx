@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { api } from "../../lib/bridge";
+import { guardStructural } from "../../lib/planImpactGuard";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
@@ -118,7 +119,11 @@ export function StudySpaceDialog() {
     if (!chosen.length) return;
     setBusy(true);
     try {
+      // Crear áreas en un espacio que ya está en la ruta de un plan lo cambia: se avisa y hace falta «Continuar».
+      const guard = await guardStructural(mode === "area" ? "add_area" : "add_space", { space: folder.trim() }, `${mode === "area" ? "Área nueva" : "Espacio"} en ${folder.trim()}: ${chosen.map((a) => a.name).join(", ")}`);
+      if (!guard.ok) return;
       const res = await api.studySpaceGenerate({ folder: folder.trim(), subject: subject.trim(), areas: chosen, steps, conversationId });
+      await guard.commit();
       followJob(res.jobId, res.conversationId);
       toast("info", "Generando… lo verás paso a paso en el chat.");
       close();

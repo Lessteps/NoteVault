@@ -25,7 +25,7 @@ const EYEBROW = "font-mono text-[11px] font-semibold uppercase tracking-[0.12em]
 
 // ── Un tema dentro de una tarjeta de área ───────────────────────────────
 
-export function DayTopicRow({ r, colour }: { r: BoardRow; colour: string }) {
+export function DayTopicRow({ r, colour, areaKey, planId }: { r: BoardRow; colour: string; areaKey?: string; planId?: string }) {
   const locked = !!r.unlockOn;
   return (
     <li className={cn("flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2.5", locked && "opacity-60")} data-testid="day-topic" data-state={locked ? "bloqueado" : r.done ? "completo" : r.state}>
@@ -36,7 +36,7 @@ export function DayTopicRow({ r, colour }: { r: BoardRow; colour: string }) {
         {locked ? (
           <span className="block truncate text-[14.5px] font-semibold">{r.title}</span>
         ) : (
-          <TopicMenu folder={r.folder} title={r.title} trigger={<span className={cn("block truncate text-[14.5px] font-semibold", r.done && "text-faint line-through decoration-faint/60")}>{r.title}</span>} className="w-full rounded-md hover:text-accent-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" />
+          <TopicMenu folder={r.folder} title={r.title} areaKey={areaKey} planId={planId} trigger={<span className={cn("block truncate text-[14.5px] font-semibold", r.done && "text-faint line-through decoration-faint/60")}>{r.title}</span>} className="w-full rounded-md hover:text-accent-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" />
         )}
         {r.sub && <span className="block truncate text-[12.5px] text-dim">{r.sub}</span>}
         <span className="sr-only">{locked ? "bloqueado" : r.done ? "completado" : STATE_LABEL[r.state]}</span>
@@ -60,7 +60,7 @@ export interface FoldItem {
 
 type FoldBadge = { text: string; colour: string } | null;
 
-function Fold({ item, badge, defaultOpen, testid }: { item: FoldItem; badge: FoldBadge; defaultOpen: boolean; testid: string }) {
+function Fold({ item, badge, defaultOpen, testid, planId }: { item: FoldItem; badge: FoldBadge; defaultOpen: boolean; testid: string; planId?: string }) {
   const [open, setOpen] = useState(defaultOpen);
   const id = useId();
   return (
@@ -76,7 +76,7 @@ function Fold({ item, badge, defaultOpen, testid }: { item: FoldItem; badge: Fol
       </button>
       {open && (
         <ul id={id} className="space-y-2 px-3 pb-3" aria-label={`Temas de ${item.name}`}>
-          {item.rows.length === 0 ? <li className="px-1 py-1 text-[13.5px] text-dim">Sin temas nuevos: repaso y práctica de mantenimiento.</li> : item.rows.map((r) => <DayTopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={item.colour} />)}
+          {item.rows.length === 0 ? <li className="px-1 py-1 text-[13.5px] text-dim">Sin temas nuevos: repaso y práctica de mantenimiento.</li> : item.rows.map((r) => <DayTopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={item.colour} areaKey={item.key} planId={planId} />)}
         </ul>
       )}
     </li>
@@ -84,14 +84,14 @@ function Fold({ item, badge, defaultOpen, testid }: { item: FoldItem; badge: Fol
 }
 
 /** Las áreas de un día, plegables. La primera con temas por hacer va abierta (y es la que está «en progreso»); el resto, cerradas. */
-export function AreaFolds({ items, planned = false, testid = "area-fold" }: { items: FoldItem[]; planned?: boolean; testid?: string }) {
+export function AreaFolds({ items, planned = false, testid = "area-fold", planId }: { items: FoldItem[]; planned?: boolean; testid?: string; planId?: string }) {
   const firstOpen = Math.max(0, items.findIndex((i) => i.rows.some((r) => !r.done)));
   return (
     <ul className="space-y-2.5" aria-label="Áreas del día">
       {items.map((it, idx) => {
         const allDone = it.rows.length > 0 && it.rows.every((r) => r.done);
         const badge: FoldBadge = planned ? { text: "Programado", colour: "var(--nv-accent)" } : allDone ? { text: "Completo", colour: "var(--nv-mint)" } : idx === firstOpen && it.rows.length ? { text: "En progreso", colour: "var(--nv-accent)" } : null;
-        return <Fold key={it.key} item={it} badge={badge} defaultOpen={idx === firstOpen} testid={testid} />;
+        return <Fold key={it.key} item={it} badge={badge} defaultOpen={idx === firstOpen} testid={testid} planId={planId} />;
       })}
     </ul>
   );
@@ -163,6 +163,8 @@ export interface LateArea {
   colour: string;
   topics: Array<{ folder: string; title: string }>;
   minutes: number;
+  subplanId?: string;
+  planId?: string;
 }
 
 export function CatchUpCard({ heading, total, areas, summary, warning }: { heading?: string; total: number; areas: LateArea[]; summary: ReactNode; warning?: ReactNode }) {
@@ -209,7 +211,7 @@ function LateFold({ a, defaultOpen }: { a: LateArea; defaultOpen: boolean }) {
           {a.topics.map((t) => (
             <li key={t.folder} className="flex items-center gap-2 text-[14px]" data-testid="late-topic">
               <span aria-hidden className="inline-block h-1.5 w-1.5 flex-none rounded-full bg-warn" />
-              <TopicMenu folder={t.folder} title={t.title} trigger={<span className="block truncate">{t.title}</span>} className="w-full rounded-md hover:text-accent-text" />
+              <TopicMenu folder={t.folder} title={t.title} areaKey={a.subplanId ?? a.area} planId={a.planId} trigger={<span className="block truncate">{t.title}</span>} className="w-full rounded-md hover:text-accent-text" />
             </li>
           ))}
         </ul>

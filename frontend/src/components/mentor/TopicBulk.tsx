@@ -4,11 +4,15 @@
 
 import { BookOpen, ChevronDown, ClipboardList, Dumbbell, Loader2, Map as MapIcon, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { api } from "../../lib/bridge";
 import type { AreaTopicRow } from "../../lib/planAreaTopics";
 import { LABEL, OBJECT, SHORT, regenBlockedReason, type BulkPlan, type RegenKind } from "../../lib/topicSelection";
 import { useApp } from "../../store/app";
+import { useRegenEngine } from "../../store/regenEngine";
 import { GhostButton, Modal, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
+import { RegenEngineChoice } from "./RegenEngineChoice";
+import { RegenHandoffPanel } from "./RegenHandoffPanel";
 import { runRegeneration } from "./TopicRegenerate";
 
 export type ItemState = "pending" | "running" | "ok" | "error" | "cancelled";
@@ -25,6 +29,8 @@ export interface QueueState {
   items: QueueItem[];
   running: boolean;
   stopping: boolean;
+  /** con el motor «agente externo»: la tarea creada para todo el lote (no hay cola que seguir) */
+  handoffId?: string;
 }
 
 /** La cola: lanza `runRegeneration` tema a tema. Vive en el componente, pero el bucle no depende de que siga montado. */
@@ -44,6 +50,19 @@ export function useRegenQueue(onTopicDone?: () => void) {
 
   const start = async (what: RegenKind, rows: ReadonlyArray<Pick<AreaTopicRow, "folder" | "title">>): Promise<void> => {
     stop.current = false;
+    const engine = what === "map" ? "app" : useRegenEngine.getState().effective;
+    if (engine === "handoff") {
+      // sin IA de la app: UNA tarea con todos los temas; la validación la pide la persona cuando el agente termina
+      try {
+        const h = await api.studyTopicRegenerateHandoff(rows.map((r) => r.folder), what as Exclude<RegenKind, "map">, true);
+        useRegenEngine.getState().putHandoff(h);
+        if (alive.current) setQueue({ what, items: [], running: false, stopping: false, handoffId: h.id });
+        useApp.getState().toast("info", `Tarea creada con ${rows.length} ${rows.length === 1 ? "tema" : "temas"}. Pásasela a tu agente y, cuando termine, pulsa «Ya terminó — validar».`);
+      } catch (e) {
+        useApp.getState().toast("error", (e as Error).message);
+      }
+      return;
+    }
     const items: QueueItem[] = rows.map((r) => ({ folder: r.folder, title: r.title, state: "pending" }));
     setQueue({ what, items, running: true, stopping: false });
     let ok = 0;
@@ -57,7 +76,7 @@ export function useRegenQueue(onTopicDone?: () => void) {
       }
       patch(r.folder, { state: "running", note: "Empezando…" });
       try {
-        const st = await runRegeneration(r.folder, what, (j) => patch(r.folder, { note: j.log[j.log.length - 1] ?? "Trabajando…" }), { quiet: true });
+        const st = await runRegeneration(r.folder, what, (j) => patch(r.folder, { note: j.log[j.log.length - 1] ?? "Trabajando…" }), { quiet: true, engine });
         if (st.error) {
           bad++;
           patch(r.folder, { state: "error", error: st.error });
@@ -95,17 +114,16 @@ const BUTTONS: ReadonlyArray<{ what: RegenKind; text: string }> = [
 export type SelectHelper = "all" | "missing" | "noExercises" | "clear";
 
 /** Barra de acciones sobre la tabla: siempre visible; sin selección, con los botones desactivados y una pista. */
-export function BulkToolbar({ count, busy, bridge, onAsk, onGenerateMissing, onHelper }: {
+export function BulkToolbar({ count, busy, onAsk, onGenerateMissing, onHelper }: {
   count: number;
   busy: boolean;
-  bridge: boolean;
   onAsk: (what: RegenKind) => void;
   onGenerateMissing: () => void;
   onHelper: (h: SelectHelper) => void;
 }) {
   const [menu, setMenu] = useState(false);
   const off = count === 0 || busy;
-  const why = busy ? "Hay una regeneración en curso." : count === 0 ? "Selecciona temas para regenerar" : bridge ? "La IA está en modo puente: no puede regenerar automáticamente." : "";
+  const why = busy ? "Hay una regeneración en curso." : count === 0 ? "Selecciona temas para regenerar" : "";
   const helpers: ReadonlyArray<{ key: SelectHelper; text: string }> = [
     { key: "all", text: "Seleccionar todos" },
     { key: "missing", text: "Solo los que faltan" },
@@ -119,11 +137,11 @@ export function BulkToolbar({ count, busy, bridge, onAsk, onGenerateMissing, onH
       </span>
       <span className="flex flex-wrap items-center gap-2">
         {BUTTONS.map((b) => (
-          <GhostButton key={b.what} onClick={() => onAsk(b.what)} disabled={off || bridge} title={why || `${b.text}: respalda lo actual y lo reemplaza`} data-testid={`bulk-${b.what}`}>
+          <GhostButton key={b.what} onClick={() => onAsk(b.what)} disabled={off} title={why || `${b.text}: respalda lo actual y lo reemplaza`} data-testid={`bulk-${b.what}`}>
             <RefreshCw size={14} aria-hidden /> {b.text}
           </GhostButton>
         ))}
-        <GhostButton onClick={() => onAsk("all")} disabled={off || bridge} title={why || "Rehace teoría, mapa, práctica y ejercicios, en ese orden"} data-testid="bulk-all">
+        <GhostButton onClick={() => onAsk("all")} disabled={off} title={why || "Rehace teoría, mapa, práctica y ejercicios, en ese orden"} data-testid="bulk-all">
           <RefreshCw size={14} aria-hidden /> Regenerar todo
         </GhostButton>
         <GhostButton onClick={onGenerateMissing} disabled={off} title={why || "Crea lo que falta de los temas elegidos (no toca lo que ya existe)"} data-testid="bulk-missing">
@@ -158,11 +176,11 @@ const QUICK: ReadonlyArray<{ what: Exclude<RegenKind, "all">; Icon: typeof BookO
   { what: "exercises", Icon: Dumbbell },
 ];
 
-export function RowQuickActions({ row, bridge, busy, onAsk }: { row: AreaTopicRow; bridge: boolean; busy: boolean; onAsk: (what: RegenKind, row: AreaTopicRow) => void }) {
+export function RowQuickActions({ row, busy, onAsk }: { row: AreaTopicRow; busy: boolean; onAsk: (what: RegenKind, row: AreaTopicRow) => void }) {
   return (
     <span className="inline-flex items-center gap-0.5" data-testid="row-quick">
       {QUICK.map(({ what, Icon }) => {
-        const why = busy ? "Hay una regeneración en curso." : regenBlockedReason(row, what, bridge);
+        const why = busy ? "Hay una regeneración en curso." : regenBlockedReason(row, what);
         return (
           <button
             key={what}
@@ -186,6 +204,7 @@ export function RowQuickActions({ row, bridge, busy, onAsk }: { row: AreaTopicRo
 export function BulkConfirm({ plan, onCancel, onConfirm }: { plan: BulkPlan; onCancel: () => void; onConfirm: () => void }) {
   const { what, run, skipped, aiCalls } = plan;
   const shown = run.slice(0, 8);
+  const effective = useRegenEngine((s) => s.effective);
   return (
     <Modal
       title={LABEL[what]}
@@ -195,7 +214,7 @@ export function BulkConfirm({ plan, onCancel, onConfirm }: { plan: BulkPlan; onC
         <>
           <span className="flex-1" />
           <GhostButton onClick={onCancel} data-testid="bulk-confirm-cancel">Cancelar</GhostButton>
-          <PrimaryButton onClick={onConfirm} disabled={run.length === 0} data-testid="bulk-confirm-run">{LABEL[what]}{run.length > 1 ? ` (${run.length})` : ""}</PrimaryButton>
+          <PrimaryButton onClick={onConfirm} disabled={run.length === 0} data-testid="bulk-confirm-run">{what !== "map" && effective === "handoff" ? "Crear tarea para el agente" : LABEL[what]}{run.length > 1 ? ` (${run.length})` : ""}</PrimaryButton>
         </>
       }
     >
@@ -209,9 +228,14 @@ export function BulkConfirm({ plan, onCancel, onConfirm }: { plan: BulkPlan; onC
               {shown.map((r) => <li key={r.folder}>{r.title}</li>)}
               {run.length > shown.length && <li className="text-dim">y {run.length - shown.length} más</li>}
             </ul>
-            <p data-testid="bulk-confirm-calls">
-              {aiCalls > 0 ? <>Llamadas a la IA aproximadas: <strong>{aiCalls}</strong> (cada una puede tardar un minuto).</> : <>No usa la IA: el mapa se construye de la teoría que ya existe.</>}
-            </p>
+            {what === "map" ? (
+              <p data-testid="bulk-confirm-calls">No usa la IA: el mapa se construye de la teoría que ya existe.</p>
+            ) : (
+              <>
+                <p data-testid="bulk-confirm-calls">{effective === "handoff" ? <>Generaciones aproximadas que hará tu agente: <strong>{aiCalls}</strong>. La app no llama a la IA.</> : <>Llamadas a la IA aproximadas: <strong>{aiCalls}</strong> (cada una puede tardar un minuto).</>}</p>
+                <RegenEngineChoice aiCalls={aiCalls} />
+              </>
+            )}
             <p className="text-dim" data-testid="bulk-confirm-backup">
               Antes de tocar cada tema se respalda lo que existe en la carpeta <code>.trash/regenerar</code> de tu vault (los ejercicios se archivan, no se borran) y, si un tema falla, se restaura. Un fallo no detiene a los demás y puedes parar la cola entre temas.
             </p>
@@ -234,6 +258,10 @@ export function BulkConfirm({ plan, onCancel, onConfirm }: { plan: BulkPlan; onC
 /** Progreso de la cola y, al terminar, el resumen por tema. */
 export function BulkProgress({ queue, onStop, onClose }: { queue: QueueState; onStop: () => void; onClose: () => void }) {
   const { items, running, stopping, what } = queue;
+  const handoff = useRegenEngine((s) => (queue.handoffId ? s.handoffs[queue.handoffId] : undefined));
+  if (queue.handoffId) {
+    return handoff ? <RegenHandoffPanel handoff={handoff} onClose={onClose} /> : null;
+  }
   const done = items.filter((i) => i.state === "ok" || i.state === "error" || i.state === "cancelled").length;
   const cur = items.find((i) => i.state === "running");
   const failed = items.filter((i) => i.state === "error");

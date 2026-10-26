@@ -6,6 +6,8 @@ import { Check, FilePlus2, FolderPlus, Loader2, RefreshCw, Wand2, X } from "luci
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { ParsedAction } from "../../lib/assistantModes";
+import { guardStructural } from "../../lib/planImpactGuard";
+import { structuralOfAction } from "../../lib/planImpact";
 import { cardKey, getCardState, setCardState } from "../../lib/cardState";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
@@ -59,9 +61,14 @@ export function ActionCard({ action: proposed }: { action: ParsedAction }) {
 
   const apply = async () => {
     const app = useApp.getState();
+    // Añadir temas puede cambiar la ruta de un plan del Mentor: se avisa y hace falta «Continuar».
+    const structural = structuralOfAction(action);
+    const guard = structural ? await guardStructural(structural.kind, structural.target, structural.label) : null;
+    if (guard && !guard.ok) return;
     setState("applying");
     try {
       const res = await api.assistantActionApply(action);
+      await guard?.commit();
       setResult({ written: res.written.length, skipped: res.skipped.length });
       setCardState(cardKey(action), "applied");
       setState("applied");

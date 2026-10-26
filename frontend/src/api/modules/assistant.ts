@@ -31,6 +31,9 @@ import { ApiError } from "../../core/errors.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 import { oneLine } from "../common.js";
+import { ChangeStore } from "../../core/mentor/planChange.js";
+import { PLAN_ID_RE } from "../../core/mentor/plan.js";
+import { generationBusy } from "./generationLock.js";
 import { clearStudySnapshotCache } from "./study.js";
 
 const MAX_HISTORY = 40;
@@ -406,12 +409,59 @@ export function assistantApi(app: AppState) {
       };
     },
 
-    /** Runs an action the user accepted. */
+    /**
+     * Runs an action the user accepted. It never races a Mentor generation (the shared generation lock) and, when the action
+     * REPLACES a file (a competency matrix, a skill), the old one is first copied to `.trash/regenerar/<fecha>_<tema>/` —
+     * the same backup place as `study_topic_regenerate` — so nothing is lost.
+     */
     assistant_action_apply(action: unknown): Record<string, unknown> {
+      if (generationBusy()) throw new ApiError("Hay una generación en curso (Ejecutar plan o Regenerar). Espera a que termine para aplicar esto.");
+      const plan = planAssistantAction(app.root, action as never);
+      const backedUp: string[] = [];
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
+      for (const op of plan.ops) {
+        if (op.kind !== "write" || !op.overwrite || !op.exists) continue;
+        const abs = path.resolve(app.root, op.rel);
+        if (path.relative(app.root, abs).startsWith("..") || !fs.existsSync(abs)) continue;
+        const dest = path.join(app.root, ".trash", "regenerar", `${stamp}_${path.basename(path.dirname(abs))}`);
+        fs.mkdirSync(dest, { recursive: true });
+        fs.copyFileSync(abs, path.join(dest, path.basename(abs)));
+        backedUp.push(op.rel);
+      }
       const res = applyAssistantAction(app.root, action as never);
       clearStudySnapshotCache();
       clearExerciseIndexCache();
-      return { ok: true, written: res.written, skipped: res.skipped, open: res.open ?? "" };
+      return { ok: true, written: res.written, skipped: res.skipped, open: res.open ?? "", backedUp };
+    },
+
+    /** ¿Hay una generación del Mentor / un «Regenerar» en curso? El chat desactiva sus acciones de generar mientras tanto. */
+    assistant_generation_busy(): boolean {
+      return generationBusy();
+    },
+
+    /**
+     * Anota en el historial de cambios de un plan que una acción del chat tocó su ruta. NO modifica el plan: queda como entrada
+     * «respondida» (no se puede deshacer ni deshace nada), igual que una pregunta al Mentor.
+     */
+    assistant_plan_note(planId: string, comment: string, summary = ""): Record<string, unknown> {
+      const id = String(planId ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const text = oneLine(String(comment ?? ""), 400);
+      if (!text) throw new ApiError("Falta el texto del cambio.");
+      const entry = new ChangeStore(app.root).append(id, {
+        at: new Date().toISOString(),
+        comment: text,
+        status: "answered",
+        kind: "question",
+        answer: oneLine(String(summary ?? ""), 600),
+        source: "none",
+        summary: "Cambio hecho desde el chat de notas: el plan no se modificó, el cronograma se recalcula solo.",
+        delta: { added: 0, removed: 0, moved: 0, deliverables: 0 },
+        changed: [],
+        warnings: [],
+        fixOptions: [],
+      });
+      return { ok: true, n: entry.n };
     },
 
     ai_chat_cancel(streamId: string): Record<string, unknown> {

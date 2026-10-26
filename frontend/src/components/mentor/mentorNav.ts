@@ -2,13 +2,14 @@
 // pone en la barra lateral. Módulo PURO (sin React): la barra y los paneles solo leen y escriben las mismas claves de `navState`.
 
 import { BASES_KEY } from "../../lib/planAreaTopics";
+import { api } from "../../lib/bridge";
 import { reviewsOfTopics, type ReviewItemLike } from "../../lib/planReviews";
-import { areaRouteTopics, basesRouteTopics, orderedAreas } from "../../lib/planTopicsByArea";
+import { areaRouteTopics, basesClassifier, basesRouteTopics, orderedAreas } from "../../lib/planTopicsByArea";
 import type { MentorBuildSummary, MentorPlan, MentorPlanRow } from "../../lib/types";
 import { useEffect } from "react";
 import { useNavState, usePersistedNav } from "../../store/navState";
 import { sectionAlias } from "./PlanSections";
-import { agendaAreaKey, MODE_KEY, PLAN_TABS, planSectionKey, planTabKey, type PlanTab } from "./planShared";
+import { agendaAreaKey, agendaViewKey, MODE_KEY, pageTabKey, PLAN_TABS, planSectionKey, planTabKey, type PlanTab } from "./planShared";
 
 /** Modo GLOBAL del Mentor: cambia los ítems de la barra y lo que enseña el panel del plan elegido. */
 export type MentorMode = "planeacion" | "ejecucion";
@@ -58,13 +59,17 @@ export const AUX_VIEWS = ["hoy", "cierre", "metas", "proyectos", "notas"] as con
 export type AuxView = (typeof AUX_VIEWS)[number];
 export const OVERVIEW_VIEW = "plan";
 export const CREATE_VIEW = "nuevo";
+/** «Áreas»: el índice de solo lectura del avance por espacio/área/tema; ruta fija, independiente del modo y del plan. */
+export const AREAS_VIEW = "areas";
 
 export type MentorRoute =
   | { kind: "plan"; planId: string }
   | { kind: "build"; buildId: string }
   | { kind: "aux"; view: AuxView }
   /** «Todos los planes» (resumen, borrador pendiente y creación); `creating` abre el formulario de plan nuevo */
-  | { kind: "overview"; creating: boolean };
+  | { kind: "overview"; creating: boolean }
+  /** «Áreas» (índice de avance de solo lectura) */
+  | { kind: "areas" };
 
 interface RouteInput {
   stored: string;
@@ -92,6 +97,7 @@ export function resolveRoute({ stored, plans, plansLoaded, builds, buildsLoaded 
     return !buildsLoaded || builds.some((b) => b.id === id) ? { kind: "build", buildId: id } : fallback();
   }
   if ((AUX_VIEWS as readonly string[]).includes(stored)) return { kind: "aux", view: stored as AuxView };
+  if (stored === AREAS_VIEW) return { kind: "areas" };
   if (stored === OVERVIEW_VIEW) return { kind: "overview", creating: false };
   if (stored === CREATE_VIEW) return { kind: "overview", creating: true };
   return fallback();
@@ -304,4 +310,95 @@ export function openRunView(planId: string, tab: string = RUN_TAB_GENERAL): void
 
 export function selectEjecucion(planId: string, id: string): void {
   useNavState.getState().set(runTabKey(planId), id.slice(RUN_NAV_PREFIX.length));
+}
+
+export const TOPIC_HIGHLIGHT_KEY = "mentor.highlightTopic";
+
+/** Abre la Planeación de un plan en la interfaz de temas del área donde vive la nota (o la página general). */
+export async function openPlanTopic(planId?: string, folder?: string, areaKey?: string): Promise<void> {
+  const nav = useNavState.getState();
+  const id = planId || (nav.values["mentor.view"]?.toString().startsWith(PLAN_PREFIX) ? nav.values["mentor.view"].toString().slice(PLAN_PREFIX.length) : "");
+  if (!id) return;
+  if (folder) {
+    nav.set(TOPIC_HIGHLIGHT_KEY, folder);
+  }
+  nav.set(MODE_KEY, "planeacion");
+  nav.set("mentor.view", `${PLAN_PREFIX}${id}`);
+
+  let resolvedSubplanId: string | null = null;
+  let isBases = areaKey === "bases" || areaKey === BASES_KEY;
+
+  try {
+    const res = await api.mentorPlanGet(id);
+    const plan = res && !res.loading ? res.plan : null;
+    if (plan) {
+      if (folder) {
+        const isBase = basesClassifier(plan);
+        for (const s of plan.subplans) {
+          const t = s.topics.find((topic) => topic.folder === folder);
+          if (t && isBase({ subplanId: s.id, group: t.group })) {
+            isBases = true;
+            break;
+          }
+        }
+      }
+      if (!isBases) {
+        const sub =
+          (folder ? plan.subplans.find((s) => s.topics.some((t) => t.folder === folder)) : undefined) ??
+          (areaKey ? plan.subplans.find((s) => s.id === areaKey || s.areaId === areaKey || s.area.toLowerCase() === areaKey.toLowerCase()) : undefined);
+        if (sub) {
+          resolvedSubplanId = sub.id;
+        }
+      }
+    }
+  } catch {
+    // fallback if bridge is unavailable
+  }
+
+  if (isBases) {
+    selectPlaneacion(id, `${PLAN_NAV_PREFIX}${PAGE_BASES}`);
+    nav.set(agendaAreaKey(id), BASES_KEY);
+    nav.set(pageTabKey(id, BASES_KEY), "temas");
+    nav.set(planTabKey(id), "agenda");
+  } else if (resolvedSubplanId || areaKey) {
+    const subId = resolvedSubplanId || areaKey!;
+    selectPlaneacion(id, `${PLAN_NAV_PREFIX}${pageAreaId(subId)}`);
+    nav.set(agendaAreaKey(id), subId);
+    nav.set(pageTabKey(id, subId), "temas");
+    nav.set(planTabKey(id), "agenda");
+  } else {
+    selectPlaneacion(id, `${PLAN_NAV_PREFIX}${PAGE_GENERAL}`);
+    nav.set(agendaAreaKey(id), "");
+    nav.set(pageTabKey(id, "all"), "area");
+  }
+}
+
+/** Abre la vista general de la Planeación del plan. */
+export function openPlanGeneral(planId?: string): void {
+  const nav = useNavState.getState();
+  const id = planId || (nav.values["mentor.view"]?.toString().startsWith(PLAN_PREFIX) ? nav.values["mentor.view"].toString().slice(PLAN_PREFIX.length) : "");
+  if (!id) return;
+  nav.set(MODE_KEY, "planeacion");
+  nav.set("mentor.view", `${PLAN_PREFIX}${id}`);
+  selectPlaneacion(id, `${PLAN_NAV_PREFIX}${PAGE_GENERAL}`);
+  nav.set(planTabKey(id), "plan");
+  nav.set(agendaAreaKey(id), "");
+  nav.set(pageTabKey(id, "all"), "semana");
+}
+
+/** Abre el calendario / agenda de la Planeación del plan. */
+export function openPlanAgenda(planId?: string, areaKey?: string): void {
+  const nav = useNavState.getState();
+  const id = planId || (nav.values["mentor.view"]?.toString().startsWith(PLAN_PREFIX) ? nav.values["mentor.view"].toString().slice(PLAN_PREFIX.length) : "");
+  if (!id) return;
+  nav.set(MODE_KEY, "planeacion");
+  nav.set("mentor.view", `${PLAN_PREFIX}${id}`);
+  selectPlaneacion(id, `${PLAN_NAV_PREFIX}${PAGE_GENERAL}`);
+  nav.set(planTabKey(id), "agenda");
+  nav.set(agendaAreaKey(id), "");
+  nav.set(agendaViewKey(id), "calendario");
+  nav.set(pageTabKey(id, "all"), "calendario");
+  if (areaKey) {
+    nav.set(pageTabKey(id, areaKey), "calendario");
+  }
 }

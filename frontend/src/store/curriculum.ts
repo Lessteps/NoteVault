@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { api } from "../lib/bridge";
 import type { AreaCoverage } from "../lib/curriculum";
-import type { CurriculumHandoff } from "../lib/types";
+import type { CurriculumHandoff, MentorAddTopicsResult } from "../lib/types";
 
 export type CurriculumHandoffState = CurriculumHandoff;
 export type EntryProgressKey = "folder" | "note" | "manifest" | "exercises" | "map";
@@ -42,6 +42,8 @@ interface CurriculumStore {
   create: (o: { areaId: string; entryIds: string[]; withExercises?: boolean }) => Promise<CurriculumHandoffState>;
   status: (id: string) => Promise<CurriculumHandoffState>;
   validate: (id: string) => Promise<CurriculumHandoffState>;
+  /** «Añadir al plan»: lleva al final de la ruta del plan los temas validados (idempotente); no cambia la cobertura */
+  addToPlan: (planId: string, folders: string[]) => Promise<MentorAddTopicsResult>;
 }
 
 const upsert = (list: CurriculumHandoffState[], h: CurriculumHandoffState): CurriculumHandoffState[] =>
@@ -91,6 +93,7 @@ export const useCurriculum = create<CurriculumStore>((set, get) => ({
     set((s) => ({ pending: h.status === "validated" ? s.pending.filter((x) => x.id !== id) : upsert(s.pending, h) }));
     return h;
   },
+  addToPlan: async (planId, folders) => api.mentorPlanAddTopics({ planId, folders }),
 }));
 
 /** La cobertura de todas las áreas del currículo (una sola lectura compartida; `refresh()` la recalcula). */

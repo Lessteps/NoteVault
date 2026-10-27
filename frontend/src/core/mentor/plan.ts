@@ -84,6 +84,8 @@ export interface PlannedTopic {
   skippedReason?: string;
   /** proyecto de aplicación tras el tema, calibrado al nivel medido; ver `lib/planTopicProject.ts` */
   topicProject?: TopicProject;
+  /** de dónde llegó al plan sin estar en su ruta original: `curriculum` = temas de referencia creados con «Crear con Antigravity» y añadidos con «Añadir al plan» */
+  addedFrom?: "curriculum";
 }
 
 export interface WeekSlice {
@@ -478,7 +480,7 @@ export interface SubplanSeed {
   objective: string;
   goalId?: string;
   goalItemIds?: string[];
-  topics: Array<{ folder: string; title: string; skills?: string[]; estMinutes: number; diagnostic?: boolean; group?: string; route?: PlannedTopic["route"]; skippedReason?: string; topicProject?: TopicProject }>;
+  topics: Array<{ folder: string; title: string; skills?: string[]; estMinutes: number; diagnostic?: boolean; group?: string; route?: PlannedTopic["route"]; skippedReason?: string; topicProject?: TopicProject; addedFrom?: "curriculum" }>;
   requiredGoals?: RequiredGoal[];
   deliverable?: Partial<Deliverable> & { title: string };
   notes?: string;
@@ -619,7 +621,7 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
     const extraOf = new Map(seed.topics.map((t) => [t.folder, t] as const));
     const withExtras = (t: PlannedTopic): PlannedTopic => {
       const x = extraOf.get(t.folder);
-      return { ...t, ...(x?.route && x.route !== "skipped" ? { route: x.route } : {}), ...(x?.topicProject ? { topicProject: x.topicProject } : {}) };
+      return { ...t, ...(x?.route && x.route !== "skipped" ? { route: x.route } : {}), ...(x?.topicProject ? { topicProject: x.topicProject } : {}), ...(x?.addedFrom ? { addedFrom: x.addedFrom } : {}) };
     };
     const plannedBy = new Map(dist.topics.map((t) => [t.folder, t] as const));
     let lastWeek = dist.topics[0]?.targetWeek ?? win?.fromWeek ?? 1;
@@ -630,7 +632,7 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
         lastWeek = planned.targetWeek;
         allTopics.push(withExtras(planned));
       } else if (!isLive(st)) {
-        allTopics.push({ folder: st.folder, title: st.title, ...(st.skills?.length ? { skills: st.skills } : {}), targetWeek: lastWeek, estMinutes: st.estMinutes, ...(st.group ? { group: st.group } : {}), route: "skipped", ...(st.skippedReason ? { skippedReason: st.skippedReason } : {}), ...(st.topicProject ? { topicProject: st.topicProject } : {}) });
+        allTopics.push({ folder: st.folder, title: st.title, ...(st.skills?.length ? { skills: st.skills } : {}), targetWeek: lastWeek, estMinutes: st.estMinutes, ...(st.group ? { group: st.group } : {}), route: "skipped", ...(st.skippedReason ? { skippedReason: st.skippedReason } : {}), ...(st.topicProject ? { topicProject: st.topicProject } : {}), ...(st.addedFrom ? { addedFrom: st.addedFrom } : {}) });
       }
     }
     totalMinutes += dist.totalMinutes;
@@ -1019,6 +1021,7 @@ function cleanTopic(raw: any): PlannedTopic | null {
   Object.assign(t, sanitizeRouteFields(raw));
   const tp = sanitizeTopicProject(raw.topicProject);
   if (tp) t.topicProject = tp;
+  if (raw.addedFrom === "curriculum") t.addedFrom = "curriculum";
   return t;
 }
 

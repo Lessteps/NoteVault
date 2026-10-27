@@ -118,6 +118,16 @@ export function openPlanTab(planId: string, tab: PlanTab): void {
   nav.set("mentor.view", `plan:${planId}`);
 }
 
+/** Abre la página de un ÁREA del plan (Agenda → área → pestaña «Temas»): «Ver en el plan» tras añadir temas de referencia. */
+export function openPlanAreaTopics(planId: string, subplanId: string): void {
+  const nav = useNavState.getState();
+  nav.set(agendaAreaKey(planId), subplanId);
+  nav.set(pageTabKey(planId, subplanId), "temas");
+  nav.set(planTabKey(planId), "agenda");
+  nav.set(MODE_KEY, "planeacion");
+  nav.set("mentor.view", `plan:${planId}`);
+}
+
 /** Abre la sub-vista «Registros» del plan (desde la Ejecución, el botón «Registros»). */
 export function openPlanRecords(planId: string): void {
   openPlanTab(planId, "plan");

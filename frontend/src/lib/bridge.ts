@@ -453,6 +453,8 @@ export const api = {
   mentorPlanCoverageAccept: (id: string, areaKey: string, title: string, accepted = true) => call<{ review: import("./planCoverage").CoverageReview }>("mentor_plan_coverage_accept", { id, areaKey, title, accepted }),
   mentorPlanRouteSet: (opts: { id: string; folders: string[]; route: "core" | "optional" | "skipped"; reason?: string; label?: string }) =>
     call<import("./types").MentorRouteChangeResult>("mentor_plan_route_set", opts),
+  /** «Añadir al plan»: los temas de referencia validados entran al final de la ruta de su área (html/css/js → Frontend, java → Java); idempotente. */
+  mentorPlanAddTopics: (opts: { planId: string; folders: string[]; subplanId?: string }) => call<import("./types").MentorAddTopicsResult>("mentor_plan_add_topics", opts),
   /** La RUTA del plan activo (o de todos los activos, o la de `planId`): cada tema con su ruta (core · optional · skipped) y su semana objetivo. Solo lee; nunca borra notas. */
   mentorRoute: (planId?: string) => call<import("./types").MentorRoute>("mentor_route", planId ? { planId } : {}),
   mentorPlanReduce: (opts: { id: string; areaId?: string; groupId?: string; max?: number }) => call<import("./types").MentorRouteChangeResult>("mentor_plan_reduce", opts),

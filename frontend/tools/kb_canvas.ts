@@ -326,21 +326,25 @@ export function readConcept(folder: string, vaultRoot: string): Concept {
 
 /**
  * Vault root = the folder that holds `.notevault` or `.obsidian` (highest ancestor if nested).
- * The user's home folder is never a vault: `~/.notevault` is the app's own settings folder.
+ * The user's home folder only counts when nothing below it is a vault: `~/.notevault` is the app's own
+ * settings folder, not a vault, so a vault inside home wins over it.
  */
 export function findVaultRoot(from: string): string {
   let dir = path.resolve(from);
   let found: string | null = null;
+  let homeMarked = false;
   const home = path.resolve(os.homedir());
   for (;;) {
-    if (dir !== home && (fs.existsSync(path.join(dir, ".notevault")) || fs.existsSync(path.join(dir, ".obsidian")))) {
-      found = dir;
+    if (fs.existsSync(path.join(dir, ".notevault")) || fs.existsSync(path.join(dir, ".obsidian"))) {
+      if (dir === home) homeMarked = true;
+      else found = dir;
     }
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   if (found) return found;
+  if (homeMarked) return home;
   throw new Error(`no encuentro la raíz del vault (.notevault) desde ${from}`);
 }
 

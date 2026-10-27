@@ -147,6 +147,8 @@ import { mentorDayCloseApi } from "./mentorDayClose.js";
 import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
+import { curriculumAreas } from "../../core/curriculum/catalog.js";
+import { addTopicsToPlan, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, type AddTopicItem } from "../../core/mentor/planAddTopics.js";
 
 const DEFAULT_BRIEF_CHARS = 6000;
 
@@ -2216,6 +2218,75 @@ export function mentorApi(app: AppState, send?: SendFn) {
         live: saved.subplans.reduce((c, s) => c + s.topics.filter((t) => routeOf(t) !== "skipped").length, 0),
         message: summary,
       };
+    },
+
+    /**
+     * «Añadir al plan»: `mentor_plan_add_topics({ planId, folders, subplanId? })` lleva al plan los temas de referencia creados por el agente externo
+     * («Crear con Antigravity»). Cada carpeta debe ser un tema real de la vault. Se añaden AL FINAL de la ruta de su área (html · css · js-reference →
+     * Frontend; java → Java; el área se crea si el plan no la tiene), en el orden del catálogo, sin tocar los temas que ya hay. `subplanId` fuerza el
+     * área destino. Idempotente (lo que ya está en el plan se omite), nunca sobre planes archivados, con entrada en el historial y «Deshacer».
+     */
+    mentor_plan_add_topics(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived) throw new ApiError("Ese plan está archivado: elige un plan activo.");
+      const wanted = [...new Set((Array.isArray(o.folders) ? (o.folders as unknown[]) : []).map((f) => String(f ?? "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").trim()).filter(Boolean))].slice(0, 400);
+      if (!wanted.length) throw new ApiError("Elige al menos un tema.");
+      const forced = String(o.subplanId ?? "").trim();
+      if (forced && !plan.subplans.some((s) => s.id === forced)) throw new ApiError("Ese área ya no existe en el plan.");
+      const snaps = new Map(topicSnaps(app).map((t) => [t.folder, t] as const));
+      const est = new Map(buildTopicCatalog([...snaps.values()], "", { max: 1_000_000 }).map((c) => [c.folder, c.estMinutes] as const));
+      const areas = curriculumAreas();
+      const items: AddTopicItem[] = [];
+      const rejected: Array<{ folder: string; reason: string }> = [];
+      for (const folder of wanted) {
+        const snap = snaps.get(folder);
+        if (!snap) {
+          rejected.push({ folder, reason: "no es un tema de la vault (falta su manifiesto de práctica)" });
+          continue;
+        }
+        const minutes = est.get(folder) ?? 45;
+        if (forced) {
+          items.push({ folder, title: snap.title, estMinutes: minutes, subplanId: forced });
+          continue;
+        }
+        const areaId = curriculumAreaOfFolder(folder, areas);
+        const target = areaId ? CURRICULUM_PLAN_TARGET[areaId] : undefined;
+        if (!target) rejected.push({ folder, reason: "no es de un área de referencia: elige el área del plan donde añadirlo" });
+        else items.push({ folder, title: snap.title, estMinutes: minutes, target });
+      }
+      if (!items.length) throw new ApiError(`No se añadió nada: ${rejected[0]!.reason}.`);
+      const res = addTopicsToPlan(plan, items);
+      const skipped = [...rejected, ...res.skipped];
+      if (!res.added.length) return { plan, added: [] as string[], skipped, created: [] as string[], changed: 0, message: "Esos temas ya estaban en el plan: no hay nada que añadir." };
+      const subTitle = (sid: string): string => res.plan.subplans.find((x) => x.id === sid)?.area ?? sid;
+      const bySub = new Map<string, number>();
+      for (const a of res.added) bySub.set(a.subplanId, (bySub.get(a.subplanId) ?? 0) + 1);
+      const labelOf = (folder: string): string => areas.find((a) => folder.startsWith(`${a.space}/${a.areaFolder}/`))?.title ?? "";
+      const kinds = [...new Set(res.added.map((a) => labelOf(a.folder)).filter(Boolean))];
+      const n = res.added.length;
+      const where = [...bySub.entries()].map(([sid]) => subTitle(sid)).join(" y ");
+      const summary = `Se añadieron ${n} ${n === 1 ? "tema" : "temas"} de referencia${kinds.length ? ` (${kinds.join(", ")})` : ""} al área ${where}, al final de su ruta.${res.created.length ? ` Se creó el área ${res.created.map((c) => c.area).join(" y ")}.` : ""}`;
+      const saved = st.save(res.plan);
+      const hist = new ChangeStore(app.root);
+      const entry = hist.append(id, {
+        at: new Date().toISOString(),
+        comment: `Añadir ${n} ${n === 1 ? "tema" : "temas"} de referencia al plan`,
+        status: "applied",
+        source: "rules",
+        kind: "adjust",
+        summary,
+        delta: { added: n, removed: 0, moved: 0, deliverables: 0, ...(res.created.length ? { structure: res.created.length } : {}) },
+        changed: res.added.map((a) => a.folder),
+        warnings: skipped.slice(0, 5).map((r) => `«${r.folder.split("/").pop()}»: ${r.reason}.`),
+        fixOptions: [],
+        before: plan,
+      });
+      return { plan: saved, entry: viewOf(entry), history: hist.list(id).map(viewOf), added: res.added.map((a) => a.folder), addedTo: [...bySub.keys()], skipped, created: res.created.map((c) => c.id), changed: n, message: summary };
     },
 
     // ── Cobertura del plan: notas de teoría y práctica por área (determinista) + revisión con el Mentor (bajo demanda) ──

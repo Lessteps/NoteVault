@@ -179,7 +179,7 @@ function seedOf(s: Subplan): SubplanSeed {
     objective: s.objective,
     ...(s.goalId ? { goalId: s.goalId } : {}),
     ...(s.goalItemIds?.length ? { goalItemIds: s.goalItemIds } : {}),
-    topics: s.topics.filter((t) => !t.completedAt).map((t) => ({ folder: t.folder, title: t.title, ...(t.skills?.length ? { skills: t.skills } : {}), estMinutes: t.estMinutes, ...(t.diagnostic ? { diagnostic: true } : {}), ...(t.group ? { group: t.group } : {}), ...(t.route ? { route: t.route } : {}), ...(t.skippedReason ? { skippedReason: t.skippedReason } : {}), ...(t.topicProject ? { topicProject: t.topicProject } : {}) })),
+    topics: s.topics.filter((t) => !t.completedAt).map((t) => ({ folder: t.folder, title: t.title, ...(t.skills?.length ? { skills: t.skills } : {}), estMinutes: t.estMinutes, ...(t.diagnostic ? { diagnostic: true } : {}), ...(t.group ? { group: t.group } : {}), ...(t.route ? { route: t.route } : {}), ...(t.skippedReason ? { skippedReason: t.skippedReason } : {}), ...(t.topicProject ? { topicProject: t.topicProject } : {}), ...(t.addedFrom ? { addedFrom: t.addedFrom } : {}) })),
     requiredGoals: s.requiredGoals,
     ...(s.deliverable ? { deliverable: s.deliverable } : {}),
     ...(s.notes ? { notes: s.notes } : {}),

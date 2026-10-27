@@ -1489,6 +1489,8 @@ export interface MentorPlannedTopic {
   route?: "optional" | "skipped"; skippedReason?: string;
   /** proyecto de aplicación tras el tema, calibrado al nivel medido (ver `lib/planTopicProject.ts`) */
   topicProject?: import("./planTopicProject").TopicProject;
+  /** llegó al plan con «Añadir al plan» (temas de referencia creados con el agente externo) */
+  addedFrom?: "curriculum";
 }
 export interface MentorWeekSlice { week: number; start: string; end: string; topics: string[]; minutes: number; capacityMinutes: number }
 export interface MentorRequiredGoal { goalId: string; itemId?: string; note: string }
@@ -1797,6 +1799,22 @@ export interface MentorRouteChangeResult {
   rejected?: Array<{ folder: string; reason: string }>;
   /** temas vivos que quedan en el alcance */
   live?: number;
+}
+
+/** `mentor_plan_add_topics`: temas de referencia añadidos al final de la ruta de su área. */
+export interface MentorAddTopicsResult {
+  plan: MentorPlan;
+  entry?: MentorChangeEntry;
+  history?: MentorChangeEntry[];
+  /** carpetas añadidas (vacío = ya estaban todas) */
+  added: string[];
+  /** ids de los subplans que recibieron temas */
+  addedTo?: string[];
+  skipped: Array<{ folder: string; reason: string }>;
+  /** ids de los subplans creados por la operación */
+  created?: string[];
+  changed: number;
+  message: string;
 }
 
 // ── Cierre del día y memoria del Mentor (`mentor_day_record`, `mentor_day_close`, ver core/mentor/dayClose.ts) ──

@@ -2266,7 +2266,10 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const subTitle = (sid: string): string => res.plan.subplans.find((x) => x.id === sid)?.area ?? sid;
       const bySub = new Map<string, number>();
       for (const a of res.added) bySub.set(a.subplanId, (bySub.get(a.subplanId) ?? 0) + 1);
-      const labelOf = (folder: string): string => areas.find((a) => folder.startsWith(`${a.space}/${a.areaFolder}/`))?.title ?? "";
+      const labelOf = (folder: string): string => {
+        const aid = curriculumAreaOfFolder(folder, areas);
+        return (aid ? areas.find((a) => a.id === aid)?.title : undefined) ?? areas.find((a) => folder.startsWith(`${a.space}/${a.areaFolder}/`))?.title ?? "";
+      };
       const kinds = [...new Set(res.added.map((a) => labelOf(a.folder)).filter(Boolean))];
       const n = res.added.length;
       const where = [...bySub.entries()].map(([sid]) => subTitle(sid)).join(" y ");

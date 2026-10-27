@@ -106,7 +106,7 @@ function strongMatch(p: PreparedTopic, e: CurriculumEntry): boolean {
 
 /** Números `N` ya usados en la carpeta del área por temas `<prefijo>.N …`. */
 function usedNumbers(area: CurriculumArea, topics: PreparedTopic[]): Set<number> {
-  const prefix = areaNumberPrefix(area.areaFolder);
+  const prefix = area.prefix ?? areaNumberPrefix(area.areaFolder);
   const used = new Set<number>();
   if (!prefix) return used;
   const base = `${area.space}/${area.areaFolder}/`.toLowerCase();
@@ -144,7 +144,7 @@ export function computeAreaCoverage(area: CurriculumArea, topics: ExistingTopic[
     });
   }
   const used = usedNumbers(area, prepared);
-  const prefix = areaNumberPrefix(area.areaFolder);
+  const prefix = area.prefix ?? areaNumberPrefix(area.areaFolder);
 
   const rows: CoverageRow[] = [];
   let covered = 0;

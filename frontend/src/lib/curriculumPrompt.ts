@@ -114,8 +114,10 @@ const difficultyOf = (e: CurriculumEntry): number => (e.importance === "esencial
 /** Separa `Espacio/Área/N.M Título`; lanza un `Error` con un mensaje claro si no cumple las reglas. */
 export function parseSuggestedFolder(folder: string): { space: string; areaFolder: string; name: string; number: string; title: string } {
   const parts = String(folder ?? "").replace(/\\/g, "/").split("/").filter(Boolean);
-  if (parts.length !== 3) throw new Error(`La carpeta «${folder}» debe tener la forma Espacio/Área/N.M Tema (dos niveles).`);
-  const [space, areaFolder, name] = parts as [string, string, string];
+  if (parts.length < 3) throw new Error(`La carpeta «${folder}» debe tener la forma Espacio/Área/N.M Tema (al menos dos niveles).`);
+  const space = parts[0]!;
+  const name = parts[parts.length - 1]!;
+  const areaFolder = parts.slice(1, -1).join("/");
   if (!isValidTopicFolderName(name)) throw new Error(`«${name}» no es un nombre de carpeta válido (N.M Nombre, máximo ${MAX_FOLDER_NAME} caracteres, sin / \\ : * ? " < > |).`);
   const m = /^(\d+(?:\.\d+)+) (.+)$/.exec(name)!;
   return { space, areaFolder, name, number: m[1]!, title: m[2]! };
@@ -222,9 +224,10 @@ export function buildCurriculumTask(input: CurriculumTaskInput): CurriculumTask 
   const { vaultRoot, space, area, skills, today, id, taskAbs } = input;
   if (!input.entries.length) throw new Error("Elige al menos un tema.");
   const planned = planEntries(area, input.entries);
-  const areaFolder = planned[0]!.folder.split("/")[1]!;
+  const areaFolder = area.areaFolder;
+  const areaPrefix = `${space}/${areaFolder}/`;
   for (const p of planned) {
-    if (p.folder.split("/")[0] !== space || p.folder.split("/")[1] !== areaFolder) throw new Error(`«${p.folder}» no está en ${space}/${areaFolder}.`);
+    if (!p.folder.startsWith(areaPrefix)) throw new Error(`«${p.folder}» no está en ${space}/${areaFolder}.`);
   }
   const withEx = input.withExercises === true;
   const existing = [...(input.existingFolders ?? [])].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));

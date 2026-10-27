@@ -39,7 +39,12 @@ const fold = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").t
 /** El área del currículo a la que pertenece una carpeta de tema (`Programación/12 CSS/12.7 …`), o undefined. */
 export function curriculumAreaOfFolder(folder: string, areas: ReadonlyArray<{ id: string; space: string; areaFolder: string }>): string | undefined {
   const f = folder.replace(/\\/g, "/");
-  return areas.find((a) => f.startsWith(`${a.space}/${a.areaFolder}/`))?.id;
+  const found = areas.find((a) => f.startsWith(`${a.space}/${a.areaFolder}/`))?.id;
+  if (found) return found;
+  if (f.startsWith("Programación/11 HTML/")) return "html";
+  if (f.startsWith("Programación/12 CSS/")) return "css";
+  if (f.startsWith("Programación/13 JavaScript Reference/")) return "js-reference";
+  return undefined;
 }
 
 /** Orden del catálogo: por la numeración de la carpeta (`12.2` antes que `12.10`). */
@@ -87,6 +92,15 @@ function weeksOf(plan: Pick<Plan, "start" | "end">, sub: Pick<Subplan, "topics" 
     const saved = sub.weeks.find((w) => w.week === r.week);
     return { week: r.week, start: r.start, end: r.end, topics: inWeek.map((t) => t.folder), minutes: inWeek.reduce((n, t) => n + t.estMinutes, 0), capacityMinutes: saved?.capacityMinutes ?? 0 };
   });
+}
+
+function groupForItem(it: AddTopicItem, subAreaId?: string): { id: string; title: string; order: number } | undefined {
+  if (!subAreaId) return undefined;
+  const f = it.folder.replace(/\\/g, "/");
+  if (f.includes("/5 Frontend/HTML/") || f.includes("/11 HTML/")) return { id: "html", title: "HTML", order: 110 };
+  if (f.includes("/5 Frontend/CSS/") || f.includes("/12 CSS/")) return { id: "css", title: "CSS", order: 120 };
+  if (f.includes("/13 JavaScript Reference/")) return { id: "js-reference", title: "JavaScript Reference", order: 130 };
+  return { id: CORE_GROUP_ID, title: it.target?.knowledgeTitle ?? areaDef(subAreaId)?.knowledgeTitle ?? "Temas", order: 100 };
 }
 
 /**
@@ -141,22 +155,23 @@ export function addTopicsToPlan(plan: Plan, items: readonly AddTopicItem[]): Add
     }
     const sub = subplans[idx]!;
     const lastWeek = Math.min(weeks, Math.max(1, ...sub.topics.map((t) => t.targetWeek)));
-    // con grupos (plan por áreas) los temas van al grupo «Conocimientos» del área, que se crea si falta
-    let groupsOf = sub.groups;
-    let groupId: string | undefined;
-    if (sub.areaId) {
-      groupId = CORE_GROUP_ID;
-      if (!groupsOf?.some((x) => x.id === CORE_GROUP_ID)) groupsOf = [...(groupsOf ?? []), { id: CORE_GROUP_ID, title: g.target?.knowledgeTitle ?? areaDef(sub.areaId)?.knowledgeTitle ?? "Temas", kind: "knowledge", order: 100 }];
-    }
-    const fresh: PlannedTopic[] = g.items.map((it, i) => ({
-      folder: it.folder,
-      title: it.title,
-      targetWeek: Math.min(weeks, lastWeek + Math.floor(i / PER_WEEK)),
-      estMinutes: it.estMinutes,
-      ...(groupId ? { group: groupId } : {}),
-      addedFrom: "curriculum" as const,
-    }));
-    const next: Subplan = { ...sub, topics: [...sub.topics, ...fresh], ...(groupsOf ? { groups: groupsOf } : {}) };
+    let groupsOf = sub.groups ? [...sub.groups] : [];
+    const fresh: PlannedTopic[] = g.items.map((it, i) => {
+      const gDef = groupForItem(it, sub.areaId);
+      if (gDef && !groupsOf.some((x) => x.id === gDef.id)) {
+        groupsOf.push({ id: gDef.id, title: gDef.title, kind: "knowledge", order: gDef.order });
+      }
+      return {
+        folder: it.folder,
+        title: it.title,
+        targetWeek: Math.min(weeks, lastWeek + Math.floor(i / PER_WEEK)),
+        estMinutes: it.estMinutes,
+        ...(gDef ? { group: gDef.id } : {}),
+        addedFrom: "curriculum" as const,
+      };
+    });
+    groupsOf.sort((a, b) => a.order - b.order);
+    const next: Subplan = { ...sub, topics: [...sub.topics, ...fresh], ...(groupsOf.length ? { groups: groupsOf } : {}) };
     subplans[idx] = { ...next, weeks: weeksOf(plan, next) };
     for (const t of fresh) added.push({ folder: t.folder, subplanId: sub.id });
   }

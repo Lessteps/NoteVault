@@ -30,8 +30,10 @@ export interface CurriculumArea {
   title: string;
   /** Espacio de la vault, p. ej. `Programación`. */
   space: string;
-  /** Carpeta del área donde se crearán los temas nuevos, p. ej. `12 CSS` (nivel 1, hermana de las actuales). */
+  /** Carpeta del área donde se crearán los temas nuevos, p. ej. `5 Frontend/HTML` o `14 Java`. */
   areaFolder: string;
+  /** Prefijo numérico opcional para los temas (ej. `5.1` para HTML, `5.2` para CSS); si no se especifica se extrae de `areaFolder`. */
+  prefix?: string;
   entries: CurriculumEntry[];
 }
 

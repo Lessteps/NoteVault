@@ -187,7 +187,7 @@ export function areaRows(rows: ReadonlyArray<TopicRow>, space?: string): AreaRow
 export function topicsOf(rows: ReadonlyArray<TopicRow>, space: string, area: string): TopicRow[] {
   const a = norm(area);
   return rows
-    .filter((r) => r.space === space && (!a || r.area === a))
+    .filter((r) => r.space === space && (!a || r.area === a || r.area.startsWith(`${a}/`)))
     .sort((x, y) => natural(x.area, y.area) || natural(x.code || x.title, y.code || y.title) || natural(x.title, y.title));
 }
 

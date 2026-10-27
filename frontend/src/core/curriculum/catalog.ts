@@ -10,12 +10,12 @@ const SPACE = "Programación";
 
 /**
  * Currículo de referencia por área (HTML, CSS, referencia de JavaScript, Java): lo que cada área DEBERÍA cubrir.
- * Son áreas hermanas de primer nivel (`11 HTML`…`14 Java`), planas: las categorías van en el catálogo, no en carpetas.
+ * HTML y CSS son áreas internas dentro de Frontend (`5 Frontend/HTML` y `5 Frontend/CSS`).
  */
 export function curriculumAreas(): CurriculumArea[] {
   return [
-    { id: "html", title: "HTML", space: SPACE, areaFolder: "11 HTML", entries: HTML_ENTRIES },
-    { id: "css", title: "CSS", space: SPACE, areaFolder: "12 CSS", entries: CSS_ENTRIES },
+    { id: "html", title: "HTML", space: SPACE, areaFolder: "5 Frontend/HTML", prefix: "5.1", entries: HTML_ENTRIES },
+    { id: "css", title: "CSS", space: SPACE, areaFolder: "5 Frontend/CSS", prefix: "5.2", entries: CSS_ENTRIES },
     { id: "js-reference", title: "JavaScript Reference", space: SPACE, areaFolder: "13 JavaScript Reference", entries: JS_REFERENCE_ENTRIES },
     { id: "java", title: "Java", space: SPACE, areaFolder: "14 Java", entries: JAVA_ENTRIES },
   ];

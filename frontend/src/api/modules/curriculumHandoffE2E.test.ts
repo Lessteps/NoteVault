@@ -130,13 +130,13 @@ describe("Antigravity -> validar -> vault -> Mentor", () => {
     const ids = html.entries.slice(0, 2).map((e) => e.id);
     const api = curriculumHandoffApi(app, { now: NOW });
     const h = await api.study_curriculum_handoff({ areaId: "html", entryIds: ids, confirm: true });
-    expect(h.entries.map((e) => e.folder)).toEqual(["Programación/11 HTML/11.1 Document skeleton - doctype, html, head and body", "Programación/11 HTML/11.2 Metadata - title, meta, base and link"]);
+    expect(h.entries.map((e) => e.folder)).toEqual(["Programación/5 Frontend/HTML/5.1.1 Document skeleton - doctype, html, head and body", "Programación/5 Frontend/HTML/5.1.2 Metadata - title, meta, base and link"]);
     // la app solo escribió la tarea
-    expect(fs.existsSync(abs("Programación/11 HTML"))).toBe(false);
+    expect(fs.existsSync(abs("Programación/5 Frontend/HTML"))).toBe(false);
 
     const task = simulateAgent(h);
     expect(task.topics.map((t) => t.items.length)).toEqual(html.entries.slice(0, 2).map((e) => e.items.length));
-    expect(task.heading).toBe("## 11 HTML");
+    expect(task.heading).toBe("## 5 Frontend/HTML");
 
     vaultScan(app);
     const v = await api.study_curriculum_handoff_validate(h.id);
@@ -148,13 +148,14 @@ describe("Antigravity -> validar -> vault -> Mentor", () => {
     const dash: any = await studyApi(app).study_topic_dashboard();
     const folders = dash.topics.map((t: any) => t.folder);
     expect(folders).toEqual(expect.arrayContaining(h.entries.map((e) => e.folder)));
-    expect(dash.areas).toContain("11 HTML");
+    expect(dash.areas).toContain("HTML");
 
     const ov = mentorAreasOverviewApi(app);
     const areas: any = await ov.mentor_areas_overview({ level: "areas", space: "Programación" });
-    expect(areas.rows.map((r: any) => r.name)).toContain("11 HTML");
-    const topics: any = await ov.mentor_areas_overview({ level: "topics", space: "Programación", area: "Programación/11 HTML" });
-    expect(topics.rows.map((r: any) => r.code)).toEqual(["11.1", "11.2"]);
+    expect(areas.rows.map((r: any) => r.name)).toContain("HTML");
+
+    const topics: any = await ov.mentor_areas_overview({ level: "topics", space: "Programación", area: "Programación/5 Frontend/HTML" });
+    expect(topics.rows.map((r: any) => r.code)).toEqual(["5.1.1", "5.1.2"]);
 
     // añadir al plan
     const plan = savePlan();
@@ -164,7 +165,7 @@ describe("Antigravity -> validar -> vault -> Mentor", () => {
     expect(r.added).toEqual(h.entries.map((e) => e.folder));
     const fe = r.plan.subplans.find((s: any) => s.areaId === "frontend");
     expect(fe.topics.map((t: any) => t.folder)).toEqual([...before, ...h.entries.map((e) => e.folder)]);
-    expect(fe.topics.slice(2).every((t: any) => t.addedFrom === "curriculum" && t.group === "core")).toBe(true);
+    expect(fe.topics.slice(2).every((t: any) => t.addedFrom === "curriculum" && t.group === "html")).toBe(true);
     // queda guardado
     expect(JSON.parse(fs.readFileSync(planFile(plan.id), "utf-8")).subplans[1].topics.at(-1).addedFrom).toBe("curriculum");
   });

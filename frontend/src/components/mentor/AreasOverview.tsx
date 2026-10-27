@@ -168,6 +168,7 @@ export function AreasOverview({ spaces }: { spaces: Loaded<SpaceRow> }) {
   const badge = usePlanBadge();
   const go = useCallback((s: string, a = ""): void => setRaw(joinPath(s, a)), [setRaw]);
   const areaName = area.split("/").pop() ?? area;
+  const parentArea = area.includes("/") ? area.slice(0, area.lastIndexOf("/")) : "";
   // «Temas por crear» del currículo de referencia: un cuarto nivel que se abre aquí mismo y vuelve con «Volver»
   const [gapsId, setGapsId] = useState<string | null>(null);
   const { areas: coverage } = useCoverage();
@@ -189,6 +190,12 @@ export function AreasOverview({ spaces }: { spaces: Loaded<SpaceRow> }) {
             <>
               <ChevronRight size={13} className="text-faint" aria-hidden />
               <Crumb label={space} on={level === "areas"} onClick={() => go(space)} />
+            </>
+          )}
+          {parentArea && parentArea !== space && (
+            <>
+              <ChevronRight size={13} className="text-faint" aria-hidden />
+              <Crumb label={parentArea.split("/").pop() ?? parentArea} on={false} onClick={() => go(space, parentArea)} />
             </>
           )}
           {area && (
@@ -367,9 +374,13 @@ function AreasLevel({ space, version, badge, onOpen, coverage, onGaps }: { space
   const s = useLevel<AreaRow>("areas", space, "", version);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<AreaSort>("nombre");
-  const rows = useMemo(() => sortAreas(s.rows.filter((r) => !q.trim() || r.name.toLowerCase().includes(q.trim().toLowerCase())), sort), [s.rows, q, sort]);
-  // áreas del currículo que aún no existen en la vault: tarjetas «Por crear» con borde discontinuo
-  const toCreate = useMemo(() => (s.loading && !s.rows.length ? [] : pendingAreas(coverage.filter((c) => c.level !== "ok"), space, s.rows.map((r) => r.area))), [coverage, space, s.rows, s.loading]);
+  const isDirectChild = (areaPath: string): boolean => {
+    const rel = areaPath.startsWith(space + "/") ? areaPath.slice(space.length + 1) : areaPath;
+    return !rel.includes("/");
+  };
+  const rows = useMemo(() => sortAreas(s.rows.filter((r) => isDirectChild(r.area) && (!q.trim() || r.name.toLowerCase().includes(q.trim().toLowerCase()))), sort), [s.rows, q, sort, space]);
+  // áreas del currículo que aún no existen en la vault: tarjetas «Por crear» con borde discontinuo (solo de nivel superior, las anidadas van en su área)
+  const toCreate = useMemo(() => (s.loading && !s.rows.length ? [] : pendingAreas(coverage.filter((c) => c.level !== "ok" && !c.areaFolder.includes("/")), space, s.rows.map((r) => r.area))), [coverage, space, s.rows, s.loading]);
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -448,6 +459,8 @@ function AreaPage({
   const topicsState = useLevel<TopicRow>("topics", space, area, version);
   const inProgress = useMemo(() => topicsState.rows.filter((t) => t.state === "en_curso").slice(0, 6), [topicsState.rows]);
   const due = useMemo(() => topicsState.rows.filter((t) => t.reviewDue).slice(0, 6), [topicsState.rows]);
+  const subAreas = useMemo(() => areasState.rows.filter((r) => r.area.startsWith(`${area}/`)), [areasState.rows, area]);
+  const relatedMissing = useMemo(() => relatedCoverage(coverage, space, area), [coverage, space, area]);
 
   const tiles = row
     ? [
@@ -475,7 +488,7 @@ function AreaPage({
           </p>
           {row && <Counts r={row} />}
           {row?.lastActivity ? <p className="text-[11px] text-faint">Última actividad: {fmtDate(row.lastActivity)}</p> : null}
-          <LackingChips list={relatedCoverage(coverage, space, area)} onGaps={onGaps} />
+          <LackingChips list={relatedMissing} onGaps={onGaps} />
         </div>
       </div>
 
@@ -498,6 +511,42 @@ function AreaPage({
 
       {tab === "resumen" && (
         <div className="space-y-4" data-testid="area-summary">
+          {(subAreas.length > 0 || relatedMissing.length > 0) && (
+            <section className="rounded-xl border border-line bg-card p-3.5" data-testid="area-subareas">
+              <h3 className="mb-2.5 text-[13.5px] font-semibold text-text">Áreas internas de {areaName}</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {subAreas.map((sa) => (
+                  <button
+                    key={sa.area}
+                    type="button"
+                    onClick={() => {
+                      useNavState.getState().set(AREAS_PATH_KEY, joinPath(space, sa.area));
+                    }}
+                    data-testid={`subarea-${sa.name}`}
+                    className="flex items-center gap-3 rounded-lg border border-line bg-panel/50 p-3 text-left transition-colors hover:bg-hover"
+                  >
+                    <Ring pct={sa.pct} size={36} />
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold text-text text-[13px]">{sa.name}</span>
+                      <span className="text-[11.5px] text-dim">{sa.completed}/{sa.topics} temas completos</span>
+                    </div>
+                    <ChevronRight size={14} className="text-faint" aria-hidden />
+                  </button>
+                ))}
+                {relatedMissing
+                  .filter((c) => !subAreas.some((sa) => sa.area.toLowerCase().endsWith(c.areaFolder.toLowerCase())))
+                  .map((c) => (
+                    <div key={c.areaId} className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-warn/60 bg-panel/30 p-3" data-testid={`pending-subarea-${c.areaId}`}>
+                      <div className="min-w-0 flex-1">
+                        <span className="block font-semibold text-text text-[13px]">{c.title}</span>
+                        <span className="text-[11.5px] text-warn">Falta de desarrollo · {c.missing} temas por crear</span>
+                      </div>
+                      <GhostButton onClick={() => onGaps(c.areaId)} data-testid={`open-gaps-${c.areaId}`}>Ver temas por crear</GhostButton>
+                    </div>
+                  ))}
+              </div>
+            </section>
+          )}
           <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
             {tiles.map((t) => (
               <li key={t.id} className="rounded-xl border border-line bg-card p-3" data-testid={`area-tile-${t.id}`}>

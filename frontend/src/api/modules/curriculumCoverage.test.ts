@@ -24,7 +24,7 @@ describe("study_curriculum_coverage", () => {
     };
     mk("Programación/5 Frontend/5.2 CSS", "5.2 CSS");
     mk("Programación/5 Frontend/5.1 The browser as a runtime and semantic HTML", "5.1 The browser as a runtime and semantic HTML");
-    mk("Programación/12 CSS/12.4 Whatever name", "Whatever name", 'curriculum_id: css.flex-container\n');
+    mk("Programación/5 Frontend/CSS/5.2.4 Whatever name", "Whatever name", 'curriculum_id: css.flex-container\n');
     mk("Matemáticas/1 Aritmética/1.1 Números", "1.1 Números");
     clearVaultScanCache();
     app = new AppState(tmp) as never;
@@ -42,8 +42,8 @@ describe("study_curriculum_coverage", () => {
     expect(css.rows.find((r) => r.entry.id === "css.flex-container")).toMatchObject({ status: "cubierto" });
     expect(css.rows.find((r) => r.entry.id === "css.grid-container")).toMatchObject({ status: "parcial" });
     expect(css.level).toBe("critico");
-    // 12.4 ya está usado: las propuestas lo saltan
-    expect(css.rows.some((r) => r.suggestedFolder.includes("/12.4 "))).toBe(false);
+    // 5.2.4 ya está usado: las propuestas lo saltan
+    expect(css.rows.some((r) => r.suggestedFolder.includes("/5.2.4 "))).toBe(false);
     expect(cov.areas.find((a) => a.areaId === "java")).toMatchObject({ covered: 0, level: "critico" });
   });
 
@@ -58,7 +58,7 @@ describe("study_curriculum_coverage", () => {
     const before = fs.readdirSync(path.join(tmp, "Programación")).sort();
     const text = curriculumGapsPrompt(app, 5, "Programación");
     expect(text).toContain("«14 Java»");
-    expect(text).toContain("«12 CSS»");
+    expect(text).toContain("«5 Frontend/CSS»");
     expect(curriculumGapsPrompt(app, 5, "Matemáticas")).toBe("");
     expect(fs.readdirSync(path.join(tmp, "Programación")).sort()).toEqual(before);
   });

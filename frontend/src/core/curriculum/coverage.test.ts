@@ -69,7 +69,7 @@ describe("computeCoverage", () => {
   });
 
   it("curriculum_id en el frontmatter da cubierto exacto", () => {
-    const topics = [...TODAY, topic("12 CSS/12.5 Flexbox container", "Flex container properties", "css.flex-container")];
+    const topics = [...TODAY, topic("5 Frontend/CSS/5.2.5 Flexbox container", "Flex container properties", "css.flex-container")];
     const css = computeCoverage(areas, topics).areas.find((a) => a.areaId === "css")!;
     const row = css.rows.find((r) => r.entry.id === "css.flex-container")!;
     expect(row.status).toBe("cubierto");
@@ -78,19 +78,19 @@ describe("computeCoverage", () => {
   });
 
   it("un tema específico con título del catálogo cubre; uno genérico de repaso no", () => {
-    const css = computeCoverage(areas, [...TODAY, topic("12 CSS/12.9 Box shadows")]).areas.find((a) => a.areaId === "css")!;
+    const css = computeCoverage(areas, [...TODAY, topic("5 Frontend/CSS/5.2.9 Box shadows")]).areas.find((a) => a.areaId === "css")!;
     expect(css.rows.find((r) => r.entry.id === "css.box-shadow")!.status).toBe("cubierto");
     const js = computeCoverage(areas, TODAY).areas.find((a) => a.areaId === "js-reference")!;
     expect(js.rows.find((r) => r.entry.id === "js.array-mutators")!.status).toBe("parcial");
   });
 
   it("numera las carpetas propuestas en orden del catálogo saltando números ya usados", () => {
-    const topics = [...TODAY, topic("12 CSS/12.2 Something already there", "Something already there")];
+    const topics = [...TODAY, topic("5 Frontend/CSS/5.2.2 Something already there", "Something already there")];
     const css = computeCoverage(areas, topics).areas.find((a) => a.areaId === "css")!;
     const folders = css.rows.map((r) => r.suggestedFolder).filter(Boolean);
-    expect(folders[0]).toBe(`${P}/12 CSS/12.1 ${css.rows[0]!.entry.title}`);
-    expect(folders[1]).toBe(`${P}/12 CSS/12.3 ${css.rows[1]!.entry.title}`);
-    const nums = folders.map((f) => Number(/\/12\.(\d+) /.exec(f)![1]));
+    expect(folders[0]).toBe(`${P}/5 Frontend/CSS/5.2.1 ${css.rows[0]!.entry.title}`);
+    expect(folders[1]).toBe(`${P}/5 Frontend/CSS/5.2.3 ${css.rows[1]!.entry.title}`);
+    const nums = folders.map((f) => Number(/\/5\.2\.(\d+) /.exec(f)![1]));
     expect(new Set(nums).size).toBe(nums.length);
     expect(nums).not.toContain(2);
     expect(nums).toEqual([...nums].sort((a, b) => a - b));
@@ -104,7 +104,7 @@ describe("computeCoverage", () => {
 
   it("una área completa queda ok y sin marca de falta de desarrollo", () => {
     const html = areas.find((a) => a.id === "html")!;
-    const all = html.entries.map((e, i) => topic(`11 HTML/11.${i + 1} ${e.title}`, e.title, e.id));
+    const all = html.entries.map((e, i) => topic(`5 Frontend/HTML/5.1.${i + 1} ${e.title}`, e.title, e.id));
     const cov = computeCoverage([html], all);
     expect(cov.areas[0]).toMatchObject({ pct: 100, level: "ok", missing: 0 });
     expect(coverageBadge(cov.areas[0]!)).toBe("");
@@ -113,7 +113,7 @@ describe("computeCoverage", () => {
 
   it("el texto de huecos para el prompt lista primero lo esencial", () => {
     const text = coverageGapsPromptSection(computeCoverage(areas, TODAY), 5);
-    expect(text).toContain("«12 CSS»");
+    expect(text).toContain("«5 Frontend/CSS»");
     expect(text).toContain("«14 Java»");
     expect(text).toMatch(/\[esencial,/);
   });

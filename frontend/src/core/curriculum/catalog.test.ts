@@ -6,10 +6,10 @@ const RANGES: Record<string, [number, number]> = { html: [40, 55], css: [110, 15
 describe("catálogo de currículo de referencia", () => {
   const areas = curriculumAreas();
 
-  it("tiene las cuatro áreas hermanas con su carpeta de nivel 1", () => {
+  it("tiene las cuatro áreas con su carpeta correspondiente (HTML y CSS bajo 5 Frontend)", () => {
     expect(areas.map((a) => [a.id, a.areaFolder])).toEqual([
-      ["html", "11 HTML"],
-      ["css", "12 CSS"],
+      ["html", "5 Frontend/HTML"],
+      ["css", "5 Frontend/CSS"],
       ["js-reference", "13 JavaScript Reference"],
       ["java", "14 Java"],
     ]);

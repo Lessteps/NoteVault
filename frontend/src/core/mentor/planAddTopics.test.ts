@@ -58,7 +58,8 @@ describe("addTopicsToPlan", () => {
     expect(fe.topics.slice(0, fe0.topics.length)).toEqual(fe0.topics);
     // por número de carpeta: 11.1, 12.2, 12.10
     expect(fe.topics.slice(fe0.topics.length).map((t) => t.title)).toEqual(["Tema 1", "Tema 2", "Tema 10"]);
-    expect(fe.topics.slice(fe0.topics.length).every((t) => t.addedFrom === "curriculum" && t.group === "core" && !t.route)).toBe(true);
+    expect(fe.topics.slice(fe0.topics.length).every((t) => t.addedFrom === "curriculum" && !t.route)).toBe(true);
+    expect(fe.topics.slice(fe0.topics.length).map((t) => t.group)).toEqual(["html", "css", "css"]);
     // las demás áreas no cambian
     expect(r.plan.subplans.find((s) => s.areaId === "backend")).toEqual(plan.subplans.find((s) => s.areaId === "backend"));
     // la semana objetivo informativa queda después del último tema
@@ -116,6 +117,6 @@ describe("addTopicsToPlan", () => {
     const r = addTopicsToPlan(basePlan(), [item("12 CSS", 1)]);
     const back = sanitizePlan(JSON.parse(JSON.stringify(r.plan)))!;
     const t = back.subplans.find((s) => s.areaId === "frontend")!.topics.at(-1)!;
-    expect(t).toMatchObject({ title: "Tema 1", addedFrom: "curriculum", group: "core" });
+    expect(t).toMatchObject({ title: "Tema 1", addedFrom: "curriculum", group: "css" });
   });
 });

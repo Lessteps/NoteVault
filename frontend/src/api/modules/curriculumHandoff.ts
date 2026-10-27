@@ -290,7 +290,7 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
     const problems: string[] = [];
     const warnings: string[] = [];
     const topicAbs = abs(e.folder);
-    const areaFolder = e.folder.split("/")[1]!;
+    const areaFolder = e.folder.split("/").slice(1, -1).join("/");
     if (!isDir(topicAbs)) return { problems: [`Falta la carpeta «${e.folder}».`], warnings };
     const noteAbs = path.join(topicAbs, `${e.name}.md`);
     const practicaAbs = path.join(topicAbs, `${e.name}.practica.md`);

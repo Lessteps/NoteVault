@@ -10,8 +10,9 @@
 // Los datos salen del plan (áreas, grupos, semanas) y de `mentor_plan_topic_catalog` (lo que existe en la vault); la lógica está en
 // `lib/planAreaTopics.ts`. Solo lectura salvo «Generar», que pasa siempre por el diálogo de confirmación de «Ejecutar plan».
 
-import { Check, ChevronDown, ChevronRight, RefreshCw, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Edit3, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useState } from "react";
+import { api } from "../../lib/bridge";
 import { matchesStatus, planBulk, regenBlockedReason, STATUS_FILTERS, type BulkPlan, type RegenKind, type StatusFilter } from "../../lib/topicSelection";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
@@ -235,6 +236,84 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
     else setGenChain(todo);
   };
 
+  const handleCreateGroup = async (): Promise<void> => {
+    if (!sub) return;
+    const title = window.prompt("Nombre de la nueva sub-asignatura o grupo (ej: HTML, CSS, Atomic Design):");
+    if (!title || !title.trim()) return;
+    try {
+      await api.mentorPlanGroupCreate({ planId: plan.id, subplanId: sub.id, title: title.trim() });
+      useApp.getState().toast("info", `Sub-asignatura «${title.trim()}» creada`);
+      useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+      reload();
+    } catch (err: any) {
+      useApp.getState().toast("error", err?.message || "No se pudo crear la sub-asignatura");
+    }
+  };
+
+  const handleRenameGroup = async (): Promise<void> => {
+    if (!sub || !group || !group.id || group.id === "bases" || group.id === "core" || group.id === "__otros") return;
+    const title = window.prompt(`Nuevo nombre para «${group.title}»:`, group.title);
+    if (!title || !title.trim() || title.trim() === group.title) return;
+    try {
+      await api.mentorPlanGroupRename({ planId: plan.id, subplanId: sub.id, groupId: group.id, title: title.trim() });
+      useApp.getState().toast("info", `Sub-asignatura renombrada a «${title.trim()}»`);
+      useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+      reload();
+    } catch (err: any) {
+      useApp.getState().toast("error", err?.message || "No se pudo renombrar");
+    }
+  };
+
+  const handleDeleteGroup = async (): Promise<void> => {
+    if (!sub || !group || !group.id || group.id === "bases" || group.id === "core" || group.id === "__otros") return;
+    if (!window.confirm(`¿Eliminar la sub-asignatura «${group.title}»? Los temas que contenga se moverán a Conocimientos.`)) return;
+    try {
+      await api.mentorPlanGroupDelete({ planId: plan.id, subplanId: sub.id, groupId: group.id });
+      setGroupId("");
+      useApp.getState().toast("info", `Sub-asignatura eliminada`);
+      useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+      reload();
+    } catch (err: any) {
+      useApp.getState().toast("error", err?.message || "No se pudo eliminar");
+    }
+  };
+
+  const handleMoveTopics = async (targetGroupId: string, newGroupTitle?: string): Promise<void> => {
+    if (!sub || selectedRows.length === 0) return;
+    try {
+      const res = await api.mentorPlanTopicsMoveGroup({
+        planId: plan.id,
+        subplanId: sub.id,
+        folders: selectedRows.map((r) => r.folder),
+        groupId: targetGroupId === "__new" ? "" : targetGroupId,
+        newGroupTitle,
+      });
+      setSelected(new Set());
+      useApp.getState().toast("info", `Se movieron ${res.changed} temas a «${res.targetGroupTitle}»`);
+      useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+      reload();
+    } catch (err: any) {
+      useApp.getState().toast("error", err?.message || "No se pudieron mover los temas");
+    }
+  };
+
+  const handleSingleMove = async (folder: string, targetGroupId: string): Promise<void> => {
+    if (!sub) return;
+    try {
+      const res = await api.mentorPlanTopicsMoveGroup({
+        planId: plan.id,
+        subplanId: sub.id,
+        folders: [folder],
+        groupId: targetGroupId,
+      });
+      useApp.getState().toast("info", `Tema movido a «${res.targetGroupTitle}»`);
+      useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+      reload();
+    } catch (err: any) {
+      useApp.getState().toast("error", err?.message || "No se pudo mover el tema");
+    }
+  };
+
   return (
     <section aria-labelledby={`${uid}-h`} data-testid="plan-areas-view" className="space-y-3">
       <SectionHeading id={`${uid}-h`} hint="Cada área del plan con todos sus temas en el orden de la ruta y lo que existe de cada uno. Elige un área arriba y, dentro de ella, un grupo.">
@@ -268,7 +347,44 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
             />}
           </div>
 
-          {groups.length > 1 && <TabBar label={`Grupos de ${active.area}`} tabs={groupTabsView(groups)} active={group.id} onSelect={pickGroup} level={2} testid="group-tabs" />}
+          {sub && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2" data-testid="groups-bar">
+              <div className="flex flex-wrap items-center gap-2">
+                {groups.length > 1 && (
+                  <TabBar label={`Grupos de ${active.area}`} tabs={groupTabsView(groups)} active={group.id} onSelect={pickGroup} level={2} testid="group-tabs" />
+                )}
+                <button
+                  type="button"
+                  onClick={handleCreateGroup}
+                  className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-dashed border-line px-2.5 text-[13px] text-dim hover:border-accent hover:bg-hover hover:text-text"
+                  title="Crear una nueva sub-asignatura o grupo dentro de esta área"
+                  data-testid="create-group-btn"
+                >
+                  <Plus size={14} aria-hidden /> Nueva sub-asignatura
+                </button>
+              </div>
+              {group.id && group.id !== "bases" && group.id !== "core" && group.id !== "__otros" && (
+                <div className="flex items-center gap-1 text-[12px] text-dim">
+                  <button
+                    type="button"
+                    onClick={handleRenameGroup}
+                    className="inline-flex items-center gap-1 rounded px-2 py-1 hover:bg-hover hover:text-text"
+                    title={`Renombrar la sub-asignatura «${group.title}»`}
+                  >
+                    <Edit3 size={13} aria-hidden /> Renombrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteGroup}
+                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-danger hover:bg-danger/10"
+                    title={`Eliminar «${group.title}» (sus temas se moverán a Conocimientos)`}
+                  >
+                    <Trash2 size={13} aria-hidden /> Eliminar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {shown.length > 0 && (
             <>
@@ -298,7 +414,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                   {visible.every((r) => openRows.has(r.folder)) ? "Contraer todo" : "Expandir todo"}
                 </button>
               </div>
-              <BulkToolbar count={selectedRows.length} busy={queueBusy} onAsk={(w) => ask(w, selectedRows)} onGenerateMissing={generateMissing} onHelper={helper} />
+              <BulkToolbar count={selectedRows.length} busy={queueBusy} onAsk={(w) => ask(w, selectedRows)} onGenerateMissing={generateMissing} onHelper={helper} groups={groups} onMoveGroup={handleMoveTopics} />
               {queue && <BulkProgress queue={queue} onStop={stop} onClose={dismiss} />}
             </>
           )}
@@ -376,9 +492,25 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                           {openRows.has(r.folder) ? <ChevronDown size={15} aria-hidden /> : <ChevronRight size={15} aria-hidden />}
                         </button>
                         <span className="min-w-0 flex-1">
-                        <TopicMenu folder={r.folder} title={r.title} trigger={<span className="block truncate" title={r.folder} data-testid="area-open">{r.title}</span>} className="font-semibold text-accent-text underline-offset-2 hover:underline" />
-                        {!r.exists && <span className="block text-[12.5px] text-faint">Aún no existe en la vault</span>}
-                        <OutdatedButtons row={r} busy={queueBusy} onAsk={(w, row) => ask(w, [row])} />
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <TopicMenu folder={r.folder} title={r.title} trigger={<span className="block truncate" title={r.folder} data-testid="area-open">{r.title}</span>} className="font-semibold text-accent-text underline-offset-2 hover:underline" />
+                            {sub && groups.length > 1 && (
+                              <select
+                                value={r.group || "core"}
+                                onChange={(e) => void handleSingleMove(r.folder, e.target.value)}
+                                title="Cambiar sub-asignatura de este tema"
+                                aria-label={`Sub-asignatura de ${r.title}`}
+                                data-testid={`select-group-${r.folder}`}
+                                className="rounded border border-line bg-card px-1 py-0.5 text-[11px] text-dim hover:border-accent hover:text-text cursor-pointer"
+                              >
+                                {groups.filter((g) => g.id !== "" && g.id !== "__otros").map((g) => (
+                                  <option key={g.id} value={g.id}>{g.title}</option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                          {!r.exists && <span className="block text-[12.5px] text-faint">Aún no existe en la vault</span>}
+                          <OutdatedButtons row={r} busy={queueBusy} onAsk={(w, row) => ask(w, [row])} />
                         </span>
                         </span>
                       </th>

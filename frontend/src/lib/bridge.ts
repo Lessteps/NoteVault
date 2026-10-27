@@ -455,6 +455,10 @@ export const api = {
     call<import("./types").MentorRouteChangeResult>("mentor_plan_route_set", opts),
   /** «Añadir al plan»: los temas de referencia validados entran al final de la ruta de su área (html/css/js → Frontend, java → Java); idempotente. */
   mentorPlanAddTopics: (opts: { planId: string; folders: string[]; subplanId?: string }) => call<import("./types").MentorAddTopicsResult>("mentor_plan_add_topics", opts),
+  mentorPlanGroupCreate: (opts: { planId: string; subplanId: string; title: string }) => call<{ plan: import("./types").MentorPlan; group: import("./planAreas").AreaGroup }>("mentor_plan_group_create", opts),
+  mentorPlanGroupRename: (opts: { planId: string; subplanId: string; groupId: string; title: string }) => call<{ plan: import("./types").MentorPlan; group: import("./planAreas").AreaGroup }>("mentor_plan_group_rename", opts),
+  mentorPlanGroupDelete: (opts: { planId: string; subplanId: string; groupId: string; fallbackGroupId?: string }) => call<{ plan: import("./types").MentorPlan; moved: number }>("mentor_plan_group_delete", opts),
+  mentorPlanTopicsMoveGroup: (opts: { planId: string; subplanId: string; folders: string[]; groupId?: string; newGroupTitle?: string }) => call<{ plan: import("./types").MentorPlan; changed: number; targetGroupId: string; targetGroupTitle: string }>("mentor_plan_topics_move_group", opts),
   /** La RUTA del plan activo (o de todos los activos, o la de `planId`): cada tema con su ruta (core · optional · skipped) y su semana objetivo. Solo lee; nunca borra notas. */
   mentorRoute: (planId?: string) => call<import("./types").MentorRoute>("mentor_route", planId ? { planId } : {}),
   mentorPlanReduce: (opts: { id: string; areaId?: string; groupId?: string; max?: number }) => call<import("./types").MentorRouteChangeResult>("mentor_plan_reduce", opts),

@@ -73,7 +73,7 @@ import {
 } from "../../core/mentor/planChange.js";
 import { generateByParts, PipelineCancel } from "../../core/mentor/planPipeline.js";
 import { canReorganize, reorganizeByAreas } from "../../core/mentor/planReorganize.js";
-import { PLAN_DELIVERABLE_STATUSES, resolveAreaMode, sanitizeGroups } from "../../lib/planAreas.js";
+import { PLAN_DELIVERABLE_STATUSES, resolveAreaMode, sanitizeGroups, type AreaGroup } from "../../lib/planAreas.js";
 import { buildSchedule, deliverablesOf, progressPlan } from "../../lib/planSchedule.js";
 import { basesClassifier } from "../../lib/planTopicsByArea.js";
 import { CurriculumCancel, generateCurriculum } from "../../core/mentor/planCurriculumAi.js";
@@ -2290,6 +2290,164 @@ export function mentorApi(app: AppState, send?: SendFn) {
         before: plan,
       });
       return { plan: saved, entry: viewOf(entry), history: hist.list(id).map(viewOf), added: res.added.map((a) => a.folder), addedTo: [...bySub.keys()], skipped, created: res.created.map((c) => c.id), changed: n, message: summary };
+    },
+
+    /**
+     * Crea una sub-asignatura / grupo en un subplan (`mentor_plan_group_create({ planId, subplanId, title })`).
+     */
+    mentor_plan_group_create(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const title = String(o.title ?? "").trim();
+      if (!title) throw new ApiError("Indica un nombre para la sub-asignatura o grupo.");
+      const subplanId = String(o.subplanId ?? "").trim();
+      if (!subplanId) throw new ApiError("Indica el área o subplan.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived) throw new ApiError("Ese plan está archivado.");
+      const sub = plan.subplans.find((s) => s.id === subplanId || s.areaId === subplanId);
+      if (!sub) throw new ApiError("Ese área no existe en el plan.");
+      if (!sub.groups) sub.groups = [];
+      const slugId = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "grupo";
+      if (sub.groups.some((g) => g.id === slugId || g.title.toLowerCase() === title.toLowerCase())) {
+        throw new ApiError(`Ya existe un grupo llamado «${title}».`);
+      }
+      const maxOrder = sub.groups.reduce((m, g) => Math.max(m, g.order), 90);
+      const newGroup: AreaGroup = {
+        id: slugId,
+        title,
+        kind: "knowledge",
+        order: maxOrder + 10,
+      };
+      sub.groups.push(newGroup);
+      const saved = st.save(plan);
+      const hist = new ChangeStore(app.root);
+      hist.append(id, {
+        at: new Date().toISOString(),
+        comment: `Crear sub-asignatura «${title}» en ${sub.area}`,
+        status: "applied",
+        source: "rules",
+        summary: `Se creó la sub-asignatura «${title}» en ${sub.area}.`,
+        delta: { added: 0, removed: 0, moved: 0, deliverables: 0, structure: 1 },
+        changed: [],
+        warnings: [],
+        fixOptions: [],
+        before: plan,
+      });
+      return { plan: saved, group: newGroup };
+    },
+
+    /**
+     * Renombra una sub-asignatura / grupo en un subplan (`mentor_plan_group_rename({ planId, subplanId, groupId, title })`).
+     */
+    mentor_plan_group_rename(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const title = String(o.title ?? "").trim();
+      if (!title) throw new ApiError("Indica el nuevo nombre.");
+      const subplanId = String(o.subplanId ?? "").trim();
+      const groupId = String(o.groupId ?? "").trim();
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived) throw new ApiError("Ese plan está archivado.");
+      const sub = plan.subplans.find((s) => s.id === subplanId || s.areaId === subplanId);
+      if (!sub) throw new ApiError("Ese área no existe en el plan.");
+      const grp = (sub.groups ?? []).find((g) => g.id === groupId);
+      if (!grp) throw new ApiError("Ese grupo no existe.");
+      grp.title = title;
+      const saved = st.save(plan);
+      return { plan: saved, group: grp };
+    },
+
+    /**
+     * Elimina una sub-asignatura / grupo de un subplan y reubica sus temas (`mentor_plan_group_delete({ planId, subplanId, groupId, fallbackGroupId? })`).
+     */
+    mentor_plan_group_delete(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const subplanId = String(o.subplanId ?? "").trim();
+      const groupId = String(o.groupId ?? "").trim();
+      if (groupId === "bases" || groupId === "core") throw new ApiError("Los grupos principales no se pueden eliminar.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived) throw new ApiError("Ese plan está archivado.");
+      const sub = plan.subplans.find((s) => s.id === subplanId || s.areaId === subplanId);
+      if (!sub) throw new ApiError("Ese área no existe en el plan.");
+      const grp = (sub.groups ?? []).find((g) => g.id === groupId);
+      if (!grp) throw new ApiError("Ese grupo no existe.");
+      const fallback = String(o.fallbackGroupId ?? "").trim() || (sub.groups?.find((g) => g.id !== groupId && g.id !== "bases")?.id ?? "core");
+      sub.groups = (sub.groups ?? []).filter((g) => g.id !== groupId);
+      let moved = 0;
+      for (const t of sub.topics) {
+        if (t.group === groupId) {
+          t.group = fallback;
+          moved++;
+        }
+      }
+      const saved = st.save(plan);
+      return { plan: saved, moved };
+    },
+
+    /**
+     * Mueve temas a otro grupo o sub-asignatura (`mentor_plan_topics_move_group({ planId, subplanId, folders, groupId, newGroupTitle? })`).
+     */
+    mentor_plan_topics_move_group(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const subplanId = String(o.subplanId ?? "").trim();
+      let groupId = String(o.groupId ?? "").trim();
+      const newTitle = String(o.newGroupTitle ?? "").trim();
+      const folders = [...new Set((Array.isArray(o.folders) ? (o.folders as unknown[]) : []).map(String).filter(Boolean))];
+      if (!folders.length) throw new ApiError("Elige al menos un tema.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived) throw new ApiError("Ese plan está archivado.");
+      const sub = plan.subplans.find((s) => s.id === subplanId || s.areaId === subplanId);
+      if (!sub) throw new ApiError("Ese área no existe en el plan.");
+      if (!sub.groups) sub.groups = [];
+      if (newTitle && (!groupId || groupId === "__new")) {
+        groupId = newTitle.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "grupo";
+        if (!sub.groups.some((g) => g.id === groupId)) {
+          const maxOrder = sub.groups.reduce((m, g) => Math.max(m, g.order), 90);
+          sub.groups.push({ id: groupId, title: newTitle, kind: "knowledge", order: maxOrder + 10 });
+        }
+      }
+      const grp = sub.groups.find((g) => g.id === groupId);
+      if (!grp && groupId !== "core" && groupId !== "bases") {
+        throw new ApiError("El grupo destino no existe.");
+      }
+      const changed: string[] = [];
+      for (const t of sub.topics) {
+        if (folders.includes(t.folder) && t.group !== groupId) {
+          t.group = groupId;
+          changed.push(t.folder);
+        }
+      }
+      if (!changed.length) return { plan, changed: 0, message: "Los temas ya pertenecen a ese grupo." };
+      const saved = st.save(plan);
+      const hist = new ChangeStore(app.root);
+      const targetName = grp?.title ?? groupId;
+      hist.append(id, {
+        at: new Date().toISOString(),
+        comment: `Mover ${changed.length} temas a «${targetName}»`,
+        status: "applied",
+        source: "rules",
+        summary: `Se movieron ${changed.length} temas a la sub-asignatura «${targetName}» en ${sub.area}.`,
+        delta: { added: 0, removed: 0, moved: changed.length, deliverables: 0 },
+        changed,
+        warnings: [],
+        fixOptions: [],
+        before: plan,
+      });
+      return { plan: saved, changed: changed.length, targetGroupId: groupId, targetGroupTitle: targetName };
     },
 
     // ── Cobertura del plan: notas de teoría y práctica por área (determinista) + revisión con el Mentor (bajo demanda) ──

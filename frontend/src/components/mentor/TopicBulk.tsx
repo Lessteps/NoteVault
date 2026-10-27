@@ -2,7 +2,7 @@
 // qué se reemplaza y cuánto cuesta, y la cola que regenera los temas elegidos DE UNO EN UNO (un trabajo `study_topic_regenerate` cada vez; el
 // turno de generación es compartido). Un fallo no aborta la cola; se puede parar entre temas y al final hay un resumen por tema.
 
-import { BookOpen, ChevronDown, ClipboardList, Dumbbell, Loader2, Map as MapIcon, RefreshCw, Sparkles } from "lucide-react";
+import { BookOpen, ChevronDown, ClipboardList, Dumbbell, FolderInput, Loader2, Map as MapIcon, Plus, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { AreaTopicRow } from "../../lib/planAreaTopics";
@@ -114,14 +114,17 @@ const BUTTONS: ReadonlyArray<{ what: RegenKind; text: string }> = [
 export type SelectHelper = "all" | "missing" | "noExercises" | "clear";
 
 /** Barra de acciones sobre la tabla: siempre visible; sin selección, con los botones desactivados y una pista. */
-export function BulkToolbar({ count, busy, onAsk, onGenerateMissing, onHelper }: {
+export function BulkToolbar({ count, busy, onAsk, onGenerateMissing, onHelper, groups, onMoveGroup }: {
   count: number;
   busy: boolean;
   onAsk: (what: RegenKind) => void;
   onGenerateMissing: () => void;
   onHelper: (h: SelectHelper) => void;
+  groups?: ReadonlyArray<{ id: string; title: string }>;
+  onMoveGroup?: (groupId: string, newGroupTitle?: string) => void;
 }) {
   const [menu, setMenu] = useState(false);
+  const [moveMenu, setMoveMenu] = useState(false);
   const off = count === 0 || busy;
   const why = busy ? "Hay una regeneración en curso." : count === 0 ? "Selecciona temas para regenerar" : "";
   const helpers: ReadonlyArray<{ key: SelectHelper; text: string }> = [
@@ -147,6 +150,55 @@ export function BulkToolbar({ count, busy, onAsk, onGenerateMissing, onHelper }:
         <GhostButton onClick={onGenerateMissing} disabled={off} title={why || "Crea lo que falta de los temas elegidos (no toca lo que ya existe)"} data-testid="bulk-missing">
           <Sparkles size={14} aria-hidden /> Generar lo que falta
         </GhostButton>
+        {onMoveGroup && groups && groups.length > 0 && (
+          <span className="relative">
+            <GhostButton
+              onClick={() => setMoveMenu((m) => !m)}
+              disabled={off}
+              aria-expanded={moveMenu}
+              title={why || "Mueve los temas seleccionados a otra sub-asignatura o grupo"}
+              data-testid="bulk-move-group-btn"
+            >
+              <FolderInput size={14} aria-hidden /> Mover a sub-asignatura <ChevronDown size={14} aria-hidden />
+            </GhostButton>
+            {moveMenu && (
+              <ul role="menu" className="absolute left-0 z-20 mt-1 min-w-56 rounded-lg border border-line bg-card p-1 shadow-lg" data-testid="bulk-move-group-list">
+                {groups.filter((g) => g.id !== "" && g.id !== "__otros").map((g) => (
+                  <li key={g.id} role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="w-full rounded-md px-3 py-1.5 text-left text-[13.5px] hover:bg-hover"
+                      onClick={() => {
+                        setMoveMenu(false);
+                        onMoveGroup(g.id);
+                      }}
+                    >
+                      {g.title}
+                    </button>
+                  </li>
+                ))}
+                <li role="none" className="my-1 border-t border-line" />
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-1.5 rounded-md px-3 py-1.5 text-left text-[13.5px] font-medium text-accent hover:bg-hover"
+                    onClick={() => {
+                      setMoveMenu(false);
+                      const name = window.prompt("Nombre de la nueva sub-asignatura o grupo (ej: HTML, CSS, Atomic Design):");
+                      if (name && name.trim()) {
+                        onMoveGroup("__new", name.trim());
+                      }
+                    }}
+                  >
+                    <Plus size={13} aria-hidden /> + Crear nueva sub-asignatura...
+                  </button>
+                </li>
+              </ul>
+            )}
+          </span>
+        )}
       </span>
       <span className="relative ml-auto">
         <GhostButton onClick={() => setMenu((m) => !m)} aria-expanded={menu} data-testid="bulk-select-menu" title="Elegir temas de un golpe">

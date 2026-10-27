@@ -559,7 +559,7 @@ export function sanitizeGroups(raw: unknown): AreaGroup[] {
     const order = Number.isFinite(Number(g.order)) ? Math.round(Number(g.order)) : kind === "bases" ? 0 : kind === "language" ? 10 : 100;
     out.push({ id, title, kind, order });
   }
-  return out.slice(0, 12);
+  return out.slice(0, 32);
 }
 
 // ── Lectura segura de lo guardado en el plan (entregables y propósitos) ──

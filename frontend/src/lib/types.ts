@@ -1959,3 +1959,54 @@ export interface TopicRegenerateJob {
   created: string[];
   archived: string[];
 }
+
+// ── Plan Reviews (Áreas y sub-asignaturas) ──────────────────────────────────
+
+export interface ReviewDuplicate {
+  addedTopic: string;
+  matchedTopic: string;
+  title: string;
+}
+
+export interface ReviewImpact {
+  addedTopics: number;
+  addedMinutes: number;
+  weeklyMinutesBefore: number;
+  weeklyMinutesAfter: number;
+  fits: boolean;
+  endDate: string;
+  suggestedEnd?: string;
+  fixOptions: Array<{ id: string; label: string; op?: unknown; reason?: string; kind?: string }>;
+}
+
+export type ReviewKind = "area" | "subject";
+export type ReviewSource = "manual" | "auto";
+export type ReviewStatus = "pending" | "kept";
+
+export interface PlanReview {
+  id: string;
+  kind: ReviewKind;
+  subplanId: string;
+  subplanName: string;
+  groupId?: string;
+  groupTitle?: string;
+  folder: string;
+  objective: string;
+  source: ReviewSource;
+  addedAt: string;
+  state: ReviewStatus;
+  added: string[];
+  duplicates: ReviewDuplicate[];
+  impact: ReviewImpact;
+  planId?: string;
+}
+
+export interface PendingReviewAction {
+  reviewId: string;
+  action: "accept" | "reject" | "adjust";
+}
+
+export interface FixResolution {
+  type: "extend_end" | "increase_hours" | "skip_duplicates" | "as_optional";
+  reviewId: string;
+}

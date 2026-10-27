@@ -51,6 +51,8 @@ import { deltaText } from "../../lib/planBuild.js";
 import { toPromptText, type StudentBrief } from "./brief.js";
 import { fold, type CatalogTopic } from "./goalDraft.js";
 import { buildPlan, subplanLabel, withTopicProjects, type Plan, type PlannedTopic, type Subplan, type SubplanSeed } from "./plan.js";
+import { groupIdOf, splitByChildFolder, topicsUnder, uniqueAreaId } from "./planFolders.js";
+import { labelOfFolder, normFolder } from "../../lib/folderRoles.js";
 import { reduceToEssentials, validateSkips, type RouteTopic } from "../../lib/planRoute.js";
 import type { MasteryLookup } from "../../lib/planTopicProject.js";
 import { objectsIn } from "./planDraft.js";
@@ -69,6 +71,10 @@ export type ChangeOp =
   | { op: "move_group"; subplan: string; group: string; to: string }
   /** añade un área elemental que no está en el plan (Desktop, Mobile…) con sus temas pendientes */
   | { op: "add_area"; areaId: string }
+  /** convierte una CARPETA de la vault en un área propia del plan (`x-<slug>`): cada subcarpeta con temas es una sub-asignatura */
+  | { op: "add_folder_area"; folder: string; name?: string; objective?: string }
+  /** añade los temas de una CARPETA como sub-asignatura (grupo) de un área que ya está en el plan */
+  | { op: "add_folder_subject"; subplan: string; folder: string; title?: string; objective?: string }
   /** reordena las áreas (las que no se nombran quedan detrás); las fases se recalculan con ese orden */
   | { op: "set_area_order"; order: string[] }
   /** cambia las semanas en que un área está activa (como mucho 2 áreas en paralelo) */
@@ -325,6 +331,69 @@ export function applyOps(plan: Plan, ops: readonly ChangeOp[], ctx: ChangeCtx): 
         }
         seeds.push(syncGroups({ area: bucket.name, areaId: bucket.areaId, objective: areaDef(op.areaId)!.objective, topics: bucket.topics, groups: bucket.groups, requiredGoals: [] }));
         rephase = true;
+        structure++;
+        structural();
+        applied++;
+        break;
+      }
+      case "add_folder_area": {
+        const folder = normFolder(op.folder);
+        if (!folder) break;
+        const candidates = topicsUnder(ctx.all, folder).filter((t) => !present(t.folder));
+        if (!candidates.length) {
+          warnings.push(`No hay temas pendientes en «${labelOfFolder(folder)}» para añadir.`);
+          break;
+        }
+        const name = oneLine(op.name, 80) || labelOfFolder(folder) || "Área propia";
+        const areaId = uniqueAreaId(folder, seeds.map((s) => s.areaId));
+        const objective = oneLine(op.objective, 200) || `Avanzar en ${name}`;
+        const mapped = candidates.map((c) => ({
+          folder: c.folder,
+          title: c.title,
+          estMinutes: pre ? adjustedMinutes(c.estMinutes, areaOfFolder(c.folder), pre.levels) : c.estMinutes,
+        }));
+        const split = splitByChildFolder(folder, mapped, name);
+        seeds.push(
+          syncGroups({
+            area: name,
+            areaId,
+            objective,
+            topics: split.topics,
+            groups: split.groups,
+            requiredGoals: [],
+          }),
+        );
+        rephase = true;
+        structure++;
+        structural();
+        applied++;
+        break;
+      }
+      case "add_folder_subject": {
+        const target = subOf(op.subplan);
+        const folder = normFolder(op.folder);
+        if (!target || !folder) break;
+        const candidates = topicsUnder(ctx.all, folder).filter((t) => !present(t.folder));
+        if (!candidates.length) {
+          warnings.push(`No hay temas pendientes en «${labelOfFolder(folder)}» para añadir.`);
+          break;
+        }
+        const groupTitle = oneLine(op.title, 60) || labelOfFolder(folder);
+        let gid = groupIdOf(groupTitle);
+        const existingGroup = (target.groups ?? []).find((g) => g.id === gid || fold(g.title) === fold(groupTitle));
+        const targetGroupId = existingGroup ? existingGroup.id : gid;
+        const nextOrder = (Math.max(0, ...(target.groups ?? []).map((g) => g.order)) || 100) + 10;
+        const extraGroups: AreaGroup[] = existingGroup
+          ? []
+          : [{ id: targetGroupId, title: groupTitle, kind: "knowledge", order: nextOrder }];
+        const mapped = candidates.map((c) => ({
+          folder: c.folder,
+          title: c.title,
+          group: targetGroupId,
+          estMinutes: pre ? adjustedMinutes(c.estMinutes, areaOfFolder(c.folder), pre.levels) : c.estMinutes,
+        }));
+        target.topics.push(...mapped);
+        Object.assign(target, syncGroups(target, extraGroups));
         structure++;
         structural();
         applied++;

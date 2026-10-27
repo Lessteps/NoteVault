@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { curriculumAreas } from "./catalog";
 
-const RANGES: Record<string, [number, number]> = { html: [40, 55], css: [110, 150], "js-reference": [100, 140], java: [80, 100] };
+const RANGES: Record<string, [number, number]> = { html: [40, 55], css: [110, 150], "atomic-design": [12, 25], "js-reference": [100, 140], java: [80, 100] };
 
 describe("catálogo de currículo de referencia", () => {
   const areas = curriculumAreas();
 
-  it("tiene las cuatro áreas con su carpeta correspondiente (HTML y CSS bajo 5 Frontend)", () => {
+  it("tiene las áreas con su carpeta correspondiente (HTML, CSS y Atomic Design bajo 5 Frontend)", () => {
     expect(areas.map((a) => [a.id, a.areaFolder])).toEqual([
       ["html", "5 Frontend/HTML"],
       ["css", "5 Frontend/CSS"],
+      ["atomic-design", "5 Frontend/Atomic Design"],
       ["js-reference", "13 JavaScript Reference"],
       ["java", "14 Java"],
     ]);
@@ -44,7 +45,7 @@ describe("catálogo de currículo de referencia", () => {
         const order: string[] = [];
         for (const e of area.entries) if (order[order.length - 1] !== e.category) order.push(e.category);
         expect(new Set(order).size).toBe(order.length); // una categoría no reaparece más tarde
-        expect(order.length).toBeGreaterThanOrEqual(8);
+        expect(order.length).toBeGreaterThanOrEqual(5);
         for (const c of order) expect(area.entries.filter((e) => e.category === c).length).toBeGreaterThan(0);
       });
 

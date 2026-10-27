@@ -125,6 +125,16 @@ export function StudySpaceDialog() {
       const res = await api.studySpaceGenerate({ folder: folder.trim(), subject: subject.trim(), areas: chosen, steps, conversationId });
       await guard.commit();
       followJob(res.jobId, res.conversationId);
+      if (mode === "area") {
+        for (const a of chosen) {
+          const areaFolder = `${folder.trim()}/${a.name}`;
+          try {
+            await api.mentorFolderRoleSet({ folder: areaFolder, role: "area", objective: objective.trim() || undefined });
+          } catch {
+            /* no bloquear */
+          }
+        }
+      }
       toast("info", "Generando… lo verás paso a paso en el chat.");
       close();
     } catch (e) {

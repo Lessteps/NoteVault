@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Bookmark, ExternalLink, Globe, LayoutDashboard, Loader2, RotateCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bookmark, ExternalLink, Globe, LayoutDashboard, Loader2, PanelRight, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type BrowserState } from "../../lib/bridge";
 import { newId } from "../../lib/canvas";
@@ -6,6 +6,8 @@ import { useApp } from "../../store/app";
 import { useCanvas } from "../../store/canvas";
 import { IconButton } from "../ui";
 import { useModuleVisible } from "../ModuleHost";
+import { toggleFace } from "../../lib/panelFaces";
+import { useWebPages } from "../../store/webPages";
 
 export function BrowserPanel({
   url,
@@ -32,6 +34,7 @@ export function BrowserPanel({
   const [inputUrl, setInputUrl] = useState(initialUrl || "");
   const visible = useModuleVisible();
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const pagesOpen = useWebPages((s) => s.open);
 
   // Sync input text when the active page navigates
   useEffect(() => {
@@ -272,6 +275,14 @@ export function BrowserPanel({
           onClick={() => void api.openExternal(state.url)}
         >
           <ExternalLink size={14} />
+        </IconButton>
+
+        <IconButton
+          title={pagesOpen ? "Ocultar pestañas del navegador" : "Mostrar pestañas del navegador"}
+          onClick={() => toggleFace("pages")}
+          active={pagesOpen}
+        >
+          <PanelRight size={14} />
         </IconButton>
       </div>
 

@@ -10,7 +10,7 @@
 // Los datos salen del plan (áreas, grupos, semanas) y de `mentor_plan_topic_catalog` (lo que existe en la vault); la lógica está en
 // `lib/planAreaTopics.ts`. Solo lectura salvo «Generar», que pasa siempre por el diálogo de confirmación de «Ejecutar plan».
 
-import { Check, ChevronDown, ChevronRight, Edit3, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Edit3, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { matchesStatus, planBulk, regenBlockedReason, STATUS_FILTERS, type BulkPlan, type RegenKind, type StatusFilter } from "../../lib/topicSelection";
@@ -36,6 +36,9 @@ import { BulkConfirm, BulkProgress, BulkToolbar, RowQuickActions, useRegenQueue,
 import { areaScope, GenerateButton, GenerateTopicButton, topicScope } from "./TopicGenerate";
 import { TopicInsight } from "./TopicInsight";
 import { RegeneratePanel } from "./TopicRegenerate";
+import { AddToPlanDialog } from "./AddToPlanDialog";
+import { PlanReviewScreen } from "./PlanReviewScreen";
+import type { PlanReview } from "../../lib/types";
 
 /** Una sub-barra de pestañas (botones con `aria-pressed`) que se desplaza en horizontal en anchos estrechos. */
 function TabBar<T extends { key: string; label: string; hint?: string; hintLabel?: string }>({ label, tabs, active, onSelect, level, testid }: { label: string; tabs: ReadonlyArray<T>; active: string; onSelect: (key: string) => void; level: 1 | 2; testid: string }) {
@@ -75,7 +78,16 @@ function TabBar<T extends { key: string; label: string; hint?: string; hintLabel
 }
 
 const areaTabsView = (tabs: AreaTab[]) => tabs.map((t) => ({ key: t.key, label: t.area, ...(t.missing > 0 ? { hint: String(t.missing), hintLabel: `${t.missing} por generar` } : {}) }));
-const groupTabsView = (tabs: GroupTab[]) => tabs.map((t) => ({ key: t.id, label: t.title, hint: String(t.total), hintLabel: `${t.total} ${t.total === 1 ? "tema" : "temas"}${t.missing ? `, ${t.missing} por generar` : ""}` }));
+const groupTabsView = (tabs: GroupTab[], reviews: PlanReview[] = []) =>
+  tabs.map((t) => {
+    const hasReview = reviews.some((r) => r.groupId === t.id);
+    return {
+      key: t.id,
+      label: t.title,
+      hint: hasReview ? "Por revisar" : String(t.total),
+      hintLabel: hasReview ? "Por revisar" : `${t.total} ${t.total === 1 ? "tema" : "temas"}${t.missing ? `, ${t.missing} por generar` : ""}`,
+    };
+  });
 
 /** Anillo de avance de un tema (el mismo lenguaje visual que el resumen del área): el número va dentro y el color solo acompaña. */
 function Ring({ pct, done }: { pct: number; done: boolean }) {
@@ -156,6 +168,17 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
   const queueBusy = !!queue?.running;
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const targetHighlight = useNavState((s) => s.values[TOPIC_HIGHLIGHT_KEY] as string | undefined);
+  const [reviews, setReviews] = useState<PlanReview[]>([]);
+  const [selectedReview, setSelectedReview] = useState<PlanReview | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (plan.id) {
+      api.mentorPlanReviewList({ planId: plan.id })
+        .then((res) => setReviews(res.reviews || []))
+        .catch(() => {});
+    }
+  }, [plan.id]);
 
   useEffect(() => {
     if (targetHighlight) {
@@ -326,7 +349,36 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
 
       {catalog && active && group && (
         <>
-          {!only && <TabBar label="Áreas del plan" tabs={areaTabsView(tabs)} active={active.key} onSelect={pickArea} level={1} testid="area-tabs" />}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {!only && <TabBar label="Áreas del plan" tabs={areaTabsView(tabs)} active={active.key} onSelect={pickArea} level={1} testid="area-tabs" />}
+            <button
+              type="button"
+              onClick={() => setAddDialogOpen(true)}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[13px] font-medium text-dim hover:bg-hover hover:text-text"
+              data-testid="add-area-or-subject-btn"
+            >
+              <Plus size={14} aria-hidden /> Añadir área o asignatura
+            </button>
+          </div>
+
+          {reviews.find((r) => sub && r.subplanId === sub.id && (!r.groupId || r.groupId === group.id)) && (
+            <div className="flex items-center justify-between rounded-xl border border-accent/40 bg-accent-soft p-3 text-[13.5px] text-accent-text" data-testid="review-notice-bar">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} />
+                <span>
+                  <strong>Revisión pendiente:</strong> Esta materia o grupo tiene cambios pendientes de revisión.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedReview(reviews.find((r) => sub && r.subplanId === sub.id)!)}
+                className="rounded-lg bg-accent px-3 py-1 text-[12.5px] font-semibold text-white shadow hover:opacity-90"
+                data-testid="open-review-btn"
+              >
+                Revisar
+              </button>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="area-summary">
             <div className="min-w-0 flex-1 basis-72 text-[14.5px]">
@@ -351,7 +403,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2" data-testid="groups-bar">
               <div className="flex flex-wrap items-center gap-2">
                 {groups.length > 1 && (
-                  <TabBar label={`Grupos de ${active.area}`} tabs={groupTabsView(groups)} active={group.id} onSelect={pickGroup} level={2} testid="group-tabs" />
+                  <TabBar label={`Grupos de ${active.area}`} tabs={groupTabsView(groups, reviews)} active={group.id} onSelect={pickGroup} level={2} testid="group-tabs" />
                 )}
                 <button
                   type="button"
@@ -571,6 +623,30 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
             useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
           }}
         />
+      )}
+      <AddToPlanDialog
+        plan={plan}
+        open={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+        onAdded={() => {
+          useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+          reload();
+        }}
+      />
+
+      {selectedReview && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
+          <PlanReviewScreen
+            plan={plan}
+            review={selectedReview}
+            onClose={() => setSelectedReview(null)}
+            onResolved={() => {
+              setSelectedReview(null);
+              useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+              reload();
+            }}
+          />
+        </div>
       )}
     </section>
   );

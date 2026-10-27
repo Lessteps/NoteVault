@@ -85,12 +85,12 @@ describe("computeCoverage", () => {
   });
 
   it("numera las carpetas propuestas en orden del catálogo saltando números ya usados", () => {
-    const topics = [...TODAY, topic("5 Frontend/CSS/5.2.2 Something already there", "Something already there")];
+    const topics = [...TODAY, topic("5 Frontend/CSS/5.19.2 Something already there", "Something already there")];
     const css = computeCoverage(areas, topics).areas.find((a) => a.areaId === "css")!;
     const folders = css.rows.map((r) => r.suggestedFolder).filter(Boolean);
-    expect(folders[0]).toBe(`${P}/5 Frontend/CSS/5.2.1 ${css.rows[0]!.entry.title}`);
-    expect(folders[1]).toBe(`${P}/5 Frontend/CSS/5.2.3 ${css.rows[1]!.entry.title}`);
-    const nums = folders.map((f) => Number(/\/5\.2\.(\d+) /.exec(f)![1]));
+    expect(folders[0]).toBe(`${P}/5 Frontend/CSS/5.19.1 ${css.rows[0]!.entry.title}`);
+    expect(folders[1]).toBe(`${P}/5 Frontend/CSS/5.19.3 ${css.rows[1]!.entry.title}`);
+    const nums = folders.map((f) => Number(/\/5\.19\.(\d+) /.exec(f)![1]));
     expect(new Set(nums).size).toBe(nums.length);
     expect(nums).not.toContain(2);
     expect(nums).toEqual([...nums].sort((a, b) => a - b));
@@ -104,7 +104,7 @@ describe("computeCoverage", () => {
 
   it("una área completa queda ok y sin marca de falta de desarrollo", () => {
     const html = areas.find((a) => a.id === "html")!;
-    const all = html.entries.map((e, i) => topic(`5 Frontend/HTML/5.1.${i + 1} ${e.title}`, e.title, e.id));
+    const all = html.entries.map((e, i) => topic(`5 Frontend/HTML/5.18.${i + 1} ${e.title}`, e.title, e.id));
     const cov = computeCoverage([html], all);
     expect(cov.areas[0]).toMatchObject({ pct: 100, level: "ok", missing: 0 });
     expect(coverageBadge(cov.areas[0]!)).toBe("");
@@ -129,6 +129,6 @@ describe("computeCoverage", () => {
     }
     const cov = computeCoverage(areas, topics);
     console.log(cov.areas.map((a) => `${a.areaId}: ${a.pct}% ${a.level} (covered ${a.covered}, partial ${a.partial}, missing ${a.missing} of ${a.total})`).join("\n"));
-    expect(cov.areas).toHaveLength(4);
+    expect(cov.areas).toHaveLength(5);
   });
 });

@@ -143,6 +143,7 @@ import { mentorTimeLogApi } from "./mentorTimeLog.js";
 import { mentorRecordsApi } from "./mentorRecords.js";
 import { dailyProjectDoneOf, mentorProjectsApi } from "./mentorProjects.js";
 import { mentorAreaPracticeApi } from "./mentorAreaPractice.js";
+import { mentorPlanFoldersApi } from "./mentorPlanFolders.js";
 import { mentorDayCloseApi } from "./mentorDayClose.js";
 import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
@@ -2842,6 +2843,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
     ...mentorDayCloseApi(app, { withJob, guarded, cancelMode: (e) => (e instanceof CancelError ? e.mode : undefined), today: () => localDate(), activePlans: (day) => activePlans(new PlanStore(app.root).list(), day), topicSnaps: () => topicSnaps(app), cold: () => studyIndexCold(app) }),
     // «Preguntas, correcciones y ajustes»: clasificar lo escrito y responder preguntas sin tocar el plan (ver `mentorAsk.ts`)
     ...mentorAskApi(app, { withJob, guarded, cancelMode: (e) => (e instanceof CancelError ? e.mode : undefined), today: () => localDate() }),
+    // Carpetas de la vault añadidas como áreas o sub-asignaturas (ver `mentorPlanFolders.ts`)
+    ...mentorPlanFoldersApi(app, { allTopics: () => buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 }), today: () => localDate() }),
     /** Compatibilidad: el flujo anterior (un BORRADOR en el chat que se acepta aparte); el camino principal crea el plan propuesto. */
     mentor_plan_generate_draft: (opts: unknown) => api.mentor_plan_generate({ ...((opts && typeof opts === "object" ? opts : {}) as object), asDraft: true }),
   };

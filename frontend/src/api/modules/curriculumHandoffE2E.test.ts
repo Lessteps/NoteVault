@@ -130,7 +130,10 @@ describe("Antigravity -> validar -> vault -> Mentor", () => {
     const ids = html.entries.slice(0, 2).map((e) => e.id);
     const api = curriculumHandoffApi(app, { now: NOW });
     const h = await api.study_curriculum_handoff({ areaId: "html", entryIds: ids, confirm: true });
-    expect(h.entries.map((e) => e.folder)).toEqual(["Programación/5 Frontend/HTML/5.1.1 Document skeleton - doctype, html, head and body", "Programación/5 Frontend/HTML/5.1.2 Metadata - title, meta, base and link"]);
+    expect(h.entries.map((e) => e.folder)).toEqual([
+      "Programación/5 Frontend/HTML/5.18.1 Document skeleton - doctype, html, head and body",
+      "Programación/5 Frontend/HTML/5.18.2 Metadata - title, meta, base and link",
+    ]);
     // la app solo escribió la tarea
     expect(fs.existsSync(abs("Programación/5 Frontend/HTML"))).toBe(false);
 
@@ -155,7 +158,7 @@ describe("Antigravity -> validar -> vault -> Mentor", () => {
     expect(areas.rows.map((r: any) => r.name)).toContain("HTML");
 
     const topics: any = await ov.mentor_areas_overview({ level: "topics", space: "Programación", area: "Programación/5 Frontend/HTML" });
-    expect(topics.rows.map((r: any) => r.code)).toEqual(["5.1.1", "5.1.2"]);
+    expect(topics.rows.map((r: any) => r.code)).toEqual(["5.18.1", "5.18.2"]);
 
     // añadir al plan
     const plan = savePlan();

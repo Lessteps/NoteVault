@@ -2,6 +2,8 @@ import { WebContentsView, BrowserWindow, net, shell } from "electron";
 import { blockedPageHtml, hostOf, normalizeUrl, UsageMeter, WebStore } from "../src/core/webStore.js";
 import { getAppState } from "../src/api/registry.js";
 import { cleanRequestHeaders, cleanUserAgent } from "../src/core/webUserAgent.js";
+import { zoomActionFor } from "../src/core/zoomLevel.js";
+import { applyZoomAction } from "./zoom.js";
 
 export interface BrowserBounds {
   x: number;
@@ -31,9 +33,46 @@ export class BrowserManager {
   private isLoading = false;
   private currentFavicon = "";
   private meterTimer: NodeJS.Timeout | null = null;
+  private lastBounds: BrowserBounds | null = null;
 
   setWindow(win: BrowserWindow) {
     this.win = win;
+  }
+
+  /**
+   * Converts renderer CSS coordinates (from getBoundingClientRect) into window
+   * Device Independent Pixels (DIPs) taking the window's zoom factor into account.
+   */
+  private toDipBounds(bounds: BrowserBounds): BrowserBounds {
+    if (!this.win || this.win.isDestroyed()) {
+      return {
+        x: Math.round(bounds.x),
+        y: Math.round(bounds.y),
+        width: Math.max(0, Math.round(bounds.width)),
+        height: Math.max(0, Math.round(bounds.height)),
+      };
+    }
+    const zf = this.win.webContents.getZoomFactor();
+    const factor = Number.isFinite(zf) && zf > 0 ? zf : 1;
+    return {
+      x: Math.round(bounds.x * factor),
+      y: Math.round(bounds.y * factor),
+      width: Math.max(0, Math.round(bounds.width * factor)),
+      height: Math.max(0, Math.round(bounds.height * factor)),
+    };
+  }
+
+  /**
+   * Synchronizes the embedded browser's zoom level with the application window,
+   * and recalculates DIP bounds for the current layout.
+   */
+  syncZoom(level: number): void {
+    if (this.view && !this.view.webContents.isDestroyed()) {
+      this.view.webContents.setZoomLevel(level);
+    }
+    if (this.lastBounds && this.attached && this.view) {
+      this.view.setBounds(this.toDipBounds(this.lastBounds));
+    }
   }
 
   private ensureView(): WebContentsView {
@@ -50,6 +89,19 @@ export class BrowserManager {
     });
 
     const wc = this.view.webContents;
+
+    // Follow the application window's zoom scale so web pages match interface sizing
+    if (this.win && !this.win.isDestroyed()) {
+      wc.setZoomLevel(this.win.webContents.getZoomLevel());
+    }
+
+    // Allow Ctrl + Plus / Minus / 0 zoom shortcuts inside the web view as well
+    wc.on("before-input-event", (event, input) => {
+      const action = zoomActionFor(input);
+      if (!action) return;
+      event.preventDefault();
+      applyZoomAction(action);
+    });
 
     // Present as a plain Chrome: WhatsApp Web and similar sites turn Electron away with
     // "update your browser" because of the Electron/app tokens and the "Electron" client-hint brand.
@@ -204,6 +256,7 @@ export class BrowserManager {
 
   attach(bounds: BrowserBounds, url?: string): BrowserState {
     if (!this.win || this.win.isDestroyed()) return this.getState();
+    this.lastBounds = bounds;
     const view = this.ensureView();
     if (!this.attached) {
       try {
@@ -213,12 +266,7 @@ export class BrowserManager {
       }
       this.attached = true;
     }
-    view.setBounds({
-      x: Math.round(bounds.x),
-      y: Math.round(bounds.y),
-      width: Math.max(0, Math.round(bounds.width)),
-      height: Math.max(0, Math.round(bounds.height)),
-    });
+    view.setBounds(this.toDipBounds(bounds));
     view.setVisible(true);
 
     const currentWcUrl = view.webContents.getURL();
@@ -245,13 +293,9 @@ export class BrowserManager {
   }
 
   setBounds(bounds: BrowserBounds): void {
+    this.lastBounds = bounds;
     if (!this.view || !this.attached) return;
-    this.view.setBounds({
-      x: Math.round(bounds.x),
-      y: Math.round(bounds.y),
-      width: Math.max(0, Math.round(bounds.width)),
-      height: Math.max(0, Math.round(bounds.height)),
-    });
+    this.view.setBounds(this.toDipBounds(bounds));
   }
 
   async navigate(rawUrl: string): Promise<BrowserState> {

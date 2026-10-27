@@ -459,7 +459,7 @@ function AreaPage({
   const topicsState = useLevel<TopicRow>("topics", space, area, version);
   const inProgress = useMemo(() => topicsState.rows.filter((t) => t.state === "en_curso").slice(0, 6), [topicsState.rows]);
   const due = useMemo(() => topicsState.rows.filter((t) => t.reviewDue).slice(0, 6), [topicsState.rows]);
-  const subAreas = useMemo(() => areasState.rows.filter((r) => r.area.startsWith(`${area}/`)), [areasState.rows, area]);
+  const subAreas = useMemo(() => areasState.rows.filter((r) => r.area?.startsWith(`${area}/`)), [areasState.rows, area]);
   const relatedMissing = useMemo(() => relatedCoverage(coverage, space, area), [coverage, space, area]);
 
   const tiles = row

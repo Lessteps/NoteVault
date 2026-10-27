@@ -7,7 +7,8 @@
 import { app, type BrowserWindow } from "electron";
 import fs from "node:fs";
 import path from "node:path";
-import { nextZoom, zoomActionFor, ZOOM_MAX, ZOOM_MIN } from "../src/core/zoomLevel";
+import { nextZoom, zoomActionFor, ZOOM_MAX, ZOOM_MIN, type ZoomAction } from "../src/core/zoomLevel.js";
+import { browserManager } from "./browserManager.js";
 
 const file = (): string => path.join(app.getPath("userData"), "zoom.json");
 
@@ -31,21 +32,34 @@ function writeLevel(level: number): void {
 let current: number | null = null;
 const windows = new Set<BrowserWindow>();
 
+export function getCurrentZoomLevel(): number {
+  current ??= readLevel();
+  return current;
+}
+
+export function applyZoomAction(action: ZoomAction): void {
+  current = nextZoom(current ?? 0, action);
+  writeLevel(current);
+  for (const w of windows) if (!w.isDestroyed()) w.webContents.setZoomLevel(current);
+  browserManager.syncZoom(current);
+}
+
 /** Makes `win` follow the zoom shortcuts and start at the remembered level. */
 export function installZoom(win: BrowserWindow): void {
   current ??= readLevel();
   windows.add(win);
   win.on("closed", () => windows.delete(win));
   const apply = (): void => {
-    if (!win.isDestroyed()) win.webContents.setZoomLevel(current ?? 0);
+    if (!win.isDestroyed()) {
+      win.webContents.setZoomLevel(current ?? 0);
+      browserManager.syncZoom(current ?? 0);
+    }
   };
   win.webContents.on("did-finish-load", apply);
   win.webContents.on("before-input-event", (event, input) => {
     const action = zoomActionFor(input);
     if (!action) return;
     event.preventDefault();
-    current = nextZoom(current ?? 0, action);
-    writeLevel(current);
-    for (const w of windows) if (!w.isDestroyed()) w.webContents.setZoomLevel(current);
+    applyZoomAction(action);
   });
 }

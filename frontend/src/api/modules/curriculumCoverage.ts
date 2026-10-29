@@ -12,7 +12,8 @@ import { manifestsFromNotes } from "../../core/practice/topic.js";
 import type { VaultScan } from "../../core/practice/exerciseIndex.js";
 import type { CurriculumCoverage } from "../../lib/curriculum.js";
 import type { AppState } from "../appState.js";
-import { vaultScan } from "../vaultScan.js";
+import { clearVaultScanCache, vaultScan } from "../vaultScan.js";
+import { clearStudySnapshotCache } from "./study.js";
 
 /** Temas existentes a partir del escaneo: manifiestos de tema + notas con `curriculum_id` en el frontmatter. */
 export function existingTopicsFromScan(app: AppState, scan: VaultScan): ExistingTopic[] {
@@ -58,6 +59,11 @@ export function curriculumCoverageApi(app: AppState) {
     study_curriculum_coverage(opts?: unknown): CurriculumCoverage {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, unknown>;
       const space = String(o.space ?? "").trim();
+      // «Recalcular»: lo que un agente externo escribió en disco mientras tanto (la app no siempre se entera sola) se vuelve a leer
+      if (o.fresh === true) {
+        clearVaultScanCache();
+        clearStudySnapshotCache();
+      }
       const all = curriculumCoverageFor(app);
       return space ? { areas: all.areas.filter((a) => a.space === space) } : all;
     },

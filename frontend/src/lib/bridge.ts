@@ -24,6 +24,7 @@ declare global {
       onOpenReview?: (cb: () => void) => () => void;
       onCaptureRequest?: (cb: () => void) => () => void;
       onCaptureDone?: (cb: (data: { rel: string; name: string }) => void) => () => void;
+      onVaultContentChanged?: (cb: () => void) => () => void;
       onWatchEvent?: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void) => () => void;
       onBrowserState?: (cb: (data: BrowserState) => void) => () => void;
       onWindowState?: (cb: (data: { maximized: boolean }) => void) => () => void;
@@ -815,7 +816,7 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studyCurriculumHandoffStatus: (id: string) => call<import("./types").CurriculumHandoff>("study_curriculum_handoff_status", id),
   studyCurriculumHandoffValidate: (id: string) => call<import("./types").CurriculumHandoff>("study_curriculum_handoff_validate", id),
   /** Cobertura del currículo de referencia (HTML, CSS, JS reference, Java) frente a los temas existentes. */
-  studyCurriculumCoverage: (opts: { space?: string } = {}) => call<import("./curriculum").CurriculumCoverage>("study_curriculum_coverage", opts),
+  studyCurriculumCoverage: (opts: { space?: string; fresh?: boolean } = {}) => call<import("./curriculum").CurriculumCoverage>("study_curriculum_coverage", opts),
   studyCurriculumHandoffList: () => call<import("./types").CurriculumHandoff[]>("study_curriculum_handoff_list"),
   studyTopicRegenerateStatus: (jobId: string) =>
     call<import("./types").TopicRegenerateJob>("study_topic_regenerate_status", jobId),
@@ -920,6 +921,11 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   },
   onCaptureDone: (cb: (data: { rel: string; name: string }) => void): (() => void) => {
     if (typeof window !== "undefined" && window.nv?.onCaptureDone) return window.nv.onCaptureDone(cb);
+    return () => undefined;
+  },
+  /** El contenido de la vault cambió fuera de la app: las cachés ya se limpiaron; la interfaz solo vuelve a leer. */
+  onVaultContentChanged: (cb: () => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onVaultContentChanged) return window.nv.onVaultContentChanged(cb);
     return () => undefined;
   },
   onWatchEvent: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void): (() => void) => {

@@ -91,6 +91,19 @@ export function CurriculumQueue({ areaId, areaTitle, missing, essentials, withEx
     useCurriculum.getState().createBatches({ areaId, refreshOnly: true, withExercises }).then((q) => setPrompt(q.master.shortPrompt)).catch(() => undefined);
   }, [queue.length, prompt, areaId, withExercises]);
 
+  // el avance REAL en disco (carpeta, nota, manifiesto): la app no siempre se entera sola de lo que escribe un agente externo, así que se mira cada 5 s
+  const ids = queue.map((h) => h.id).join("|");
+  useEffect(() => {
+    if (!ids || mode !== "manual") return;
+    const poll = (): void => {
+      for (const id of ids.split("|")) void useCurriculum.getState().status(id).catch(() => undefined);
+    };
+    const t = setInterval(poll, 5000);
+    return () => clearInterval(t);
+  }, [ids, mode]);
+  const written = queue.reduce((n, h) => n + h.ready.found, 0);
+  const expected = queue.reduce((n, h) => n + h.ready.expected, 0);
+
   const topics = queue.reduce((n, h) => n + h.entries.length, 0);
   const validatedTopics = done.filter((h) => h.status === "validated");
   const total = queue.length + validatedTopics.length;
@@ -242,14 +255,16 @@ export function CurriculumQueue({ areaId, areaTitle, missing, essentials, withEx
             <PrimaryButton large onClick={() => void copy()} disabled={!prompt} data-testid="queue-copy">
               {copied ? <CheckCircle2 size={15} aria-hidden /> : <ClipboardCopy size={15} aria-hidden />} {copied ? "Copiado" : "Copiar instrucción para Antigravity"}
             </PrimaryButton>
-            <span className="text-[13px] text-dim">Pégala una vez: el agente hace las {queue.length} tareas, una detrás de otra.</span>
+            <span className="text-[13px] text-dim">Pégala una vez: el agente hace las {queue.length} tareas de una sentada. Si se detiene, pega la MISMA instrucción: sigue donde quedó.</span>
           </li>
           <li className="flex flex-wrap items-center gap-2" data-testid="queue-step-validate">
             <span className="w-6 flex-none text-right font-bold text-accent-text">2</span>
             <GhostButton large onClick={() => void validate()} disabled={busy !== ""} data-testid="queue-validate">
               {busy === "validate" ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <CheckCircle2 size={15} aria-hidden />} Ya terminó — validar todo
             </GhostButton>
-            <span className="text-[13px] text-dim">Cuando Antigravity avise que acabó (puedes validar antes: lo que falte queda marcado).</span>
+            <span className="text-[13px] text-dim" data-testid="queue-written">
+              {expected > 0 ? `Antigravity lleva ${written} de ${expected} temas escritos${written >= expected ? ": ya puedes validar." : "."}` : "Cuando Antigravity avise que acabó (puedes validar antes: lo que falte queda marcado)."}
+            </span>
           </li>
         </ol>
       )}

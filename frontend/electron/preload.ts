@@ -10,6 +10,14 @@ contextBridge.exposeInMainWorld("nv", {
       ipcRenderer.removeListener("vault-watch-event", handler);
     };
   },
+  /** The vault content changed outside the app (an agent, git…): caches were already cleared in the main process. */
+  onVaultContentChanged: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on("vault-content-changed", handler);
+    return () => {
+      ipcRenderer.removeListener("vault-content-changed", handler);
+    };
+  },
   onBrowserState: (cb: (data: any) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: any) => cb(data);
     ipcRenderer.on("nv-browser-state", handler);

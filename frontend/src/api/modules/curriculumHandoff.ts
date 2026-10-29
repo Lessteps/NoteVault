@@ -23,6 +23,7 @@ import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
 import { catalogFor } from "../../core/practice/skillSelection.js";
 import { generateConcept, readConcept } from "../../../tools/kb_canvas";
+import { repairTopicType } from "../../lib/curriculumRepair.js";
 import { planBatches, type CurriculumArea, type CurriculumEntry } from "../../lib/curriculum.js";
 import { buildCurriculumTask, isValidTopicFolderName, itemCovered, planEntries, topicFolderName, type CurriculumSkills, type PlannedEntry } from "../../lib/curriculumPrompt.js";
 import type { AppState } from "../appState.js";
@@ -429,7 +430,7 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
   const writeMaster = (area: CurriculumArea, tasks: CurriculumHandoff[]): CurriculumMaster => {
     const dirAbs = path.join(app.root, area.space, "_handoff", "crear");
     const masterAbs = path.join(dirAbs, `TODAS_${area.id}.md`);
-    const shortPrompt = `NEW TASK — ignore everything we discussed before in this conversation. Read \`${masterAbs}\` and execute it: it lists ${tasks.length} task file${tasks.length === 1 ? "" : "s"}; do them one after another, in order, creating only the vault folders and notes they list. Do NOT modify the NoteVault app (frontend/, electron/), ~/.notevault or any setting. Tell me when you finish each one.`;
+    const shortPrompt = `NEW TASK — ignore everything we discussed before in this conversation. Read \`${masterAbs}\` and execute it: it lists ${tasks.length} task file${tasks.length === 1 ? "" : "s"}. Do ALL of them, one after another, WITHOUT stopping or asking me anything between them — keep going until the last one is finished, then report once. If you are resuming after an interruption, skip every topic that already has its folder with the note, the .practica.md and the map, and continue with the first missing one. Create only the vault folders and notes the tasks list. Do NOT modify the NoteVault app (frontend/, electron/), ~/.notevault or any setting.`;
     const lines = [
       `# NoteVault queue — ${area.title} · ${tasks.length} task${tasks.length === 1 ? "" : "s"} in order`,
       "",
@@ -442,10 +443,11 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
       "## How to work",
       "",
       "0. This is a NEW task: ignore any earlier conversation. Your only job is the list below. **Never modify the NoteVault app source (`frontend/`, `electron/`), `~/.notevault`, system or app settings** — only create the vault folders and notes the task files list.",
-      "1. Do the tasks **in the order below, one after the other**. Open a task file, read it completely, do exactly what it says, run the checks it lists, fix what they report, and only then start the next one.",
-      "2. Each task file is self-contained and overrides anything here. Create only the folders and files it lists; never touch anything else; do not run git commands.",
-      "3. After each task write one line under its `## Done` heading (create the heading if missing) with the date and the number of topics, and tell the person «task N of M done».",
-      "4. If a task cannot be completed (a folder already exists, a check keeps failing after two honest attempts), STOP, say which task and why, and wait.",
+      "1. **Do ALL the tasks in one go.** Do them in the order below, one after the other, **without stopping, asking for confirmation or waiting for me between them**. Do not end your turn until the last task is finished; a one-line progress note after each task is fine, but keep working. Report once, at the end.",
+      "2. For each task: open its file, read it completely, do exactly what it says, run the checks it lists, fix what they report, and only then start the next one. Each task file is self-contained and overrides anything here. Create only the folders and files it lists; never touch anything else; do not run git commands.",
+      "3. **Resuming.** If you are asked to run this file again (you stopped, ran out of room, or the person re-pasted the prompt), do NOT start over: for every topic listed, check the disk first. A topic whose folder already has its note (`<name>.md`), its `<name>.practica.md` and its map (`<name> — mapa.canvas`) is DONE: skip it, never rewrite it. Continue with the first topic that is missing something, and finish only what is missing in it.",
+      "4. After each task write one line under its `## Done` heading (create the heading if missing) with the date and the number of topics.",
+      "5. If a task cannot be completed (a check keeps failing after two honest attempts on the same topic), skip that topic, note it in the task's `## Done` line, and CONTINUE with the rest; list every skipped topic in your final report.",
       "",
       "## The tasks",
       "",
@@ -455,6 +457,30 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
     fs.mkdirSync(dirAbs, { recursive: true });
     fs.writeFileSync(masterAbs, lines.join("\n"), "utf-8");
     return { taskPath: rel(masterAbs), taskAbs: masterAbs, shortPrompt, count: tasks.length };
+  };
+
+  /** Arregla lo mecánico de los temas con problemas (hoy el `topic_type` inventado); devuelve cuántos archivos cambió. Solo toca la nota y el manifiesto del tema. */
+  const repairTask = (s: State): number => {
+    let n = 0;
+    for (const e of s.entries) {
+      if (e.state === "created" || !e.problems.some((p) => /topic_type/.test(p))) continue;
+      for (const f of [path.join(abs(e.folder), `${e.name}.md`), path.join(abs(e.folder), `${e.name}.practica.md`)]) {
+        try {
+          const r = repairTopicType(fs.readFileSync(f, "utf-8"));
+          if (r.changed) {
+            fs.writeFileSync(f, r.text, "utf-8");
+            n++;
+          }
+        } catch {
+          /* el archivo no está: lo dirá la validación */
+        }
+      }
+    }
+    if (n) {
+      s.log.push(`Se corrigió el topic_type de ${n} archivo(s) a «mixed» (el contrato solo admite theoretical, procedural o mixed).`);
+      save(s);
+    }
+    return n;
   };
 
   const api = {
@@ -482,7 +508,10 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
     /** Valida UNA TRAS OTRA todas las tareas pendientes del área (lo que el agente ya escribió); las que aún no tienen notas quedan «con problemas» con el motivo. */
     async study_curriculum_handoff_validate_all(input: { areaId: string }): Promise<CurriculumHandoff[]> {
       const out: CurriculumHandoff[] = [];
-      for (const s of pendingStates(String(input?.areaId ?? ""))) out.push(await api.study_curriculum_handoff_validate(s.id));
+      for (const s of pendingStates(String(input?.areaId ?? ""))) {
+        repairTask(s); // lo mecánico (topic_type) se arregla solo antes de validar
+        out.push(await api.study_curriculum_handoff_validate(s.id));
+      }
       return out;
     },
 

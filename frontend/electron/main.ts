@@ -52,6 +52,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 
 import { FileWatcherService, type WatchEvent } from "../src/core/fileWatcher";
+import { createVaultChangeNotifier } from "../src/core/vaultChange";
+import { invalidateVaultCaches } from "../src/api/vaultInvalidate";
 
 let win: BrowserWindow | null = null;
 let fileWatcher: FileWatcherService | null = null;
@@ -63,10 +65,16 @@ export function restartFileWatcher(root?: string) {
   }
   const target = root ?? getAppState()?.root;
   if (target && fs.existsSync(target)) {
+    // Cambios hechos fuera de la app (Antigravity, git…): una sola relectura por ráfaga y aviso a la interfaz para que los temas nuevos aparezcan solos
+    const notify = createVaultChangeNotifier(() => {
+      invalidateVaultCaches(target);
+      if (win && !win.isDestroyed()) win.webContents.send("vault-content-changed");
+    });
     fileWatcher = new FileWatcherService(target, (event: WatchEvent) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send("vault-watch-event", event);
       }
+      notify(event.relPath);
     });
     fileWatcher.start();
   }

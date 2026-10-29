@@ -210,6 +210,28 @@ describe("Antigravity -> validar -> vault -> Mentor", () => {
     expect(left.some((f) => h.entries.some((e) => e.folder === f))).toBe(false);
   });
 
+  it("un agente que inventa topic_type: reference: la validación lo ve y «validar todo» lo corrige solo y valida", async () => {
+    const api = curriculumHandoffApi(app, { now: NOW });
+    const { tasks } = await api.study_curriculum_handoff_batches({ areaId: "html", importance: "esencial", confirm: true });
+    const h = tasks[0]!;
+    const task = simulateAgent(h);
+    for (const t of task.topics.slice(0, 3)) {
+      const rel = path.relative(dir, t.folderAbs).split(path.sep).join("/");
+      for (const f of [`${rel}/${t.name}.md`, `${rel}/${t.name}.practica.md`]) put(f, read(f).replace(/^topic_type: .*$/m, "topic_type: reference"));
+    }
+    vaultScan(app);
+    const bad = await api.study_curriculum_handoff_validate(h.id);
+    expect(bad.status).toBe("failed");
+    expect(bad.entries.filter((e) => e.problems.some((p) => /topic_type/.test(p))).length).toBe(3);
+
+    const res = await api.study_curriculum_handoff_validate_all({ areaId: "html" });
+    const fixed = res.find((x) => x.id === h.id)!;
+    expect(fixed.entries.flatMap((e) => e.problems)).toEqual([]);
+    expect(fixed.status).toBe("validated");
+    expect(fixed.log.join("\n")).toMatch(/Se corrigió el topic_type de 6 archivo/);
+    expect(read(`${path.relative(dir, task.topics[0]!.folderAbs).split(path.sep).join("/")}/${task.topics[0]!.name}.md`)).toMatch(/^topic_type: mixed$/m);
+  });
+
   it("si el agente no añadió la línea del temario, la validación lo dice con el mensaje exacto", async () => {
     const api = curriculumHandoffApi(app, { now: NOW });
     const h = await api.study_curriculum_handoff({ areaId: "html", entryIds: [curriculumAreas().find((a) => a.id === "html")!.entries[0]!.id], confirm: true });

@@ -13,7 +13,7 @@ export type EntryProgressKey = "folder" | "note" | "manifest" | "exercises" | "m
 
 /** Las operaciones del backend (nombres acordados). Se accede de forma tolerante: si aún no están, la interfaz se queda sin datos, no se rompe. */
 interface CurriculumApi {
-  studyCurriculumCoverage?: (o?: { space?: string }) => Promise<{ areas: AreaCoverage[] }>;
+  studyCurriculumCoverage?: (o?: { space?: string; fresh?: boolean }) => Promise<{ areas: AreaCoverage[] }>;
   studyCurriculumHandoff?: (o: { areaId: string; entryIds: string[]; withExercises?: boolean; confirm: true }) => Promise<CurriculumHandoffState>;
   studyCurriculumHandoffBatches?: (o: { areaId: string; importance?: string; size?: number; withExercises?: boolean; refreshOnly?: boolean; confirm: true }) => Promise<CurriculumQueue>;
   studyCurriculumHandoffValidateAll?: (o: { areaId: string }) => Promise<CurriculumHandoffState[]>;
@@ -74,7 +74,7 @@ export const useCurriculum = create<CurriculumStore>((set, get) => ({
     if (get().loading || (get().loaded && !force)) return;
     set({ loading: true });
     try {
-      const r = await need("studyCurriculumCoverage")({});
+      const r = await need("studyCurriculumCoverage")(force ? { fresh: true } : {});
       set((s) => ({ areas: r?.areas ?? [], loaded: true, loading: false, error: "", version: s.version + 1 }));
     } catch (e) {
       set({ loading: false, loaded: true, error: (e as Error).message });

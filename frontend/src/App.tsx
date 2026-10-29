@@ -239,6 +239,20 @@ function useFileWatcherListener() {
   }, []);
 }
 
+/** Cambios en la vault hechos fuera de la app (un agente, git…): lo que depende del contenido —temas, cobertura, plan— se vuelve a leer SOLO, sin reindexar ni cerrar pestañas. */
+function useVaultContentListener(): void {
+  useEffect(() => {
+    return api.onVaultContentChanged(() => {
+      // import dinámico: estos almacenes viven en módulos pesados que no deben entrar en el arranque
+      void import("./components/study/StudyPanel").then((m) => m.useStudyVersion.getState().bump());
+      void import("./store/mentor").then((m) => m.useMentor.setState((st) => ({ planVersion: st.planVersion + 1 })));
+      void import("./store/curriculum").then((m) => {
+        if (m.useCurriculum.getState().loaded) void m.useCurriculum.getState().refresh();
+      });
+    });
+  }, []);
+}
+
 export function App() {
   const init = useApp((s) => s.init);
   // The view to show is driven by the active tab's module id.
@@ -251,6 +265,7 @@ export function App() {
   useShortcuts();
   useTaskReminders();
   useFileWatcherListener();
+  useVaultContentListener();
   // Clicking a review notification opens the Repaso calendar.
   useEffect(() => api.onOpenReview(() => useReviewCalendar.getState().set(true)), []);
   // Screenshots: the global shortcut and the "saved" toast.

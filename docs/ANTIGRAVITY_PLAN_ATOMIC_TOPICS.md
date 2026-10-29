@@ -55,6 +55,9 @@ anything here. **If there is no master file, STOP and say so**: the person has n
 | Atomic Design (`atomic-design`) | `5 Frontend\Atomic Design` | 11 | 1 | 17 |
 | Java (`java`) | `14 Java` | 43 | 2 | 84 |
 
+**One go, resumable.** The master asks you to do ALL its tasks without stopping or asking, and to resume safely: a topic whose folder already has
+its note, its `.practica.md` and its map is done — skip it and continue with the first missing one. If you stop, the person re-pastes the SAME sentence.
+
 ## 3. Work packages — in this order, never skipping ahead
 
 1. **WP1 HTML essentials** — the 7 `…_html*.md` tasks.

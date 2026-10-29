@@ -104,3 +104,25 @@ describe("mentor_plan_dossier", () => {
     expect(() => api.mentor_plan_dossier({ id: "../x" })).toThrow(/Plan inválido/);
   });
 });
+
+import { vi } from "vitest";
+import { mentorApi } from "./mentor.js";
+import { setWarmApp, warmStudyIndex } from "./study.js";
+
+describe("Nuevo proyecto (add_deliverable por la API directa)", () => {
+  it("añade un proyecto propio al plan, con sus criterios y fecha dentro del plan, y queda guardado", async () => {
+    const plan = savePlan();
+    setWarmApp(app);
+    await warmStudyIndex();
+    const m = mentorApi(app, vi.fn());
+    const r: any = await m.mentor_plan_change({ id: plan.id, label: "Añadir el proyecto «API de reservas»", ops: [{ op: "add_deliverable", title: "API de reservas", description: "Reservas con auth", criteria: ["Tiene pruebas", "Se arranca con un comando", ""], subplan: plan.subplans[0]!.id, dueDate: "2099-01-01" }] });
+    expect(r.applied).toBeTruthy();
+    const saved = new PlanStore(dir).load(plan.id)!;
+    const own = (saved.deliverables ?? []).filter((d) => d.id.startsWith("x:"));
+    expect(own).toHaveLength(1);
+    expect(own[0]!.title).toBe("API de reservas");
+    expect(own[0]!.criteria).toEqual(["Tiene pruebas", "Se arranca con un comando"]);
+    expect(own[0]!.dueDate).toBe(plan.end); // una fecha fuera del plan se recorta al fin del plan
+    expect(own[0]!.areaId).toBe("backend");
+  });
+});

@@ -2,7 +2,7 @@
 // una ventana propia con TODO su material y su progreso (producto, hitos, semanas y piezas, archivos y el proyecto real del módulo Proyectos). Lo usan la
 // Planeación («Entregables») y la Ejecución («Proyectos»): el avance sale de la cadena del plan (las casillas de las carpetas), nunca se marca a mano.
 
-import { AlertTriangle, ArrowRight, Check, Circle, ExternalLink, FolderKanban, Lock, Target } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, Circle, ExternalLink, FolderKanban, Lock, Plus, Target } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { weeklyBreakdown } from "../../lib/planAreaPractice";
@@ -18,6 +18,7 @@ import { AreaSections } from "./AreaSections";
 import { DSTATUS_COLOUR, plural, StatusChip } from "./agendaKit";
 import { useDeliverableChain } from "./MonthlyDeliverables";
 import { ProgressBar } from "./parts";
+import { NewProjectDialog } from "./NewProjectDialog";
 import { ProjectFolder } from "./ProjectFolder";
 import { ProjectsHub } from "./ProjectsHub";
 import type { Loaded } from "./planShared";
@@ -203,6 +204,7 @@ export function ProjectsBoard({ data, mode }: { data: Loaded; mode: "planeacion"
   const chain = useDeliverableChain(data);
   const today = todayIso();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const [links, setLinks] = useState<Record<string, RealLink>>({});
   const loadLinks = useCallback(() => {
     Promise.resolve()
@@ -219,6 +221,7 @@ export function ProjectsBoard({ data, mode }: { data: Loaded; mode: "planeacion"
   const next = pieces.find((p) => p.current);
   const current = months.find((m) => m.weeks.some((w) => w.pieces.some((p) => p.current))) ?? months.find((m) => m.status !== "hecho") ?? months[0];
   const open = months.find((m) => m.id === openId);
+  const own = (plan.deliverables ?? []).filter((d) => d.id.startsWith("x:"));
 
   if (!months.length) {
     return (
@@ -229,9 +232,12 @@ export function ProjectsBoard({ data, mode }: { data: Loaded; mode: "planeacion"
   }
   return (
     <section aria-labelledby="board-h" data-testid="projects-board" data-mode={mode} className="space-y-4">
-      <div>
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+        <div className="min-w-0 flex-1 basis-72">
         <h3 id="board-h" className="text-[18px] font-semibold">Proyectos</h3>
         <p className="mt-0.5 text-[14px] text-dim">{mode === "ejecucion" ? "Lo que construyes: cada día una pieza, cada semana un hito y cada mes un producto real que consolida lo aprendido." : "Cómo se construye el producto: piezas diarias → hitos semanales → producto mensual. El avance sale solo de lo que completas."}</p>
+        </div>
+        <GhostButton large="md" onClick={() => setAdding(true)} data-testid="board-new-project"><Plus size={15} aria-hidden /> Nuevo proyecto</GhostButton>
       </div>
 
       <div className="grid gap-3 @2xl:grid-cols-3" data-testid="board-levels">
@@ -275,6 +281,23 @@ export function ProjectsBoard({ data, mode }: { data: Loaded; mode: "planeacion"
         </ol>
       </div>
 
+      {own.length > 0 && (
+        <div className="space-y-2" data-testid="board-own">
+          <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Proyectos propios · los que añadiste al plan</p>
+          <ul className="grid gap-3 @3xl:grid-cols-2">
+            {own.map((d) => (
+              <li key={d.id} className="min-w-0 space-y-1.5 rounded-2xl border border-line bg-card p-4" data-testid="board-own-project">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="min-w-0 flex-1 basis-48 break-words text-[15.5px] font-semibold">{d.title}</span><StatusChip status={d.status} /></div>
+                <p className="text-[13px] text-faint">Se entrega el {dateLabel(d.dueDate)}{d.areaId ? ` · ${plan.subplans.find((s) => (s.areaId ?? s.id) === d.areaId)?.area ?? d.areaId}` : ""}</p>
+                {d.description && <p className="text-[14px] text-dim">{d.description}</p>}
+                {d.criteria.length > 0 && <ul className="list-disc space-y-0.5 pl-5 text-[13.5px] text-dim">{d.criteria.map((c) => <li key={c}>{c}</li>)}</ul>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {adding && <NewProjectDialog plan={plan} onClose={() => setAdding(false)} />}
       {open && <ProjectDetail month={open} data={data} link={links[open.id]} onLink={(l) => { setLinks((s) => ({ ...s, [open.id]: l })); loadLinks(); }} onClose={() => setOpenId(null)} />}
     </section>
   );

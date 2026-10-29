@@ -18,8 +18,8 @@ app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 // Configure GPU and rendering switches before app ready to maximize performance and respect settings
 try {
-  if (process.platform === "linux" && !app.commandLine.hasSwitch("ozone-platform")) {
-    app.commandLine.appendSwitch("ozone-platform", "x11");
+  if (process.platform === "linux" && !app.commandLine.hasSwitch("ozone-platform") && !app.commandLine.hasSwitch("ozone-platform-hint")) {
+    app.commandLine.appendSwitch("ozone-platform-hint", "auto");
   }
   const rendering = AppConfig.get_rendering();
   if (rendering.mode === "software") {
@@ -94,15 +94,17 @@ function createWindow() {
   const state = getAppState();
   if (state) state.window = win;
   browserManager.setWindow(win);
-  // El <webview> es contenido de terceros: nunca con Node, sin preload propio y solo con la partición del navegador de la app
-  win.webContents.on("will-attach-webview", (event, webPreferences, params) => {
+  // El <webview> es contenido de terceros: nunca con Node, sin preload propio y solo con la partición del navegador de la app (y solo orígenes web)
+  win.webContents.on("will-attach-webview", (_event, webPreferences, params) => {
     delete (webPreferences as { preload?: string }).preload;
     webPreferences.nodeIntegration = false;
     webPreferences.nodeIntegrationInSubFrames = false;
     webPreferences.contextIsolation = true;
     webPreferences.webSecurity = true;
     webPreferences.allowRunningInsecureContent = false;
-    if (params.partition !== "persist:nvweb" || (params.src && !/^(?:https?:|about:blank|data:text\/html)/i.test(params.src))) event.preventDefault();
+    // En vez de impedir que se acople (eso deja el navegador en negro), se corrige: siempre la partición de la app y solo orígenes web
+    params.partition = "persist:nvweb";
+    if (params.src && !/^(?:https?:|about:blank|data:text\/html)/i.test(params.src)) params.src = "about:blank";
   });
   win.webContents.on("did-attach-webview", (_event, guestContents) => {
     browserManager.attachGuest(guestContents);

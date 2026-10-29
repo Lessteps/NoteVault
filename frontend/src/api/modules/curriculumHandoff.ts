@@ -429,7 +429,7 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
   const writeMaster = (area: CurriculumArea, tasks: CurriculumHandoff[]): CurriculumMaster => {
     const dirAbs = path.join(app.root, area.space, "_handoff", "crear");
     const masterAbs = path.join(dirAbs, `TODAS_${area.id}.md`);
-    const shortPrompt = `Read \`${masterAbs}\` and execute it: it lists ${tasks.length} task file${tasks.length === 1 ? "" : "s"}; do them one after another, in order, and tell me when you finish each one.`;
+    const shortPrompt = `NEW TASK — ignore everything we discussed before in this conversation. Read \`${masterAbs}\` and execute it: it lists ${tasks.length} task file${tasks.length === 1 ? "" : "s"}; do them one after another, in order, creating only the vault folders and notes they list. Do NOT modify the NoteVault app (frontend/, electron/), ~/.notevault or any setting. Tell me when you finish each one.`;
     const lines = [
       `# NoteVault queue — ${area.title} · ${tasks.length} task${tasks.length === 1 ? "" : "s"} in order`,
       "",
@@ -441,6 +441,7 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
       "",
       "## How to work",
       "",
+      "0. This is a NEW task: ignore any earlier conversation. Your only job is the list below. **Never modify the NoteVault app source (`frontend/`, `electron/`), `~/.notevault`, system or app settings** — only create the vault folders and notes the task files list.",
       "1. Do the tasks **in the order below, one after the other**. Open a task file, read it completely, do exactly what it says, run the checks it lists, fix what they report, and only then start the next one.",
       "2. Each task file is self-contained and overrides anything here. Create only the folders and files it lists; never touch anything else; do not run git commands.",
       "3. After each task write one line under its `## Done` heading (create the heading if missing) with the date and the number of topics, and tell the person «task N of M done».",

@@ -1,6 +1,6 @@
 # Plan for Antigravity — create ALL the atomic topics (one note per HTML element, CSS property, JavaScript method…)
 
-To start or resume in any session, paste only this:
+**Open a NEW conversation** in Antigravity for this (an old one with other work in progress may answer that instead). To start or resume, paste only this:
 
 > Read `C:\PROGRAMMING\PROJECTS\NoteVault\docs\ANTIGRAVITY_PLAN_ATOMIC_TOPICS.md` and execute it. List
 > `C:\PROGRAMMING\Programación\_handoff\crear\` and continue with the first task file that is not finished.

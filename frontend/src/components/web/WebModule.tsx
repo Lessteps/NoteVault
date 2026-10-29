@@ -108,6 +108,7 @@ export function WebModule() {
         {tab === "browser" ? (
           page ? (
             <BrowserPanel
+              key={page.id}
               url={page.url}
               onPageState={(state) =>
                 patchPage(page.id, { url: state.url, title: state.title, favicon: state.favicon })

@@ -1,6 +1,7 @@
 import { WebContentsView, BrowserWindow, net, shell, type WebContents } from "electron";
 import { blockedPageHtml, hostOf, normalizeUrl, UsageMeter, WebStore } from "../src/core/webStore.js";
 import { getAppState } from "../src/api/registry.js";
+import { googleSignInDataUrl, isGoogleSignIn } from "../src/core/webAuth.js";
 import { cleanRequestHeaders, cleanUserAgent } from "../src/core/webUserAgent.js";
 import { zoomActionFor } from "../src/core/zoomLevel.js";
 import { applyZoomAction } from "./zoom.js";
@@ -185,6 +186,10 @@ export class BrowserManager {
     wc.session.setUserAgent(ua);
     if (!this.headersConfigured) {
       this.headersConfigured = true;
+      // Páginas web de terceros: sin cámara, micrófono, ubicación, notificaciones ni nada más salvo lo imprescindible
+      const ALLOWED = new Set(["fullscreen", "clipboard-sanitized-write"]);
+      wc.session.setPermissionRequestHandler((_wc, permission, callback) => callback(ALLOWED.has(permission)));
+      wc.session.setPermissionCheckHandler((_wc, permission) => ALLOWED.has(permission));
       wc.session.webRequest.onBeforeSendHeaders((details, callback) => {
         callback({ requestHeaders: cleanRequestHeaders(details.requestHeaders) as Record<string, string> });
       });
@@ -240,6 +245,10 @@ export class BrowserManager {
     });
 
     wc.setWindowOpenHandler(({ url }) => {
+      if (isGoogleSignIn(url)) {
+        void shell.openExternal(url);
+        return { action: "deny" };
+      }
       const state = getAppState();
       if (state) {
         const store = new WebStore(state.root);
@@ -270,6 +279,13 @@ export class BrowserManager {
         if (url.startsWith("file:") || url.startsWith("chrome:")) {
           e.preventDefault();
         }
+        return;
+      }
+      // Google no deja iniciar sesión en un navegador integrado: se abre en el del sistema y aquí se explica
+      if (isGoogleSignIn(url)) {
+        e.preventDefault();
+        void shell.openExternal(url);
+        void wc.loadURL(googleSignInDataUrl()).catch(() => undefined);
         return;
       }
       const state = getAppState();

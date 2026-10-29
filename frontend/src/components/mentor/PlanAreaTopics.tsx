@@ -600,7 +600,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
               <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-empty">Esta sección no tiene temas.</p>
             </div>
           ) : visible.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-filter-empty">Ningún tema cumple ese estado.</p>
+            <div className="space-y-2"><p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-filter-empty">Ningún tema cumple ese estado.</p></div>
           ) : (
             <>
             <div className="overflow-x-auto rounded-xl border border-line">
@@ -781,7 +781,6 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between pt-2" data-testid="add-topics-bottom">{addTopicsBar("add-topics-btn-bottom")}</div>
             </>
           )}
         </>

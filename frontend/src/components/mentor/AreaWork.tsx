@@ -395,6 +395,11 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
                           <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} planId={planId} />
                         ))}
                       </ul>
+                      {plan && subplanId && (
+                        <div className="pt-1" data-testid="subject-add-topic" data-subject={grp.id}>
+                          <AddExtraTopic planId={planId} date={today} area={subplanId} lockArea lockSession minDate={plan.start} maxDate={plan.end} subject={{ title: grp.title, info: `${grp.done}/${grp.total} hechos (${grp.pct}%)` }} label={`Añadir más temas de ${grp.title}`} onChanged={bumpPlanVersion} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}

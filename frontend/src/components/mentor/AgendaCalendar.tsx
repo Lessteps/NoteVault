@@ -184,7 +184,15 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged, hideFilter = fa
                     </div>
 
                     <div className="mt-2 flex-1 space-y-1.5 overflow-y-auto">
-                      {dayEntries.length > 0 ? (
+                      {dayEntries.length > 1 && only === null ? (
+                        // Vista general: todas las áreas del día colapsadas en una sola tarjeta (un punto por área y el total); cada área se ve al abrir el día
+                        <div className="rounded-lg border border-line/80 bg-card p-2 text-[12px]" data-testid="week-col-collapsed" title={dayEntries.map((e) => `${areaShort(e.areaId, e.area)} ${e.theoryMinutes + e.practiceMinutes}m`).join(" · ")}>
+                          <div className="flex flex-wrap items-center gap-1">
+                            {dayEntries.map((e) => <AreaDot key={e.subplanId} {...(e.areaId ? { areaId: e.areaId } : {})} />)}
+                          </div>
+                          <div className="mt-1.5 text-[11px] text-faint">{dayEntries.length} áreas · {dayEntries.reduce((n, e) => n + e.theoryMinutes + e.practiceMinutes, 0)}m</div>
+                        </div>
+                      ) : dayEntries.length > 0 ? (
                         dayEntries.map((e) => (
                           <div
                             key={e.subplanId}
@@ -289,7 +297,14 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged, hideFilter = fa
                             <span className={cn("grid h-6 min-w-6 place-items-center rounded-full px-1", date === m.today && "bg-[var(--nv-btn,var(--nv-accent))] text-white")}>{Number(date.slice(8))}</span>
                             {Number(date.slice(8)) === 1 && <span className="text-[13px] font-medium uppercase text-dim">{dateLabel(date).split(" ")[1]}</span>}
                           </span>
-                          {entries.length > 0 && (
+                          {entries.length > 1 && only === null && (
+                            // Vista general: las áreas del día colapsadas en una sola línea (un punto por área + el total); el detalle por área está en la etiqueta del día y al abrirlo
+                            <span className="flex items-center gap-1 text-[12.5px] leading-tight text-dim" aria-hidden data-testid="agenda-cell-collapsed" title={entries.map((e) => areaShort(e.areaId, e.area)).join(" · ")}>
+                              {entries.map((e) => <AreaDot key={e.subplanId} {...(e.areaId ? { areaId: e.areaId } : {})} />)}
+                              <span className="whitespace-nowrap">{entries.length} áreas · {entries.reduce((n, e) => n + (e.theoryTopics || e.topics), 0)}t</span>
+                            </span>
+                          )}
+                          {entries.length > 0 && !(entries.length > 1 && only === null) && (
                             <span className="flex flex-col gap-0.5" aria-hidden data-testid="agenda-cell-areas">
                               {entries.map((e) => (
                                 <span key={e.subplanId} className="flex items-center gap-1 text-[12.5px] leading-tight text-text" data-testid="agenda-cell-area" data-area={e.areaId ?? e.subplanId}>

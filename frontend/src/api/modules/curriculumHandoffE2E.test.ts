@@ -173,6 +173,39 @@ describe("Antigravity -> validar -> vault -> Mentor", () => {
     expect(JSON.parse(fs.readFileSync(planFile(plan.id), "utf-8")).subplans[1].topics.at(-1).addedFrom).toBe("curriculum");
   });
 
+  it("lotes atómicos: la primera tarea de HTML se ejecuta, valida, entra al plan en la asignatura HTML y sube la cobertura", async () => {
+    const api = curriculumHandoffApi(app, { now: NOW });
+    const batches = await api.study_curriculum_handoff_batches({ areaId: "html", importance: "esencial", confirm: true });
+    expect(batches.length).toBeGreaterThan(3);
+    const h = batches[0]!;
+    // el grupo va primero y sus piezas cuelgan de su número (N.M.K)
+    expect(h.entries[0]!.folder).toMatch(/\/5\.18\.1 Document skeleton/);
+    expect(h.entries.some((e) => /\/5\.18\.\d+\.\d+ /.test(e.folder))).toBe(true);
+
+    const task = simulateAgent(h);
+    expect(task.topics.length).toBe(h.entries.length);
+    expect(fs.readFileSync(h.taskAbs, "utf-8")).toContain("ATOMIC TOPIC");
+
+    vaultScan(app);
+    const v = await api.study_curriculum_handoff_validate(h.id);
+    expect(v.entries.flatMap((e) => e.problems)).toEqual([]);
+    expect(v.status).toBe("validated");
+
+    const plan = savePlan();
+    const r: any = mentorApi(app, vi.fn()).mentor_plan_add_topics({ planId: plan.id, folders: v.entries.map((e) => e.folder) });
+    const fe = r.plan.subplans.find((s: any) => s.areaId === "frontend");
+    const added = fe.topics.filter((t: any) => t.addedFrom === "curriculum");
+    expect(added.length).toBe(h.entries.length);
+    expect(added.every((t: any) => t.group === "html")).toBe(true);
+    // el grupo general antes que sus piezas
+    expect(added[0].folder).toMatch(/5\.18\.1 Document skeleton/);
+
+    // con las notas creadas esas piezas ya no faltan
+    const again = await api.study_curriculum_handoff_batches({ areaId: "html", importance: "esencial", confirm: true });
+    const left = again.flatMap((b) => b.entries.map((e) => e.folder));
+    expect(left.some((f) => h.entries.some((e) => e.folder === f))).toBe(false);
+  });
+
   it("si el agente no añadió la línea del temario, la validación lo dice con el mensaje exacto", async () => {
     const api = curriculumHandoffApi(app, { now: NOW });
     const h = await api.study_curriculum_handoff({ areaId: "html", entryIds: [curriculumAreas().find((a) => a.id === "html")!.entries[0]!.id], confirm: true });

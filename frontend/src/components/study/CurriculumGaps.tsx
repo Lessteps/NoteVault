@@ -46,6 +46,8 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
   const [confirming, setConfirming] = useState(false);
   const [creating, setCreating] = useState(false);
   const [handoff, setHandoff] = useState<CurriculumHandoffState | null>(null);
+  const [batching, setBatching] = useState(false);
+  const [batches, setBatches] = useState<CurriculumHandoffState[]>([]);
 
   useEffect(() => {
     void useCurriculum.getState().loadPending();
@@ -79,6 +81,20 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
       toast("error", (e as Error).message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  /** TODAS las tareas de golpe: lo esencial que falta en lotes (o todo lo que falta), una tarea por lote, listas para el agente */
+  const makeBatches = async (importance?: string): Promise<void> => {
+    setBatching(true);
+    try {
+      const list = await useCurriculum.getState().createBatches({ areaId, ...(importance ? { importance } : {}), withExercises });
+      setBatches(list);
+      toast("info", `${list.length} ${list.length === 1 ? "tarea escrita" : "tareas escritas"}: el agente las ejecuta en orden.`);
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setBatching(false);
     }
   };
 
@@ -163,6 +179,25 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
                   );
                 })}
               </div>
+            )}
+
+            {/* Todas las tareas por lotes */}
+            {area.missing + area.partial > 0 && (
+              <section className="rounded-xl border border-line bg-card p-3" data-testid="gaps-batches" aria-label="Crear todas las tareas por lotes">
+                <h3 className="text-[13.5px] font-semibold text-text">Crear TODAS las tareas por lotes</h3>
+                <p className="mb-2 text-[13px] text-dim">En vez de elegir tema a tema: la app escribe una tarea por cada lote de ≈ 25 temas (el grupo y sus piezas juntos) para que Antigravity las ejecute en orden. Después validas cada una y la añades al plan.</p>
+                <div className="flex flex-wrap gap-2">
+                  <PrimaryButton large onClick={() => void makeBatches("esencial")} disabled={batching} data-testid="gaps-batches-essential">Solo lo esencial</PrimaryButton>
+                  <GhostButton large="md" onClick={() => void makeBatches()} disabled={batching} data-testid="gaps-batches-all">Todo lo que falta</GhostButton>
+                </div>
+                {batches.length > 0 && (
+                  <ol className="mt-2 list-decimal space-y-0.5 pl-6 text-[13px] text-dim" data-testid="gaps-batches-list">
+                    {batches.map((h) => (
+                      <li key={h.id} className="break-all">{h.entries.length} temas · <code>{h.taskPath}</code> <button type="button" className="text-accent-text hover:underline" onClick={() => setHandoff(h)}>Abrir</button></li>
+                    ))}
+                  </ol>
+                )}
+              </section>
             )}
 
             {/* Ayudas de selección */}

@@ -3,8 +3,9 @@
 // subtemas. Sin IA local: (1) «Crear con Antigravity» escribe la tarea para el agente externo; (2) «Copiar prompt de revisión» deja el texto listo
 // para pegar en cualquier IA. La app no crea temas por sí misma.
 
-import { ClipboardCheck, ClipboardCopy, ChevronRight } from "lucide-react";
+import { ClipboardCheck, ClipboardCopy, ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
+import { api } from "../../lib/bridge";
 import { copyText } from "../../lib/clipboard";
 import { curriculumIdsOfScope, reviewPrompt, type MethodologyScope, type ScopeTopic } from "../../lib/methodologyScope";
 import { useApp } from "../../store/app";
@@ -19,6 +20,8 @@ export function MethodologyCheckButton({ scope, topics, label = "Verificar metod
   const { areas, loaded, error } = useCoverage();
   const [open, setOpen] = useState(false);
   const [gapsId, setGapsId] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [aiText, setAiText] = useState("");
 
   const ids = useMemo(() => curriculumIdsOfScope(scope, areas.map((a) => a.areaId)), [scope, areas]);
   const mine = areas.filter((a) => ids.includes(a.areaId));
@@ -28,6 +31,20 @@ export function MethodologyCheckButton({ scope, topics, label = "Verificar metod
   const copyPrompt = async (): Promise<void> => {
     const ok = await copyText(reviewPrompt(scope, topics, folders));
     toast(ok ? "info" : "error", ok ? "Prompt copiado: pégalo en tu IA." : "No se pudo copiar el prompt.");
+  };
+  /** Con la IA de la app (clave de API o modelo local); sin ella, lo dice y quedan Antigravity y el prompt */
+  const reviewWithAi = async (): Promise<void> => {
+    setReviewing(true);
+    setAiText("");
+    try {
+      const r = await api.mentorMethodologyReview({ prompt: reviewPrompt(scope, topics, folders) });
+      if (!r.aiConfigured) toast("info", "La IA de la app no está configurada: usa «Ver y crear lo que falta» (Antigravity) o copia el prompt.");
+      else setAiText(r.text || "La IA no devolvió nada.");
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setReviewing(false);
+    }
   };
   const close = (): void => {
     setOpen(false);
@@ -79,7 +96,16 @@ export function MethodologyCheckButton({ scope, topics, label = "Verificar metod
                 <GhostButton large="md" onClick={() => void copyPrompt()} data-testid="methodology-copy-prompt">
                   <ClipboardCopy size={15} aria-hidden /> Copiar prompt de revisión
                 </GhostButton>
+                <GhostButton large="md" onClick={() => void reviewWithAi()} disabled={reviewing} data-testid="methodology-ai-review" title="Usa la IA configurada en la app (clave de API o modelo local)">
+                  {reviewing ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Sparkles size={15} aria-hidden />} Revisar con la IA de la app
+                </GhostButton>
               </div>
+              {aiText && (
+                <section aria-label="Respuesta de la IA" className="space-y-1.5" data-testid="methodology-ai-answer">
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-panel p-3 text-[13px] text-text">{aiText}</pre>
+                  <GhostButton onClick={() => void copyText(aiText).then((ok) => toast(ok ? "info" : "error", ok ? "Respuesta copiada." : "No se pudo copiar."))}><ClipboardCopy size={14} aria-hidden /> Copiar respuesta</GhostButton>
+                </section>
+              )}
               <p className="text-[12.5px] text-faint">El prompt lleva tus {topics.length} {topics.length === 1 ? "tema" : "temas"} de «{scope.label}» y las reglas de metodología; la IA te dice qué partir y qué añadir.</p>
             </>
           )}

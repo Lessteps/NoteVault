@@ -292,6 +292,10 @@ export interface SubjectMethodologyWarning {
   }>;
 }
 
+/** Mínimo de temas (una pieza cada uno) para dar HTML y CSS por desarrollados: el currículo de referencia tiene muchos más; esto es solo el umbral del aviso. */
+export const MIN_HTML_TOPICS = 20;
+export const MIN_CSS_TOPICS = 40;
+
 export function evaluateAreaMethodology(subplan: {
   id: string;
   areaId?: string;
@@ -304,95 +308,22 @@ export function evaluateAreaMethodology(subplan: {
   if (!isFrontend) return warnings;
 
   const liveTopics = subplan.topics.filter((t) => t.route !== "skipped");
-  const htmlTopics = liveTopics.filter(
-    (t) => t.group === "html" || frontendGroupForFolder(t.folder)?.id === "html"
-  );
-  const hasContainerHtml = htmlTopics.some((t) =>
-    /contenedor|container|semantic|landmark|section/i.test(`${t.title} ${t.folder} ${(t.tags ?? []).join(" ")}`)
-  );
-  if (htmlTopics.length < 3 || !hasContainerHtml) {
+  const count = (id: "html" | "css"): number => liveTopics.filter((t) => t.group === id || frontendGroupForFolder(t.folder)?.id === id).length;
+  const make = (id: "html" | "css", title: string, description: string, n: number, min: number): void => {
+    if (n >= min) return;
     warnings.push({
       areaId: subplan.id,
-      groupId: "html",
-      groupTitle: "HTML",
+      groupId: id,
+      groupTitle: title,
       severity: "warning",
-      title: "Problema metodológico en la asignatura HTML: falta práctica de contenedores y estructura semántica",
-      description: "Cuando una asignatura radica en la memorización y práctica particular de elementos (contenedores semánticos, landmarks, formularios y tablas), un único tema general resulta insuficiente.",
-      missingTags: ["#memorizacion-elementos", "#practica-contenedores", "#html-semantico"],
-      recommendedTopics: [
-        {
-          folder: "Programación/5 Frontend/HTML/5.18.1 HTML practicar con contenedores y estructura semántica",
-          title: "HTML: practicar con contenedores y estructura semántica",
-          group: "html",
-          tags: ["memorizacion-elementos", "practica-contenedores", "html-semantico"],
-          estMinutes: 45,
-        },
-        {
-          folder: "Programación/5 Frontend/HTML/5.18.2 HTML practicar con formularios, inputs y tablas",
-          title: "HTML: practicar con formularios, inputs y tablas",
-          group: "html",
-          tags: ["memorizacion-elementos", "practica-formularios", "html-inputs"],
-          estMinutes: 45,
-        },
-        {
-          folder: "Programación/5 Frontend/HTML/5.18.3 HTML practicar con multimedia, enlaces y accesibilidad",
-          title: "HTML: practicar con multimedia, enlaces y accesibilidad",
-          group: "html",
-          tags: ["memorizacion-elementos", "practica-accesibilidad", "html-aria"],
-          estMinutes: 45,
-        },
-      ],
+      title: `${title} está poco desarrollada: ${n} ${n === 1 ? "tema" : "temas"} (lo esperable son al menos ${min})`,
+      description,
+      missingTags: [],
+      recommendedTopics: [],
     });
-  }
-
-  const cssTopics = liveTopics.filter(
-    (t) => t.group === "css" || frontendGroupForFolder(t.folder)?.id === "css"
-  );
-  const hasContainerCss = cssTopics.some((t) =>
-    /contenedor|container|flexbox|grid|box-model|propiedades/i.test(`${t.title} ${t.folder} ${(t.tags ?? []).join(" ")}`)
-  );
-  if (cssTopics.length < 4 || !hasContainerCss) {
-    warnings.push({
-      areaId: subplan.id,
-      groupId: "css",
-      groupTitle: "CSS",
-      severity: "warning",
-      title: "Problema metodológico en la asignatura CSS: práctica insuficiente de propiedades de contenedores",
-      description: "La práctica actual de CSS es insuficiente para lo que necesita dominar un frontend real. Requiere práctica particular de propiedades de contenedores (Box Model, Flexbox, Grid, posicionamiento y responsive).",
-      missingTags: ["#practica-propiedades-contenedores", "#flexbox", "#css-grid", "#box-model"],
-      recommendedTopics: [
-        {
-          folder: "Programación/5 Frontend/CSS/5.19.1 CSS practicar con propiedades de contenedores y Box Model",
-          title: "CSS: practicar con propiedades de contenedores y Box Model",
-          group: "css",
-          tags: ["practica-propiedades-contenedores", "box-model", "display-flow"],
-          estMinutes: 45,
-        },
-        {
-          folder: "Programación/5 Frontend/CSS/5.19.2 CSS practicar con contenedores Flexbox y alineación",
-          title: "CSS: practicar con contenedores Flexbox y alineación",
-          group: "css",
-          tags: ["practica-propiedades-contenedores", "flexbox", "alineacion"],
-          estMinutes: 45,
-        },
-        {
-          folder: "Programación/5 Frontend/CSS/5.19.3 CSS practicar con contenedores CSS Grid y áreas",
-          title: "CSS: practicar con contenedores CSS Grid y áreas",
-          group: "css",
-          tags: ["practica-propiedades-contenedores", "css-grid", "layout"],
-          estMinutes: 45,
-        },
-        {
-          folder: "Programación/5 Frontend/CSS/5.19.4 CSS practicar con posicionamiento, responsive y variables",
-          title: "CSS: practicar con posicionamiento, responsive y variables",
-          group: "css",
-          tags: ["practica-propiedades-contenedores", "positioning", "responsive"],
-          estMinutes: 45,
-        },
-      ],
-    });
-  }
-
+  };
+  make("html", "HTML", "HTML se aprende pieza a pieza: un tema por elemento y atributo (header, nav, section, form, input…), no uno general. Con «Verificar metodología» ves qué falta y lo creas con Antigravity o con tu IA.", count("html"), MIN_HTML_TOPICS);
+  make("css", "CSS", "CSS se aprende propiedad a propiedad: un tema por propiedad, selector y regla (flex-direction, gap, grid-template-areas…), no uno general. Con «Verificar metodología» ves qué falta y lo creas con Antigravity o con tu IA.", count("css"), MIN_CSS_TOPICS);
   return warnings;
 }
 

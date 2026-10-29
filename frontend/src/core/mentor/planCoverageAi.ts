@@ -4,6 +4,7 @@
  * La respuesta se valida con `parseCoverageReply` (descarta lo que ya existe, normaliza áreas) y se guarda como `Plan.coverageReview`.
  */
 
+import { METHODOLOGY_RULE } from "./methodologyRule.js";
 import type { AreaGroup } from "../../lib/planAreas.js";
 import type { PlanCoverage } from "../../lib/planCoverage.js";
 import { areaKeyOf, criteriaText, LEVEL_LABEL, type CoverageCriteria } from "../../lib/planCoverage.js";
@@ -54,7 +55,7 @@ export const COVERAGE_SYSTEM_PROMPT = [
   "- `design` por área: {\"summary\": una frase, \"topics\": [{\"title\": EXACTO, \"verdict\": \"good|incomplete|poor\", \"create\": [ids del checklist], \"note\": una frase}]}. Incluye los temas con diseño incompleto y, como mucho, tres ejemplos de temas bien diseñados. `designSummary` global: una o dos frases.",
   "- No inventes horas. No propongas crear notas: solo informas (la persona decide después si se ejecuta algo).",
   'Responde SOLO con JSON: {"summary": "valoración global (máx. 3 frases)", "designSummary": "valoración del diseño de los temas", "overall": {"verdict": "short|adequate|excessive", "coveragePct": 70, "text": "una o dos frases con la estimación"}, "areas": [{"key": "backend", "verdict": "short", "verdictWhy": "…", "coveragePct": 65, "assessment": "una o dos frases", "missing": [{"title": "Message queues", "why": "…", "group": "core", "priority": "high", "level": "junior"}], "design": {"summary": "…", "topics": [{"title": "4.3 REST API design", "verdict": "incomplete", "create": ["canvas", "practice_basic"], "note": "…"}]}, "dispensable": [{"title": "…", "reason": "…"}], "misplaced": [{"title": "…", "reason": "…", "suggestedArea": "automation"}]}]}',
-].join("\n");
+].join("\n") + "\n" + METHODOLOGY_RULE;
 
 export function coverageMessages(input: CoverageAiInput): Array<{ role: "system" | "user"; content: string }> {
   const cov = new Map(input.coverage.areas.map((a) => [a.key, a]));

@@ -26,6 +26,8 @@ export interface AddExtraTopicProps {
   minDate?: string;
   maxDate?: string;
   onChanged: (plan: MentorPlan) => void;
+  /** si se da, solo se ven y adelantan los temas de ESA asignatura (título del grupo: «Lenguaje: JavaScript»); `info` es la línea de estado que se enseña arriba */
+  subject?: { title: string; info?: string };
   /** texto del botón */
   label?: string;
   className?: string;
@@ -71,7 +73,7 @@ function TopicRow({ c, day, busy, onAdd, dayText, lockSession }: { c: MentorTopi
   );
 }
 
-export function AddExtraTopic({ planId, date, area, lockArea, lockSession, minDate, maxDate, onChanged, label = "Añadir más temas al aprendizaje diario", className }: AddExtraTopicProps) {
+export function AddExtraTopic({ planId, date, area, lockArea, lockSession, minDate, maxDate, onChanged, subject, label = "Añadir más temas al aprendizaje diario", className }: AddExtraTopicProps) {
   const toast = useApp((s) => s.toast);
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState(date);
@@ -125,6 +127,7 @@ export function AddExtraTopic({ planId, date, area, lockArea, lockSession, minDa
   const groups = useMemo(() => {
     const byWeek = new Map<number, Map<string, { name: string; rows: MentorTopicCandidate[] }>>();
     for (const c of data?.ahead ?? []) {
+      if (subject && c.group !== subject.title) continue;
       const w = c.week ?? c.targetWeek ?? 0;
       const areas = byWeek.get(w) ?? new Map<string, { name: string; rows: MentorTopicCandidate[] }>();
       const key = c.subplanId ?? c.area ?? "";
@@ -134,7 +137,7 @@ export function AddExtraTopic({ planId, date, area, lockArea, lockSession, minDa
       byWeek.set(w, areas);
     }
     return [...byWeek.entries()].sort((a, b) => a[0] - b[0]);
-  }, [data]);
+  }, [data, subject]);
 
   const dayText = day === localToday() ? "Adelantar a hoy" : `Adelantar al ${dateLabel(day)}`;
   const planned = Object.entries(data?.plannedByArea ?? {});
@@ -145,7 +148,14 @@ export function AddExtraTopic({ planId, date, area, lockArea, lockSession, minDa
         <ArrowUpRight size={15} aria-hidden /> {label}
       </GhostButton>
       {open && (
-        <Modal title={lockSession ? "Añadir más temas al aprendizaje diario" : "Próximos temas"} onClose={close} width={760}>
+        <Modal title={subject ? `Añadir más temas · ${subject.title}` : lockSession ? "Añadir más temas al aprendizaje diario" : "Próximos temas"} onClose={close} width={760}>
+          {subject && (
+            <p className="rounded-lg border border-line bg-panel px-3 py-2 text-[13.5px]" data-testid="extra-topic-subject">
+              <strong className="text-text">{subject.title}</strong>
+              {subject.info ? <span className="text-dim"> · {subject.info}</span> : null}
+              <span className="block text-dim">Solo se muestran los próximos temas de esta asignatura.</span>
+            </p>
+          )}
           <p className="text-[14px] text-dim">
             {lockSession
               ? "Selecciona los próximos temas de esta área para añadirlos a tu sesión de aprendizaje diario."
@@ -172,7 +182,7 @@ export function AddExtraTopic({ planId, date, area, lockArea, lockSession, minDa
           )}
           {error && <p role="alert" className="text-[14px] text-danger">{error}</p>}
           {!data && !error && <p className="text-[14px] text-dim" role="status">Buscando los próximos temas…</p>}
-          {data && groups.length === 0 && <p className="text-[14px] text-dim">No quedan temas pendientes en las próximas semanas.</p>}
+          {data && groups.length === 0 && <p className="text-[14px] text-dim">{subject ? `No quedan temas pendientes de ${subject.title} en las próximas semanas.` : "No quedan temas pendientes en las próximas semanas."}</p>}
           {data &&
             groups.map(([week, areas]) => {
               const r = data.weeks[String(week)];

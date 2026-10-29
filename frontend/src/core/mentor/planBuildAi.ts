@@ -9,6 +9,7 @@
  *  - Se IGNORAN fechas, minutos y cualquier otro campo; lo desconocido se descarta y se anota.
  */
 
+import { METHODOLOGY_RULE } from "./methodologyRule.js";
 import type { ChatMessage } from "../aiClient.js";
 import { PACE_TEXT } from "./planSpec.js";
 import { toPromptText, type StudentBrief } from "./brief.js";
@@ -108,6 +109,7 @@ export function parseScopeReply(raw: string, allowedIds: readonly string[]): Sco
   return { ok: true, questions, rewrites };
 }
 
+
 // ── Etapa Temas ──────────────────────────────────────────────────────────
 
 export const TOPICS_SYSTEM = [
@@ -118,7 +120,7 @@ export const TOPICS_SYSTEM = [
   "Opcional: `rewrites` con la clave `weight` (texto <=160 y why <=140) si quieres reformular la pregunta de carga con contexto.",
   "Responde EXCLUSIVAMENTE con JSON válido, sin texto antes ni después:",
   '{ "type": "topic_order", "subplans": [ { "key": string, "topics": [ { "folder": string, "why": string } ] } ], "rewrites"?: { "weight": { "text": string, "why": string } } }',
-].join("\n");
+].join("\n") + "\n" + METHODOLOGY_RULE;
 
 export function topicsMessages(brief: StudentBrief, pre: PlanPreconditions, seeds: readonly SubplanSeed[], answers: readonly BuildAnswer[]): ChatMessage[] {
   const blocks = seeds.map((s) => `SUBPLAN key=${subplanKey(s)} | ${s.area}${s.objective ? ` · ${s.objective}` : ""}\n${s.topics.slice(0, TOPIC_BLOCK).map((t) => `  - folder=${t.folder} | ~${t.estMinutes}m`).join("\n")}`);
@@ -188,7 +190,7 @@ export const SKELETON_SYSTEM = [
   "NO propongas áreas ni ramas que no estén en la lista. NO conviertas Programming practice en un área: es una práctica diaria aparte. No incluyas fechas ni minutos: la app reparte con la capacidad real.",
   "Responde EXCLUSIVAMENTE con JSON válido, sin texto antes ni después:",
   '{ "type": "skeleton", "rationale": string, "subplans": [ { "key": string, "weight"?: number, "objective"?: string } ] }',
-].join("\n");
+].join("\n") + "\n" + METHODOLOGY_RULE;
 
 /** Con `areaMode: "ai"` el esqueleto también decide cómo se combinan las áreas (la app valida y calcula). */
 export const SKELETON_AREA_MODE_RULE = [
@@ -252,7 +254,7 @@ export const TOPICS_COMPACT_SYSTEM = [
   "No incluyas fechas ni minutos: la app reparte los temas por semanas.",
   "Responde EXCLUSIVAMENTE con JSON válido, sin texto antes ni después (los temas son solo las carpetas):",
   '{ "type": "topic_order", "subplans": [ { "key": string, "reason": string, "topics": [ string ] } ] }',
-].join("\n");
+].join("\n") + "\n" + METHODOLOGY_RULE;
 
 /** Un bloque de temas de un subplan (≤ TOPIC_BLOCK), en formato compacto: una línea por tema y la respuesta solo con carpetas. */
 export function topicsBlockMessages(brief: StudentBrief, pre: PlanPreconditions, seed: SubplanSeed, block: { index: number; count: number }, answers: readonly BuildAnswer[] = []): ChatMessage[] {

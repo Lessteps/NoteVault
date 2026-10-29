@@ -23,7 +23,7 @@ import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
 import { catalogFor } from "../../core/practice/skillSelection.js";
 import { generateConcept, readConcept } from "../../../tools/kb_canvas";
-import type { CurriculumArea, CurriculumEntry } from "../../lib/curriculum.js";
+import { planBatches, type CurriculumArea, type CurriculumEntry } from "../../lib/curriculum.js";
 import { buildCurriculumTask, isValidTopicFolderName, itemCovered, planEntries, topicFolderName, type CurriculumSkills, type PlannedEntry } from "../../lib/curriculumPrompt.js";
 import type { AppState } from "../appState.js";
 import { withGenerationLock } from "./generationLock.js";
@@ -396,7 +396,25 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
     return { problems, warnings };
   };
 
-  return {
+  const api = {
+    /**
+     * TODAS las tareas de un área de una vez: lo que falta (por importancia) repartido en lotes de ≤ `size` temas, una tarea por lote, en el orden del catálogo.
+     * Cada una es una tarea normal (se valida y se añade al plan igual). El agente las ejecuta en orden; la cobertura no cambia hasta que crea las notas.
+     */
+    async study_curriculum_handoff_batches(input: { areaId: string; importance?: string; size?: number; withExercises?: boolean; confirm?: boolean }): Promise<CurriculumHandoff[]> {
+      if (input?.confirm !== true) throw new ApiError("Falta la confirmación: las tareas piden a un agente externo que cree carpetas y notas en la vault.");
+      const areaId = String(input.areaId ?? "");
+      const imp = ["esencial", "recomendado", "opcional"].includes(String(input.importance)) ? (input.importance as "esencial" | "recomendado" | "opcional") : undefined;
+      const size = Math.max(5, Math.min(MAX_ENTRIES_PER_TASK, Math.round(Number(input.size) || RECOMMENDED_BATCH)));
+      const rows = curriculumCoverageFor(app).areas.find((a) => a.areaId === areaId)?.rows;
+      if (!rows) throw new ApiError("Esa área no está en el currículo.");
+      const batches = planBatches(rows, size, imp);
+      if (!batches.length) throw new ApiError("No falta nada de eso en esta área.");
+      const out: CurriculumHandoff[] = [];
+      for (const entryIds of batches) out.push(await api.study_curriculum_handoff({ areaId, entryIds, ...(input.withExercises ? { withExercises: true } : {}), confirm: true }));
+      return out;
+    },
+
     async study_curriculum_handoff(input: CurriculumHandoffInput): Promise<CurriculumHandoff> {
       if (input?.confirm !== true) throw new ApiError("Falta la confirmación: la tarea pide a un agente externo que cree carpetas y notas en la vault.");
       const area = areasOf().find((a) => a.id === String(input.areaId ?? ""));
@@ -533,4 +551,5 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
       return view(s);
     },
   };
+  return api;
 }

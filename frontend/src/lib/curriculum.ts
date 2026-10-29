@@ -87,3 +87,36 @@ export function coverageBadge(c: Pick<AreaCoverage, "pct" | "level" | "missing">
   if (c.level === "ok") return "";
   return `${c.level === "critico" ? "Desarrollo insuficiente" : "Desarrollo parcial"} · ${c.pct} % · faltan ${c.missing}`;
 }
+
+/**
+ * Reparte lo que falta en LOTES para las tareas del agente externo (una tarea admite pocos temas). Las categorías se mantienen juntas —el grupo y
+ * sus piezas viajan en la misma tarea—, en el orden del catálogo; una categoría más grande que el lote se parte, con el grupo siempre en el primero.
+ * `only` limita por importancia («esencial» primero y por separado).
+ */
+export function planBatches(rows: readonly CoverageRow[], size: number, only?: CurriculumImportance): string[][] {
+  const todo = rows.filter((r) => r.status !== "cubierto" && (!only || r.entry.importance === only));
+  const byCategory: string[][] = [];
+  let last = "";
+  for (const r of todo) {
+    // un subtema cuelga de la categoría de su grupo: la `category` del subtema es el título del grupo, y el grupo está en SU categoría
+    const key = r.entry.parentId ? `${r.entry.parentId}` : r.entry.id;
+    if (!byCategory.length || key !== last) {
+      byCategory.push([]);
+      last = key;
+    }
+    byCategory[byCategory.length - 1]!.push(r.entry.id);
+  }
+  const out: string[][] = [];
+  let cur: string[] = [];
+  for (const chunk of byCategory) {
+    if (chunk.length > size) {
+      if (cur.length) out.push(cur), (cur = []);
+      for (let i = 0; i < chunk.length; i += size) out.push(chunk.slice(i, i + size));
+      continue;
+    }
+    if (cur.length + chunk.length > size) out.push(cur), (cur = []);
+    cur.push(...chunk);
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}

@@ -94,6 +94,16 @@ function createWindow() {
   const state = getAppState();
   if (state) state.window = win;
   browserManager.setWindow(win);
+  // El <webview> es contenido de terceros: nunca con Node, sin preload propio y solo con la partición del navegador de la app
+  win.webContents.on("will-attach-webview", (event, webPreferences, params) => {
+    delete (webPreferences as { preload?: string }).preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.webSecurity = true;
+    webPreferences.allowRunningInsecureContent = false;
+    if (params.partition !== "persist:nvweb" || (params.src && !/^(?:https?:|about:blank|data:text\/html)/i.test(params.src))) event.preventDefault();
+  });
   win.webContents.on("did-attach-webview", (_event, guestContents) => {
     browserManager.attachGuest(guestContents);
   });

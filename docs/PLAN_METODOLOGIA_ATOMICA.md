@@ -16,9 +16,15 @@
 | Regla para la IA / Antigravity | `core/programmingDefaultSkills.ts` («Granularity») y `lib/curriculumPrompt.ts` («ATOMIC TOPIC») |
 | Alcance de «Verificar metodología» y prompt de revisión | `lib/methodologyScope.ts` |
 
+## Qué garantiza que un plan nuevo la lleve
+- `core/mentor/methodologyRule.ts` (`METHODOLOGY_RULE`) está en TODOS los prompts que arman o juzgan un plan: esqueleto, temas (completo y compacto), planificador, ajustes (`planChange`) y análisis de cobertura. Test: `methodologyRule.test.ts`.
+- `evaluateAreaMethodology` (lib/planAreas.ts) avisa solo en cualquier plan de Frontend con menos de 20 temas de HTML o 40 de CSS.
+- Los temas creados bajo `5 Frontend/HTML|CSS/` entran al plan ya agrupados en su asignatura.
+- Una pieza del catálogo (`atomTitle`) solo es elemento, propiedad, selector, regla, función o método; la prosa y los conceptos se descartan.
+
 ## Botones nuevos
 - **Agregar nuevos temas…** arriba **y abajo** de la tabla de cada asignatura; el diálogo enseña los temas que ya tiene.
-- **Verificar metodología** (junto a «Agregar nuevos temas»): según la pestaña, verifica la asignatura, el área o todas. «Ver y crear lo que falta» escribe la tarea para Antigravity (sin IA local); «Copiar prompt de revisión» deja el texto para cualquier IA. También en Preparar → Ejecutar plan (todas las áreas).
+- **Verificar metodología** (junto a «Agregar nuevos temas»): según la pestaña, verifica la asignatura, el área o todas. «Ver y crear lo que falta» escribe la tarea para Antigravity (sin IA local); «Copiar prompt de revisión» deja el texto para cualquier IA; «Revisar con la IA de la app» usa tu clave de API o modelo local (`mentor_methodology_review`). También en Preparar → Ejecutar plan (todas las áreas).
 - **Verificar áreas faltantes** (junto a «Analizar el plan»): áreas estándar y carpetas de la vault que no están en el plan, con «Añadir» (operación del plan con historial y «Deshacer»).
 - **Horario por área**: `lib/areaTimes.ts` + API `mentor_area_time_set`; el calendario general (`MentorCalendarSource`) usa esa hora. Se edita en Calendario (Vista general, plegado) y en el Calendario de cada área: es el mismo dato.
 

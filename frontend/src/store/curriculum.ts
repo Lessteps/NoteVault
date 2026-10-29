@@ -15,6 +15,7 @@ export type EntryProgressKey = "folder" | "note" | "manifest" | "exercises" | "m
 interface CurriculumApi {
   studyCurriculumCoverage?: (o?: { space?: string }) => Promise<{ areas: AreaCoverage[] }>;
   studyCurriculumHandoff?: (o: { areaId: string; entryIds: string[]; withExercises?: boolean; confirm: true }) => Promise<CurriculumHandoffState>;
+  studyCurriculumHandoffBatches?: (o: { areaId: string; importance?: string; size?: number; withExercises?: boolean; confirm: true }) => Promise<CurriculumHandoffState[]>;
   studyCurriculumHandoffStatus?: (id: string) => Promise<CurriculumHandoffState>;
   studyCurriculumHandoffValidate?: (id: string) => Promise<CurriculumHandoffState>;
   studyCurriculumHandoffList?: () => Promise<CurriculumHandoffState[]>;
@@ -40,6 +41,8 @@ interface CurriculumStore {
   /** tras crear/validar: recalcula la cobertura y avisa a las vistas */
   refresh: () => Promise<void>;
   create: (o: { areaId: string; entryIds: string[]; withExercises?: boolean }) => Promise<CurriculumHandoffState>;
+  /** una tarea por lote con TODO lo que falta (por importancia); el agente las ejecuta en orden */
+  createBatches: (o: { areaId: string; importance?: string; size?: number; withExercises?: boolean }) => Promise<CurriculumHandoffState[]>;
   status: (id: string) => Promise<CurriculumHandoffState>;
   validate: (id: string) => Promise<CurriculumHandoffState>;
   /** «Añadir al plan»: lleva al final de la ruta del plan los temas validados (idempotente); no cambia la cobertura */
@@ -82,6 +85,11 @@ export const useCurriculum = create<CurriculumStore>((set, get) => ({
     const h = await need("studyCurriculumHandoff")({ ...o, confirm: true });
     set((s) => ({ pending: upsert(s.pending, h) }));
     return h;
+  },
+  createBatches: async (o) => {
+    const list = await need("studyCurriculumHandoffBatches")({ ...o, confirm: true });
+    set((s) => ({ pending: list.reduce((acc, h) => upsert(acc, h), s.pending) }));
+    return list;
   },
   status: async (id) => {
     const h = await need("studyCurriculumHandoffStatus")(id);

@@ -35,6 +35,27 @@ export function mentorAskApi(app: AppState, deps: AskDeps) {
   };
 
   return {
+    /**
+     * «Verificar metodología» con la IA de la app (clave de API o modelo local): le pasa el prompt de revisión (temas del alcance + reglas) y devuelve su
+     * respuesta como texto. No escribe nada. Sin IA configurada no falla: dice `aiConfigured: false` y la interfaz ofrece Antigravity o copiar el prompt.
+     */
+    async mentor_methodology_review(opts: unknown): Promise<{ aiConfigured: boolean; text: string }> {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, unknown>;
+      const prompt = String(o.prompt ?? "").trim().slice(0, 60_000);
+      if (!prompt) throw new ApiError("No hay nada que revisar.");
+      if (!aiOn()) return { aiConfigured: false, text: "" };
+      const text = await deps.withJob("methodology", "Revisando la metodología de tus temas…", (job) =>
+        job.send(
+          [
+            { role: "system", content: "You are a careful curriculum reviewer for a self-study app. Follow the methodology and the answer format of the user's message exactly. Be concrete and brief." },
+            { role: "user", content: prompt },
+          ] as ChatMessage[],
+          { timeoutMs: 180_000 },
+        ),
+      );
+      return { aiConfigured: true, text: String(text ?? "").trim() };
+    },
+
     /** ¿Pregunta, corrección o ajuste? */
     async mentor_plan_intent(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;

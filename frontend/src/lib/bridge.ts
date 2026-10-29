@@ -479,6 +479,7 @@ export const api = {
   mentorFolderRoleSet: (opts: { folder: string; role: import("./folderRoles").FolderRoleKind; objective?: string }) => call<import("./folderRoles").FolderRolesFile>("mentor_folder_role_set", opts),
   mentorFolderRoleClear: (opts: { folder: string }) => call<import("./folderRoles").FolderRolesFile>("mentor_folder_role_clear", opts),
   mentorFolderAutoAddSet: (opts: { enabled: boolean }) => call<import("./folderRoles").FolderRolesFile>("mentor_folder_auto_add_set", opts),
+  mentorMethodologyReview: (opts: { prompt: string }) => call<{ aiConfigured: boolean; text: string }>("mentor_methodology_review", opts),
   mentorAreaTimesGet: (opts: { planId: string }) => call<{ times: import("./areaTimes").AreaTimes }>("mentor_area_times_get", opts),
   mentorAreaTimeSet: (opts: { planId: string; subplanId: string; start: string | null; durationMin?: number | null }) => call<{ times: import("./areaTimes").AreaTimes }>("mentor_area_time_set", opts),
   mentorPlanFolderCandidates: (opts: { planId: string }) => call<{ candidates: Array<{ folder: string; label: string; role?: import("./folderRoles").FolderRoleKind; objective?: string; topicCount: number; estMinutes: number }> }>("mentor_plan_folder_candidates", opts),
@@ -804,6 +805,7 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studyTopicRegenerateValidate: (id: string, restore = false) => call<import("./types").RegenHandoff>("study_topic_regenerate_validate", id, restore),
   /** «Crear con Antigravity»: escribe SOLO la tarea (sin IA) para que un agente externo cree los temas de referencia que faltan. Exige `confirm: true`; máximo 40 temas (lotes de ≤ 25). */
   studyCurriculumHandoff: (input: { areaId: string; entryIds: string[]; withExercises?: boolean; confirm: boolean }) => call<import("./types").CurriculumHandoff>("study_curriculum_handoff", input),
+  studyCurriculumHandoffBatches: (input: { areaId: string; importance?: string; size?: number; withExercises?: boolean; confirm: boolean }) => call<import("./types").CurriculumHandoff[]>("study_curriculum_handoff_batches", input),
   studyCurriculumHandoffStatus: (id: string) => call<import("./types").CurriculumHandoff>("study_curriculum_handoff_status", id),
   studyCurriculumHandoffValidate: (id: string) => call<import("./types").CurriculumHandoff>("study_curriculum_handoff_validate", id),
   /** Cobertura del currículo de referencia (HTML, CSS, JS reference, Java) frente a los temas existentes. */

@@ -8,6 +8,7 @@
  * entrada/salida es `sendChat`, inyectable.
  */
 
+import { METHODOLOGY_RULE } from "./methodologyRule.js";
 import { AIConfig, sendChat, type ChatMessage, type SendOpts } from "../aiClient.js";
 import { toPromptText, type StudentBrief } from "./brief.js";
 import { allocate, type Candidate, type CandidateKind } from "./candidates.js";
@@ -88,7 +89,7 @@ export const PLANNER_SYSTEM_PROMPT = [
   "- Es una propuesta: el estudiante la acepta o la ajusta.",
   "Responde EXCLUSIVAMENTE con JSON válido, sin texto antes ni después, con este esquema:",
   '{ "summary": string, "blocks": [ { "candidateId": string, "minutes": number, "reason": string } ], "notes"?: string }',
-].join("\n");
+].join("\n") + "\n" + METHODOLOGY_RULE;
 
 function candidateLine(c: Candidate): string {
   const extra = [c.skills?.length ? `skills: ${c.skills.join(", ")}` : "", c.topicFolder ? `tema: ${c.topicFolder}` : ""].filter(Boolean).join("; ");

@@ -71,17 +71,6 @@ export function MethodologyWarningBanner({
               >
                 <div className="text-[14px] font-semibold text-text">{w.title}</div>
                 <p className="text-[13px] text-dim">{w.description}</p>
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[12px] font-medium text-faint">Tags requeridos:</span>
-                  {w.missingTags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded bg-surface px-1.5 py-0.5 text-[11px] font-mono text-dim"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
                 <div className="flex flex-wrap items-center gap-2 pt-2">
                   <MethodologyCheckButton
                     scope={{ kind: "group", label: w.groupTitle, areaName: sub.area, groupId: w.groupId, groupTitle: w.groupTitle }}

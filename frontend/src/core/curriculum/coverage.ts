@@ -88,6 +88,8 @@ function touches(rule: OverviewRule, e: CurriculumEntry): boolean {
 
 function strongMatch(p: PreparedTopic, e: CurriculumEntry): boolean {
   if (p.topic.curriculumId && p.topic.curriculumId === e.id) return true;
+  // un subtema atómico («gap», «target», «min») es una palabra corriente: solo lo cubre una nota de SU área, nunca una cualquiera que la contenga
+  if (e.parentId && !p.own) return false;
   const titleWords = wordsOf(e.title);
   if (containsPhrase(p.titleWords, titleWords)) return true;
   // fuera de la carpeta del área (otros lenguajes, Fundamentals…) solo cuentan el id exacto o el título completo

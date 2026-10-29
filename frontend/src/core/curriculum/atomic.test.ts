@@ -13,13 +13,20 @@ describe("atomic", () => {
 
   it("da título de carpeta válido a elementos y propiedades", () => {
     expect(atomTitle("<img src alt>")).toBe("img element");
-    expect(atomTitle(":nth-child()")).toBe(":nth-child".replace(":", ""));
+    expect(atomTitle(":nth-child()")).toBe("nth-child pseudo-class");
+    expect(atomTitle("::before")).toBe("before pseudo-element");
+    expect(atomTitle("display: flex | inline-flex")).toBe("display");
+    expect(atomTitle("calc()")).toBe("calc()");
     expect(atomTitle("flex-wrap")).toBe("flex-wrap");
+  });
+
+  it("no toma prosa, conceptos ni listas como piezas", () => {
+    for (const x of ["standards vs quirks mode", "inline images gap", "margin-top right bottom left", "[attr=value]", "grouping", "main vs cross axis", "text-decoration-line style color thickness"]) expect(atomTitle(x), x).toBeNull();
   });
 
   it("descarta la prosa y lo repetido del título", () => {
     const e = entry({ title: "Margin", items: ["margin", "margin-top", "shorthand order", "when to use semantic vs generic containers every time"] });
-    expect(atomsOf(e)).toEqual(["margin-top", "shorthand order"]);
+    expect(atomsOf(e)).toEqual(["margin-top"]);
   });
 
   it("las entradas opcionales o con una sola pieza se quedan agrupadas", () => {
@@ -33,7 +40,7 @@ describe("atomic", () => {
     expect(cov.rows[0]!.status).toBe("cubierto");
     expect(cov.pct).toBeLessThan(40);
     expect(cov.rows.filter((r) => r.status === "faltante").map((r) => r.suggestedFolder)).toEqual([
-      "Programación/5 Frontend/CSS/5.19.1.1 display flex inline-flex",
+      "Programación/5 Frontend/CSS/5.19.1.1 display",
       "Programación/5 Frontend/CSS/5.19.1.2 flex-direction",
       "Programación/5 Frontend/CSS/5.19.1.3 flex-wrap",
       "Programación/5 Frontend/CSS/5.19.1.4 gap",

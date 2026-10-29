@@ -24,7 +24,17 @@ export function useAutoSync(plan: MentorPlan | null | undefined, onChanged: (p: 
           await new Promise((ok) => setTimeout(ok, 1500));
           r = await api.mentorPlanSyncReference({ planId: plan.id });
         }
-        if (!live || r.loading || !r.added.length) return;
+        if (!live || r.loading) return;
+        if (!r.added.length) {
+          // nada nuevo, pero la app ordenó lo que ya había (asignaturas del índice y orden por números)
+          if (r.tidied && r.plan) {
+            tried.current.add(`${r.plan.id}:${r.plan.updatedAt ?? ""}:${version}`);
+            onChanged(r.plan);
+            useApp.getState().toast("info", "Se ordenaron los temas del plan en sus asignaturas, por números.");
+            useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+          }
+          return;
+        }
         if (r.plan) {
           tried.current.add(`${r.plan.id}:${r.plan.updatedAt ?? ""}:${version}`);
           onChanged(r.plan);

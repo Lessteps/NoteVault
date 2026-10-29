@@ -162,6 +162,7 @@ import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
 import { curriculumAreas } from "../../core/curriculum/catalog.js";
+import { regroupByUnits } from "../../core/mentor/planRegroup.js";
 import { addTopicsToPlan, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, findAreaSubplan, knowledgeTargetOfFolder, type AddTopicItem } from "../../core/mentor/planAddTopics.js";
 
 const DEFAULT_BRIEF_CHARS = 6000;
@@ -560,6 +561,29 @@ function slimIssue(i: any) {
 /** `send` se inyecta solo en los tests; en la app es `sendChat`. */
 export function mentorApi(app: AppState, send?: SendFn) {
   const log = () => new SessionLog(app.root);
+  /** El índice `00 Units — <área>.md` de una carpeta de área de la vault (sus secciones son las asignaturas), o null. */
+  const readUnitsIndex = (areaFolder: string): string | null => {
+    try {
+      return fs.readFileSync(path.join(app.root, areaFolder, `00 Units — ${areaFolder.split("/").pop()}.md`), "utf8");
+    } catch {
+      return null;
+    }
+  };
+  /** Pone en orden un plan SIN IA: reparte los temas sueltos en las asignaturas del índice de su área y los ordena por número (y reparte las semanas). Devuelve el mismo objeto si no hizo falta nada. */
+  const tidyPlan = (plan: Plan): { plan: Plan; changed: boolean; organized: boolean } => {
+    let cur = regroupByUnits(plan, readUnitsIndex);
+    let organized = false;
+    try {
+      const o = applyOps(cur, [{ op: "organize" }], { today: localDate(), all: [], startFocus: practiceStartFocus(app), mastery: masteryLookup(app) });
+      if (o.applied) {
+        cur = o.plan;
+        organized = true;
+      }
+    } catch {
+      /* se queda como entró: «Organizar» se puede lanzar a mano */
+    }
+    return { plan: cur, changed: cur !== plan, organized };
+  };
   const chats = () => new ChatStore(app.root);
   /** La conversación activa del Mentor, o la indicada (así un turno en vuelo no salta de conversación). */
   const chatFor = (id?: unknown): ChatLog | null => (id ? chats().get(String(id)) : null) ?? chats().peek();
@@ -2289,17 +2313,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const where = [...bySub.entries()].map(([sid]) => subTitle(sid)).join(" y ");
       let summary = `Se añadieron ${n} ${n === 1 ? "tema" : "temas"} de referencia${kinds.length ? ` (${kinds.join(", ")})` : ""} al área ${where}, al final de su ruta.${res.created.length ? ` Se creó el área ${res.created.map((c) => c.area).join(" y ")}.` : ""}`;
       // ORGANIZAR solo: lo recién añadido entra con su orden por números (tema general y luego sus piezas) y repartido en semanas con la capacidad real, no apilado al final
-      let finalPlan = res.plan;
-      let organized = "";
-      try {
-        const o = applyOps(res.plan, [{ op: "organize" }], { today: localDate(), all: [], startFocus: practiceStartFocus(app), mastery: masteryLookup(app) });
-        if (o.applied) {
-          finalPlan = o.plan;
-          organized = " Se organizó por números y se repartió en semanas.";
-        }
-      } catch {
-        /* se queda como entró: «Organizar» se puede lanzar a mano */
-      }
+      const tidied = tidyPlan(res.plan);
+      const finalPlan = tidied.plan;
+      const organized = tidied.organized ? " Se organizó por números y se repartió en semanas." : "";
       summary += organized;
       const saved = st.save(finalPlan);
       const hist = new ChangeStore(app.root);
@@ -2356,7 +2372,13 @@ export function mentorApi(app: AppState, send?: SendFn) {
           return !!knowledge && !!findAreaSubplan(plan, knowledge) && newerThanPlan(f);
         });
       const fresh = candidates.filter((f) => !offered.has(f)).slice(0, 400);
-      if (!fresh.length) return { loading: false as const, added: [] as string[], message: "" };
+      if (!fresh.length) {
+        // nada nuevo que añadir, pero lo que ya está puede estar sin asignatura o sin orden (temas que entraron antes de esta regla): se ordena solo
+        const t = tidyPlan(plan);
+        if (!t.changed) return { loading: false as const, added: [] as string[], message: "" };
+        const saved = new PlanStore(app.root).save(t.plan);
+        return { loading: false as const, added: [] as string[], message: "", tidied: true as const, plan: saved };
+      }
       const res = api.mentor_plan_add_topics({ planId: id, folders: fresh }) as { added?: string[]; message?: string };
       for (const f of candidates) offered.add(f);
       fs.mkdirSync(path.dirname(file), { recursive: true });

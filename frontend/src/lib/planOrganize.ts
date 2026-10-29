@@ -5,8 +5,8 @@
 
 import type { AreaGroup } from "./planAreas.js";
 
-/** Carpetas de las áreas de referencia: aquí el número de carpeta ES el orden de aprendizaje. */
-export const REFERENCE_FOLDER_RE = /\/(?:5 Frontend\/(?:HTML|CSS|Atomic Design)|11 HTML|12 CSS|13 JavaScript Reference|14 Java)\//;
+/** Carpetas de las áreas de referencia y de las de conocimiento con temario por dependencia (`6 Databases`…): aquí el número de carpeta ES el orden de aprendizaje. */
+export const REFERENCE_FOLDER_RE = /\/(?:5 Frontend\/(?:HTML|CSS|Atomic Design)|11 HTML|12 CSS|13 JavaScript Reference|14 Java|1 Fundamentals|4 Backend|6 Databases|7 Automation|9 Tooling and Quality)\//;
 
 /** Temas genéricos que creó la antigua «Corregir metodología» (3 de HTML, 4 de CSS): las piezas atómicas los sustituyen. */
 export const LEGACY_STUB_RE = /\/5\.18\.[1-3] HTML practicar con |\/5\.19\.[1-4] CSS practicar con /;

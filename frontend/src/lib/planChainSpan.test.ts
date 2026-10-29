@@ -41,7 +41,7 @@ describe("cadena de entregables sobre el plan completo", () => {
       expect(m.criteria.length).toBeGreaterThanOrEqual(3);
       expect(m.id).toBe(`mm:${m.month}`);
       for (const wk of m.weeks) {
-        expect(wk.slice).toContain(`Parte ${wk.n} de ${m.weeks.length}`);
+        expect(wk.slice).toContain(`Hito ${wk.n} de ${m.weeks.length}`);
         for (const p of wk.pieces) expect(p.slice).toContain(`Pieza ${p.n} de ${wk.pieces.length}`);
       }
     }
@@ -105,5 +105,22 @@ describe("cadena de entregables sobre el plan completo", () => {
     expect(pieceDone({ dailyProjectDone: { "2026-10-06": ["backend", "frontend"] } }, "2026-10-06", ["backend", "frontend"])).toBe(true);
     const idx = chainIndex(planChain(plan, sch));
     expect(idx.months.size).toBe(6);
+  });
+
+  it("el proyecto mensual es UN producto real que crece: una etapa por mes, un hito por semana y los temas del mes repartidos entre sus hitos", () => {
+    const chain = planChain(plan, sch);
+    expect(chain.months[0]!.title).toMatch(/^Mes 1 · La primera versión del producto/);
+    expect(chain.months[1]!.title).toMatch(/^Mes 2 · Cuentas, permisos y pruebas/);
+    for (const m of chain.months) {
+      expect(m.product?.milestones).toHaveLength(m.weeks.length);
+      for (const wk of m.weeks) {
+        expect(wk.milestone?.title).toBeTruthy();
+        expect(wk.title).toContain(`Hito ${wk.n}: ${wk.milestone!.title}`);
+      }
+      // ningún tema del mes se pierde: todos tienen un hito donde aplicarse
+      expect(m.product!.milestones.flatMap((x) => x.topics)).toEqual(m.topics);
+      expect(m.goal).toMatch(/Consolidas lo que aprendes este mes/);
+      expect(m.criteria.join(" ")).toMatch(/UN producto real/);
+    }
   });
 });

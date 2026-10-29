@@ -168,7 +168,7 @@ describe("Agenda: áreas juntas, lenguaje diario, proyecto del tema y entregable
     expect(sum).toMatch(/Backend \d+/);
     expect(sum).toMatch(/Frontend \d+/);
     expect(sum).toMatch(/Integradores \d+/);
-    expect(byTest("monthly-deliverables").textContent).toContain("Mes 1");
+    expect(byTest("projects-board").textContent).toContain("Mes 1");
   });
 
   it("Mi plan: la tabla mes a mes dice que las áreas van juntas y marca los meses con varias a la vez", async () => {

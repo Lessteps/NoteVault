@@ -466,13 +466,16 @@ describe("Entregables: la cadena diario → semanal → mensual siempre está de
     await click(tab("entregables"));
     expect(byTest("plan-deliverables-pending")).toBeFalsy();
     expect(host.textContent).not.toContain("por definir");
-    const months = all("chain-month");
+    const months = all("board-month");
     expect(months.length).toBeGreaterThan(0);
-    expect(months[0]!.querySelectorAll("[data-testid=chain-week]").length).toBeGreaterThan(0);
-    expect(months[0]!.querySelectorAll("[data-testid=chain-piece]").length).toBeGreaterThan(0);
+    await click(months[0]!.querySelector("[data-testid=board-open-month]")!);
+    await click(byTest("detail-tab-semanas"));
+    const detail = byTest("project-detail");
+    expect(detail.querySelectorAll("[data-testid=board-week]").length).toBeGreaterThan(0);
+    expect(detail.querySelectorAll("[data-testid=board-piece]").length).toBeGreaterThan(0);
     // sin ningún selector de estado
     expect(host.querySelector("#plan-tabs-panel-entregables select[aria-label^='Estado']")).toBeNull();
-    expect(host.textContent).toContain("Se completa automáticamente conforme avanzas");
+    expect(host.textContent).toContain("El avance sale solo de lo que completas");
     // el segundo mes queda bloqueado hasta completar el primero
     if (months.length > 1) expect(months[1]!.getAttribute("data-locked")).toBe("true");
   });
@@ -499,7 +502,7 @@ describe("Entregables: la cadena diario → semanal → mensual siempre está de
     await click(tab("entregables"));
     expect(byTest("plan-deliverables-pending")).toBeFalsy();
     expect(byTest("plan-global-question").textContent).toContain("por cada área");
-    expect(byTest("monthly-deliverables")).toBeTruthy();
+    expect(byTest("projects-board")).toBeTruthy();
   });
 
   it("un entregable de área o manual también cuenta como definido", async () => {

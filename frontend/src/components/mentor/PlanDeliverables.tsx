@@ -16,7 +16,7 @@ import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { confirmAction } from "../ui";
 import { AreaCounts, doneText, plural, KIND_COLOUR, KIND_LABEL, StatusChip, useAgendaModel } from "./agendaKit";
 import { DELIVERABLES_PENDING_TEXT } from "../../lib/planTopicsByArea";
-import { MonthlyDeliverables } from "./MonthlyDeliverables";
+import { ProjectsBoard } from "./ProjectsBoard";
 import { SectionHeading } from "./planKit";
 import { openPractice } from "./PracticeCard";
 import { branchOf, openProjectInProyectos, type Loaded } from "./planShared";
@@ -250,7 +250,7 @@ export function PlanDeliverables({ data, onChanged, announce, goTab }: { data: L
         )}
       </section>
 
-      <MonthlyDeliverables data={data} />
+      <ProjectsBoard data={data} mode="planeacion" />
       <OtherDeliverables list={m.deliverables.filter((d) => !["daily_project", "weekly_project", "monthly_project"].includes(d.kind))} />
     </>
   );

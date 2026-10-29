@@ -5,52 +5,25 @@
 // semanal es la vertical completa, con más exigencia, sobre lo aprendido en la semana. La práctica diaria de cada área vive en su tarjeta de
 // «Cómo voy» (ver `AreaPracticeBlock.tsx`), no aquí.
 
-import { CheckCircle2 } from "lucide-react";
 import { useMemo } from "react";
 import { chainSignalsOf, planChain } from "../../lib/planChain";
 import { clampToPlan } from "../../lib/planSchedule";
 import { shortOf, weeklyProjectOf } from "../../lib/planCurriculum";
-import { weeklyBreakdown, type ProjectSection } from "../../lib/planAreaPractice";
+import { weeklyBreakdown } from "../../lib/planAreaPractice";
 import type { MentorPlan } from "../../lib/types";
 import { Chip } from "../common/forms";
-import { cn } from "../ui";
-import { DSTATUS_COLOUR, DSTATUS_LABEL, focusColour, plural, type AgendaModel } from "./agendaKit";
-import { MonthCard } from "./MonthlyDeliverables";
+import { DSTATUS_COLOUR, DSTATUS_LABEL, plural, type AgendaModel } from "./agendaKit";
+import { AreaSections } from "./AreaSections";
+import { ProjectsBoard } from "./ProjectsBoard";
 import { ProgressBar } from "./parts";
 import { ProjectFolder } from "./ProjectFolder";
-import { ProjectsHub } from "./ProjectsHub";
 import { GeneralCards } from "./PracticeCard";
 import { SectionCard, SectionHeading } from "./planKit";
 import type { Loaded } from "./planShared";
 
 const PRACTICE_COLOUR = "var(--nv-practice, #c58be0)";
 
-/** Un proyecto desglosado por área: qué hacer, cómo y el resultado real. */
-export function AreaSections({ sections, testid }: { sections: ProjectSection[]; testid: string }) {
-  if (!sections.length) return null;
-  return (
-    <ul className={cn("mt-3 grid items-start gap-3 [&>*]:min-w-0", sections.length > 1 && "@4xl:grid-cols-2")} aria-label="Desglose por área" data-testid={testid}>
-      {sections.map((s) => {
-        const colour = focusColour(s.areaId);
-        return (
-          <li key={s.areaId} className="rounded-xl border border-line bg-surface p-3.5" style={{ borderLeft: `4px solid ${colour}` }} data-testid="project-area" data-area={s.areaId}>
-            <h4 className="text-[15.5px] font-bold">{s.area}</h4>
-            <p className="mt-1 text-[11.5px] font-semibold uppercase tracking-wide text-faint">Qué hay que hacer</p>
-            <p className="text-[14.5px]">{s.what}</p>
-            <p className="mt-2 text-[11.5px] font-semibold uppercase tracking-wide text-faint">Cómo hacerlo</p>
-            <ol className="list-decimal space-y-0.5 pl-5 text-[14.5px] text-dim">
-              {s.how.map((h) => <li key={h}>{h}</li>)}
-            </ol>
-            <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-mint/50 bg-mint-soft px-2.5 py-2 text-[14px]" data-testid="project-result">
-              <CheckCircle2 size={16} aria-hidden className="mt-0.5 flex-none text-mint" />
-              <span><span className="font-semibold text-mint">Resultado real:</span> {s.result}</span>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
+export { AreaSections } from "./AreaSections";
 
 /** Los proyectos al final de la vista: el semanal (conjunción de todo) y el proyecto mensual. */
 export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded; m: AgendaModel }) {
@@ -77,10 +50,11 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
       <SectionHeading id="run-projects-h" hint="El proyecto semanal junta las áreas en una vertical completa y el proyecto mensual consolida el avance del mes.">
         Proyectos
       </SectionHeading>
-      <ProjectsHub planId={plan.id} />
+      {/* el panorama ordenado: tres niveles, lista de proyectos mensuales y, al abrir uno, su ventana con todo el material */}
+      <ProjectsBoard data={data} mode="ejecucion" />
 
       <SectionCard labelledBy="run-weekly-h" testid="run-project-weekly" className="space-y-1.5">
-        <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Proyecto semanal{weekly ? ` · semana ${weekly.week}` : ""}</p>
+        <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Esta semana · proyecto semanal{weekly ? ` · semana ${weekly.week}` : ""}</p>
         {weekly ? (
           <>
             <h3 id="run-weekly-h" className="text-[18px] font-semibold leading-snug">{weekly.title}</h3>
@@ -108,20 +82,6 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
         )}
       </SectionCard>
 
-      {currentMonth && (
-        <div className="space-y-2" data-testid="run-project-monthly">
-          <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Entregable del mes</p>
-          <ul className="space-y-2">
-            <MonthCard month={currentMonth} planId={plan.id} />
-          </ul>
-          <ProjectFolder
-            planId={plan.id}
-            areaKeys={allKeys}
-            testid="monthly-project-folder"
-            project={{ kind: "monthly", title: currentMonth.title, description: currentMonth.goal, month: currentMonth.month, topics: currentMonth.topics.slice(0, 8), sections: [] }}
-          />
-        </div>
-      )}
     </section>
   );
 }

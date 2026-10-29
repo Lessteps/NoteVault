@@ -455,12 +455,16 @@ describe("pestaña «Entregables»: pregunta global, proyectos de área y agenda
     const upd = vi.spyOn(api, "mentorPlanUpdateDeliverable").mockResolvedValue(areasPlan());
     await openAgenda(areasPlan(), { practice: { ppReady: true, kata: null, kataDoneDates: ["2026-10-14", "2026-10-13"], weeks: [] } });
     await click(tab("entregables"));
-    const months = [...host.querySelectorAll("[data-testid=chain-month]")];
+    const months = [...host.querySelectorAll("[data-testid=board-month]")];
     expect(months.length).toBeGreaterThan(1);
     expect(months[0]!.textContent).toContain("Mes 1");
-    expect(months[0]!.querySelectorAll("[data-testid=chain-week]").length).toBeGreaterThan(0);
-    expect(months[0]!.querySelectorAll("[data-testid=chain-piece]").length).toBeGreaterThan(0);
     expect(months[1]!.getAttribute("data-locked")).toBe("true");
+    // la ventana del proyecto enseña sus semanas y sus piezas
+    await click(months[0]!.querySelector("[data-testid=board-open-month]")!);
+    await click(host.querySelector("[data-testid=detail-tab-semanas]")!);
+    const detail = host.querySelector("[data-testid=project-detail]")!;
+    expect(detail.querySelectorAll("[data-testid=board-week]").length).toBeGreaterThan(0);
+    expect(detail.querySelectorAll("[data-testid=board-piece]").length).toBeGreaterThan(0);
     // los katas hechos salen de la práctica (2) y se leen en «Otros entregables»
     const katas = [...host.querySelectorAll("[data-testid=deliverable-row]")].filter((r) => r.textContent!.includes("Kata del"));
     expect(katas.length).toBeGreaterThan(2);
@@ -468,6 +472,6 @@ describe("pestaña «Entregables»: pregunta global, proyectos de área y agenda
     // sin selectores de estado ni filtros editables: el avance se calcula solo
     expect(host.querySelector("select[aria-label^='Estado de']")).toBeNull();
     expect(upd).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Se completa automáticamente conforme avanzas");
+    expect(host.textContent).toContain("El avance sale solo de lo que completas");
   });
 });

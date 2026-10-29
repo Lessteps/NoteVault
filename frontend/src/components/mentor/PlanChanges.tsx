@@ -15,6 +15,7 @@ import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { Chip, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
+import { PlanOtherAi } from "./PlanOtherAi";
 import { SectionHeading } from "./planKit";
 import { ThinkingStatus, useAiStatus } from "./parts";
 
@@ -341,6 +342,7 @@ export function PlanChanges({ planId, onApplied, autoSend, announce, focusSignal
           )}
         </div>
       )}
+      <PlanOtherAi planId={planId} question={text} onApplied={onApplied} />
       {shown.length > 0 && (
         <div className="mt-5" data-testid="change-history">
           <h3 className="mb-2 text-[16px] font-semibold">Historial: preguntas y cambios <span className="text-[14px] font-normal text-dim">{shown.length}</span></h3>

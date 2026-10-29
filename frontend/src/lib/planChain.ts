@@ -15,6 +15,7 @@ import { addDays, addMonthsToDate, daysBetween, weekRangesOf } from "./planTime.
 import type { PlanDeliverableStatus } from "./planAreas.js";
 import { areaPracticeOf, integratedMonthly, monthlyPieceOf } from "./planAreaPractice.js";
 import { dailyProjectOf, shortOf, weeklyProjectOf, type DayProject } from "./planCurriculum.js";
+import { monthProduct, type MonthProduct } from "./planProduct.js";
 import type { PlanSchedule, SchedulePlan } from "./planSchedule.js";
 
 /** Lo que el estudiante ha completado (las ÚNICAS entradas del avance). */
@@ -57,6 +58,8 @@ export interface ChainWeek {
   /** «Parte 2 de 4 del proyecto del mes: …» */
   slice: string;
   areaIds: string[];
+  /** el hito del producto del mes que construye esta semana y los temas que aplica */
+  milestone?: { title: string; topics: string[] };
   pieces: ChainPiece[];
   done: number;
   total: number;
@@ -86,6 +89,8 @@ export interface ChainMonth {
   criteria: string[];
   areaIds: string[];
   topics: string[];
+  /** el producto real del mes (etapa, hitos y temas que consolida); lo ven las dos vistas de proyectos */
+  product?: MonthProduct;
   source: "ai" | "template";
   weeks: ChainWeek[];
   done: number;
@@ -174,10 +179,12 @@ export function planChain(plan: SchedulePlan, sch: PlanSchedule, signals?: Chain
     const sys = together && areaIds.length > 1 ? integratedMonthly(areaIds, key) : focusIds.length === 1 ? monthlyPieceOf(focusIds[0]!, key) : null;
     const baseTitle = c?.title ?? (sys ? sys.title.replace(/ · \d{4}-\d{2}$/, "") : focusLabels.length ? `Integración de ${list(focusLabels.slice(0, 3))}` : "Proyecto integrador");
     const withAreas = !c && sys && focusLabels.length && !sys.title.includes("del mes") ? `${baseTitle} · ${list(focusLabels.slice(0, 3))}` : baseTitle;
-    const title = c?.title ? c.title : `Mes ${mi + 1} · ${withAreas}`;
+    // EL PRODUCTO DEL MES (sin currículo de práctica generado): un producto real que crece cada mes y consolida lo aprendido; cada semana construye un hito suyo
+    const product = monthProduct(mi, raws.length, topics);
+    const title = c?.title ? c.title : c ? `Mes ${mi + 1} · ${withAreas}` : `Mes ${mi + 1} · ${product.stage.title}`;
     const nPieces = raws.reduce((n, r) => n + r.dailies.length, 0);
-    const baseGoal = c?.description ?? sys?.description ?? "Un proyecto mayor que integra los proyectos semanales del mes.";
-    const goal = `${baseGoal}${topics.length ? ` Este mes aplicas: ${topics.slice(0, 5).join(", ")}${topics.length > 5 ? "…" : ""}.` : ""}`.slice(0, 700);
+    const baseGoal = c?.description ?? product.stage.summary;
+    const goal = `${baseGoal}${topics.length ? ` Consolidas lo que aprendes este mes: ${topics.slice(0, 6).join(", ")}${topics.length > 6 ? `… (${topics.length} temas)` : ""}.` : ""}`.slice(0, 900);
     const measures = [...new Set(areaIds.map((a) => areaPracticeOf(a)?.measure).filter((x): x is string => !!x))].slice(0, 3);
 
     let monthDone = 0;
@@ -210,6 +217,8 @@ export function planChain(plan: SchedulePlan, sch: PlanSchedule, signals?: Chain
       monthDone += done;
       monthTotal += total;
       const studyDays = pieces.map((p) => p.date);
+      const ms = product.milestones[wi];
+      const hasCurriculum = !!plan.practiceCurriculum?.weeks.find((x) => x.week === r.range.week)?.weeklyProject;
       return {
         id: r.wp.id,
         week: r.range.week,
@@ -218,10 +227,11 @@ export function planChain(plan: SchedulePlan, sch: PlanSchedule, signals?: Chain
         start: r.range.start,
         end: r.range.end,
         dueDate: studyDays[studyDays.length - 1] ?? r.range.end,
-        title: r.wp.title,
-        description: r.wp.description,
-        slice: `Parte ${wi + 1} de ${raws.length} del proyecto del mes «${withAreas}»${pieces.length ? `: ${list(r.dailies.map((d) => d.piece).slice(0, 3))}${pieces.length > 3 ? "…" : ""}` : ""}.`,
+        title: hasCurriculum || !ms ? r.wp.title : `Semana ${r.range.week} · Hito ${wi + 1}: ${ms.title}`,
+        description: hasCurriculum || !ms ? r.wp.description : `Construyes el hito «${ms.title}» del producto del mes. Juntas las ${pieces.length} piezas diarias de la semana en un avance real del producto${ms.topics.length ? `, aplicando ${ms.topics.slice(0, 4).join(", ")}${ms.topics.length > 4 ? "…" : ""}` : ""}.`,
+        slice: `Hito ${wi + 1} de ${raws.length} del producto del mes «${title}»${pieces.length ? `: ${list(r.dailies.map((d) => d.piece).slice(0, 3))}${pieces.length > 3 ? "…" : ""}` : ""}.`,
         areaIds: r.wp.areaIds,
+        ...(ms ? { milestone: ms } : {}),
         pieces,
         done,
         total,
@@ -240,8 +250,11 @@ export function planChain(plan: SchedulePlan, sch: PlanSchedule, signals?: Chain
       dueDate: weeks.flatMap((x) => x.pieces.map((p) => p.date)).at(-1) ?? weeks.at(-1)?.end ?? w.end,
       title,
       goal,
+      product,
       criteria: [
-        `Integra los ${weeks.length} proyectos semanales del mes (semanas ${weeks[0]!.week}–${weeks[weeks.length - 1]!.week}) en un solo proyecto que funciona de principio a fin`,
+        `Es UN producto real que funciona de principio a fin: integra los ${weeks.length} hitos semanales (semanas ${weeks[0]!.week}–${weeks[weeks.length - 1]!.week})`,
+        ...(c ? [] : product.stage.criteria),
+        ...(topics.length ? [`Cada uno de los ${topics.length} temas del mes tiene su lugar en el producto (mira qué hito aplica cada tema)`] : []),
         ...measures,
         `Se completa cuando terminas las ${nPieces} piezas diarias del mes: no se marca a mano`,
         "Puedes ejecutarlo y explicarlo sin ayuda",

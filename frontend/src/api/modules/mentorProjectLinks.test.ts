@@ -1,0 +1,106 @@
+// El proyecto mensual del Mentor como proyecto real del módulo Proyectos.
+
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { buildPlan, PlanStore, type Plan } from "../../core/mentor/plan.js";
+import { addDays } from "../../lib/planTime.js";
+import { AppState } from "../appState.js";
+import { mentorProjectLinksApi, projectDescription } from "./mentorProjectLinks.js";
+
+let dir: string;
+let app: AppState;
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+function savePlan(): Plan {
+  const start = today();
+  const end = addDays(start, 100);
+  const CORE = [{ id: "core", title: "Conocimientos", kind: "knowledge" as const, order: 100 }];
+  const seeds = [
+    { area: "Backend", areaId: "backend", objective: "Servicios", groups: CORE, topics: Array.from({ length: 12 }, (_, i) => ({ folder: `Programación/4 Backend/4.${i + 1} Tema ${i + 1}`, title: `Tema ${i + 1}`, estMinutes: 60, group: "core" })) },
+    { area: "Frontend", areaId: "frontend", objective: "Interfaces", groups: CORE, topics: Array.from({ length: 12 }, (_, i) => ({ folder: `Programación/5 Frontend/5.${i + 1} Pieza ${i + 1}`, title: `Pieza ${i + 1}`, estMinutes: 60, group: "core" })) },
+  ];
+  const built = buildPlan(seeds, { id: `${start}_${end}`, start, end, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6, 7], pace: "intenso", from: start, name: "Plan" }).plan;
+  const plan: Plan = { ...built, structure: "areas", areaMode: "together" };
+  new PlanStore(dir).save(plan);
+  return plan;
+}
+
+beforeEach(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), "nv_projlink_"));
+  fs.mkdirSync(path.join(dir, ".notevault"), { recursive: true });
+  app = new AppState(dir);
+});
+afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+describe("mentor_plan_project_create / links", () => {
+  it("crea un proyecto REAL por mes, con hitos semanales y piezas diarias como issues, y es idempotente", () => {
+    const plan = savePlan();
+    const api = mentorProjectLinksApi(app);
+    expect(api.mentor_plan_project_links({ planId: plan.id }).links).toEqual({});
+    const monthId = `mm:${plan.start.slice(0, 7)}`;
+    const r = api.mentor_plan_project_create({ planId: plan.id, monthId });
+    expect(r.created).toBe(true);
+    expect(r.link.name).toMatch(/^Mes 1 · La primera versión del producto/);
+    const pm = app.mgrs().projects;
+    const project = pm.get(r.link.projectId)!;
+    expect(project.description).toMatch(/## Hitos \(uno por semana\)/);
+    const issues = pm.issues(project.id);
+    expect(issues.length).toBe(r.link.issues.total);
+    expect(issues.filter((i) => !i.parent).length).toBeGreaterThanOrEqual(2); // un hito por semana
+    expect(issues.filter((i) => i.parent).length).toBeGreaterThan(issues.filter((i) => !i.parent).length); // piezas diarias colgando de su hito
+
+    const again = api.mentor_plan_project_create({ planId: plan.id, monthId });
+    expect(again.created).toBe(false);
+    expect(again.link.projectId).toBe(r.link.projectId);
+    expect(pm.projects().length).toBe(1);
+    expect(api.mentor_plan_project_links({ planId: plan.id }).links[monthId]!.projectId).toBe(r.link.projectId);
+  });
+
+  it("si borran el proyecto el enlace deja de enseñarse; un mes que no existe se rechaza", () => {
+    const plan = savePlan();
+    const api = mentorProjectLinksApi(app);
+    const monthId = `mm:${plan.start.slice(0, 7)}`;
+    const r = api.mentor_plan_project_create({ planId: plan.id, monthId });
+    app.mgrs().projects.delete(r.link.projectId);
+    expect(api.mentor_plan_project_links({ planId: plan.id }).links).toEqual({});
+    expect(() => api.mentor_plan_project_create({ planId: plan.id, monthId: "mm:1999-01" })).toThrow(/ya no está en el plan/);
+    expect(() => api.mentor_plan_project_create({ planId: "../x", monthId })).toThrow(/Plan inválido/);
+  });
+
+  it("la descripción enseña producto, hitos y criterios", () => {
+    const plan = savePlan();
+    const api = mentorProjectLinksApi(app);
+    const r = api.mentor_plan_project_create({ planId: plan.id, monthId: `mm:${plan.start.slice(0, 7)}` });
+    const d = app.mgrs().projects.get(r.link.projectId)!.description;
+    expect(d).toContain("Se considera hecho cuando");
+    expect(typeof projectDescription).toBe("function");
+  });
+});
+
+import { mentorPlanDossierApi } from "./mentorPlanDossier.js";
+
+describe("mentor_plan_dossier", () => {
+  it("escribe el dosier en la vault con la pregunta, el plan, los proyectos y la ruta de la respuesta, y no toca el plan", () => {
+    const plan = savePlan();
+    const before = JSON.stringify(new PlanStore(dir).load(plan.id));
+    const api = mentorPlanDossierApi(app, { now: () => new Date("2026-10-29T10:30:00") });
+    const r = api.mentor_plan_dossier({ id: plan.id, question: "¿Cuánto falta para terminar?" });
+    expect(r.rel).toMatch(/^Programación\/_handoff\/preguntas\/2026-10-29_10-30_plan\.md$/);
+    const md = fs.readFileSync(r.abs, "utf-8");
+    expect(md).toContain("¿Cuánto falta para terminar?");
+    expect(md).toContain(r.answerAbs);
+    expect(md).toContain("### Backend");
+    expect(md).toContain("## 5. Projects");
+    expect(md).toMatch(/Mes 1 · La primera versión del producto/);
+    expect(r.shortPrompt).toContain("NEW TASK");
+    expect(r.shortPrompt).toContain(r.abs);
+    expect(r.topics).toBe(24);
+    expect(JSON.stringify(new PlanStore(dir).load(plan.id))).toBe(before);
+    expect(() => api.mentor_plan_dossier({ id: "../x" })).toThrow(/Plan inválido/);
+  });
+});

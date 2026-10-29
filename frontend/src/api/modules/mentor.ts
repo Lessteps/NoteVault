@@ -152,6 +152,8 @@ import { dailyProjectDoneOf, mentorProjectsApi } from "./mentorProjects.js";
 import { mentorAreaPracticeApi } from "./mentorAreaPractice.js";
 import { mentorPlanFoldersApi } from "./mentorPlanFolders.js";
 import { mentorAreaTimesApi } from "./mentorAreaTimes.js";
+import { mentorProjectLinksApi } from "./mentorProjectLinks.js";
+import { mentorPlanDossierApi } from "./mentorPlanDossier.js";
 import { mentorDayCloseApi } from "./mentorDayClose.js";
 import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
@@ -3162,6 +3164,10 @@ export function mentorApi(app: AppState, send?: SendFn) {
     // Carpetas de la vault añadidas como áreas o sub-asignaturas (ver `mentorPlanFolders.ts`)
     // Hora de estudio de cada área (calendario general ↔ página del área; ver `mentorAreaTimes.ts`)
     ...mentorAreaTimesApi(app),
+    // El proyecto mensual como proyecto REAL del módulo Proyectos (ver `mentorProjectLinks.ts`)
+    ...mentorProjectLinksApi(app),
+    // «Preguntar con otra IA»: el dosier del plan para que Antigravity responda sin la app abierta (ver `mentorPlanDossier.ts`)
+    ...mentorPlanDossierApi(app),
     ...mentorPlanFoldersApi(app, { allTopics: () => buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 }), today: () => localDate() }),
     /** Compatibilidad: el flujo anterior (un BORRADOR en el chat que se acepta aparte); el camino principal crea el plan propuesto. */
     mentor_plan_generate_draft: (opts: unknown) => api.mentor_plan_generate({ ...((opts && typeof opts === "object" ? opts : {}) as object), asDraft: true }),

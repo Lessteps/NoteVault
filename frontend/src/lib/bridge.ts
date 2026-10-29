@@ -808,6 +808,10 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studyCurriculumHandoffBatches: (input: { areaId: string; importance?: string; size?: number; withExercises?: boolean; refreshOnly?: boolean; confirm: boolean }) => call<import("./types").CurriculumQueue>("study_curriculum_handoff_batches", input),
   studyCurriculumHandoffValidateAll: (input: { areaId: string }) => call<import("./types").CurriculumHandoff[]>("study_curriculum_handoff_validate_all", input),
   studyCurriculumHandoffDiscard: (input: { areaId: string }) => call<{ removed: number }>("study_curriculum_handoff_discard", input),
+  studyCurriculumAutoEngine: () => call<{ ready: boolean; reason: string; label: string }>("study_curriculum_auto_engine"),
+  studyCurriculumAutoStart: (input: { areaId: string; importance?: string; entryIds?: string[]; confirm: boolean }) => call<{ jobId: string; total: number }>("study_curriculum_auto_start", input),
+  studyCurriculumAutoStatus: (jobId: string) => call<import("./types").CurriculumAutoJob>("study_curriculum_auto_status", jobId),
+  studyCurriculumAutoCancel: (jobId: string) => call<{ ok: boolean }>("study_curriculum_auto_cancel", jobId),
   studyCurriculumHandoffStatus: (id: string) => call<import("./types").CurriculumHandoff>("study_curriculum_handoff_status", id),
   studyCurriculumHandoffValidate: (id: string) => call<import("./types").CurriculumHandoff>("study_curriculum_handoff_validate", id),
   /** Cobertura del currículo de referencia (HTML, CSS, JS reference, Java) frente a los temas existentes. */

@@ -220,6 +220,37 @@ export const absJoin = (root: string, rel: string): string => {
 
 const clip = (text: string | undefined, max: number): string => (text ?? "").slice(0, max);
 
+/** El contrato de la nota de teoría de un tema de referencia (sección 4 de la tarea): lo comparten la tarea para el agente externo y el modo automático de la app. */
+export function noteContractLines(linkable: readonly string[]): string[] {
+  return [
+    "## 4. Contract of each theory note (`<Title>.md`)",
+    "",
+    "Headings in this order, exactly (the map generator and the app parse them):",
+    "",
+    "1. `# <number> <title>` — same as the folder name.",
+    "2. `## Requires` — `- [[Earlier topic]] — why it is needed` (EXACT folder name of an existing topic of the list below), or `*No prerequisites.*`.",
+    "3. `## Explanation` with `### What it is` and `### Mental model`:",
+    "   - `### What it is`: **In one sentence.** a plain-language definition, then 2–3 short sentences with an everyday analogy and why you would use it in a real project; then the **REFERENCE** block (below); then the minimum syntax in a code block with a comment on every line.",
+    "   - `### Mental model`: a numbered walkthrough of what the browser/engine/runtime does, then 3–5 bullets with **bold** lead-ins, ending with a bullet **In the practice:** what the learner will do with this and the first thing to check when it does not work.",
+    "4. `## Examples` — exactly 3 examples `### Example N — title`. Each is EXACTLY four bullets (extra detail goes inside them, never as new bullets/headings): `- **Context:** …` (a realistic task, 1–3 sentences) · `- **Case:** …` (numbered steps `1.` `2.` `3.`, then the complete code block, with a plain-words comment on every line or small group of lines and `# <-- the important part` / `/* <-- the important part */` on the key line) · `- **Expected result:** …` (the exact output or what is seen on screen, and how to read it) · `- **Why it works:** …` (each step tied to its line; finish with **How you will apply it:** …).",
+    "5. `## Common mistakes` — exactly 3 mistakes `### Mistake N — title`, each EXACTLY four bullets `- **Mistake:**` `- **Symptom:**` `- **Cause:**` `- **Fix:**` (behavioural slips that run but do the wrong thing, including those an AI assistant makes; the Fix shows the corrected line with a comment).",
+    "6. `## Connections` — related topics (as `[[links]]`) and what they are for; new vocabulary at the end.",
+    "7. `## Cards` — one card per KEY item of the group, between 6 and 9 in total (add a contrast or mistake card if the group has fewer than 6 items): `### 1 · definition` then `**Q:** …` and `**A:** …`. Types: definition, example, mistake, contrast, connection.",
+    "",
+    "**REFERENCE block (inside `### What it is`).** After the analogy, write `**Reference — N items.**` and then a NUMBERED list, one entry per item of the topic's item list (section 5), in that order and using the item text literally in backticks. Each entry has four short parts on one line or a few indented lines: **what it does** · **accepted values** · **default** (or `none`) · **one-line example with a comment**, e.g.",
+    "",
+    "```",
+    "1. `item` — what it does in one sentence. Values: a | b | c. Default: a. Example: `item: b; /* what this line changes */`",
+    "```",
+    "",
+    "Plain language: explain any term with an everyday analogy before using it. Everything is oriented to PRACTICE (the exercises of this topic); make each Context the same kind of task a learner would be given.",
+    "",
+    `Existing/planned topics you may link in \`## Requires\` and \`## Connections\` (EXACT names; anything else is removed or reported):`,
+    "",
+    linkable.length ? linkable.map((n) => `- ${n}`).join("\n") : "- (none)",
+  ];
+}
+
 export function buildCurriculumTask(input: CurriculumTaskInput): CurriculumTask {
   const { vaultRoot, space, area, skills, today, id, taskAbs } = input;
   if (!input.entries.length) throw new Error("Elige al menos un tema.");
@@ -295,31 +326,7 @@ export function buildCurriculumTask(input: CurriculumTaskInput): CurriculumTask 
   push("Where this task and the skills differ, THIS task wins for these reference-group topics (3 examples, 3 mistakes, the reference list of section 4).", "");
 
   push(
-    "## 4. Contract of each theory note (`<Title>.md`)",
-    "",
-    "Headings in this order, exactly (the map generator and the app parse them):",
-    "",
-    "1. `# <number> <title>` — same as the folder name.",
-    "2. `## Requires` — `- [[Earlier topic]] — why it is needed` (EXACT folder name of an existing topic of the list below), or `*No prerequisites.*`.",
-    "3. `## Explanation` with `### What it is` and `### Mental model`:",
-    "   - `### What it is`: **In one sentence.** a plain-language definition, then 2–3 short sentences with an everyday analogy and why you would use it in a real project; then the **REFERENCE** block (below); then the minimum syntax in a code block with a comment on every line.",
-    "   - `### Mental model`: a numbered walkthrough of what the browser/engine/runtime does, then 3–5 bullets with **bold** lead-ins, ending with a bullet **In the practice:** what the learner will do with this and the first thing to check when it does not work.",
-    "4. `## Examples` — exactly 3 examples `### Example N — title`. Each is EXACTLY four bullets (extra detail goes inside them, never as new bullets/headings): `- **Context:** …` (a realistic task, 1–3 sentences) · `- **Case:** …` (numbered steps `1.` `2.` `3.`, then the complete code block, with a plain-words comment on every line or small group of lines and `# <-- the important part` / `/* <-- the important part */` on the key line) · `- **Expected result:** …` (the exact output or what is seen on screen, and how to read it) · `- **Why it works:** …` (each step tied to its line; finish with **How you will apply it:** …).",
-    "5. `## Common mistakes` — exactly 3 mistakes `### Mistake N — title`, each EXACTLY four bullets `- **Mistake:**` `- **Symptom:**` `- **Cause:**` `- **Fix:**` (behavioural slips that run but do the wrong thing, including those an AI assistant makes; the Fix shows the corrected line with a comment).",
-    "6. `## Connections` — related topics (as `[[links]]`) and what they are for; new vocabulary at the end.",
-    "7. `## Cards` — one card per KEY item of the group, between 6 and 9 in total (add a contrast or mistake card if the group has fewer than 6 items): `### 1 · definition` then `**Q:** …` and `**A:** …`. Types: definition, example, mistake, contrast, connection.",
-    "",
-    "**REFERENCE block (inside `### What it is`).** After the analogy, write `**Reference — N items.**` and then a NUMBERED list, one entry per item of the topic's item list (section 5), in that order and using the item text literally in backticks. Each entry has four short parts on one line or a few indented lines: **what it does** · **accepted values** · **default** (or `none`) · **one-line example with a comment**, e.g.",
-    "",
-    "```",
-    "1. `item` — what it does in one sentence. Values: a | b | c. Default: a. Example: `item: b; /* what this line changes */`",
-    "```",
-    "",
-    "Plain language: explain any term with an everyday analogy before using it. Everything is oriented to PRACTICE (the exercises of this topic); make each Context the same kind of task a learner would be given.",
-    "",
-    `Existing/planned topics you may link in \`## Requires\` and \`## Connections\` (EXACT names; anything else is removed or reported):`,
-    "",
-    linkable.length ? linkable.map((n) => `- ${n}`).join("\n") : "- (none)",
+    ...noteContractLines(linkable),
     "",
     "## 5. Work list",
     "",

@@ -52,10 +52,11 @@ beforeEach(() => {
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
-  useCurriculum.setState({ areas: [], loaded: false, loading: false, error: "", pending: [], version: 0 });
+  useCurriculum.setState({ areas: [], loaded: false, loading: false, error: "", pending: [], version: 0, autoRun: null });
   coverage = vi.fn(async () => ({ areas: [CSS, SMALL] }));
   capi.studyCurriculumCoverage = coverage;
   capi.studyCurriculumHandoffList = vi.fn(async () => []);
+  capi.studyCurriculumAutoEngine = vi.fn(async () => ({ ready: false, reason: "", label: "" }));
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -197,6 +198,41 @@ describe("vista «Temas por crear»", () => {
     expect(byId("queue-step-copy")).toBeTruthy();
     // pulsar de nuevo (otra pantalla, otro clic) no crea nada nuevo: la cola es una
     expect((byId("queue-copy") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("modo AUTOMÁTICO por omisión cuando la IA de la app puede escribir; un botón lanza la generación y se ve el progreso", async () => {
+    capi.studyCurriculumAutoEngine = vi.fn(async () => ({ ready: true, reason: "", label: "OpenAI · gpt" }));
+    const start = vi.fn(async () => ({ jobId: "j1", total: 3 }));
+    capi.studyCurriculumAutoStart = start;
+    capi.studyCurriculumAutoStatus = vi.fn(async () => ({ id: "j1", areaId: "css", areaTitle: "CSS", total: 3, finished: 1, current: "5.19.1 x", done: false, cancelled: false, error: "", log: [], created: ["P/A/B/5.19.1 x"], failed: [], skipped: 0 }));
+    await mount("css");
+    expect(byId("queue-mode-auto")!.getAttribute("aria-pressed")).toBe("true");
+    await click(byId("auto-essential"));
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ areaId: "css", importance: "esencial", confirm: true }));
+    expect(byId("curriculum-queue")!.getAttribute("data-state")).toBe("auto");
+    expect(byId("auto-progress")!.textContent).toContain("1 de 3");
+    expect(byId("auto-stop")).toBeTruthy();
+  });
+
+  it("sin IA utilizable (modo puente) el automático avisa y el modo por omisión es el manual", async () => {
+    capi.studyCurriculumAutoEngine = vi.fn(async () => ({ ready: false, reason: "El proveedor de IA está en modo puente.", label: "" }));
+    await mount("css");
+    expect(byId("queue-mode-manual")!.getAttribute("aria-pressed")).toBe("true");
+    await click(byId("queue-mode-auto"));
+    expect(byId("auto-blocked")!.textContent).toContain("modo puente");
+    expect((byId("auto-essential") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("interfaz AVANZADA: lo elegido a mano se manda a la IA de la app con sus ids exactos", async () => {
+    const start = vi.fn(async () => ({ jobId: "j9", total: 2 }));
+    capi.studyCurriculumAutoStart = start;
+    capi.studyCurriculumAutoStatus = vi.fn(async () => ({ id: "j9", areaId: "css", areaTitle: "CSS", total: 2, finished: 0, current: "", done: false, cancelled: false, error: "", log: [], created: [], failed: [], skipped: 0 }));
+    await mount("css");
+    await click(byId("gaps-sel-essential"));
+    await click(byId("gaps-auto"));
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ areaId: "css", confirm: true, entryIds: expect.any(Array) }));
+    expect((start.mock.calls[0] as unknown[])[0]).toHaveProperty("entryIds");
+    expect(((start.mock.calls[0] as unknown[])[0] as { entryIds: string[] }).entryIds.length).toBeGreaterThan(0);
   });
 
   it("validar todo y «Empezar de nuevo» usan la cola entera", async () => {

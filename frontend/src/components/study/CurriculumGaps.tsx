@@ -1,7 +1,8 @@
 // Temas por crear — para un área del currículo de referencia (CSS, HTML, JavaScript, Java…): cuánto está cubierto, qué falta y, eligiendo varios temas,
 // «Crear con Antigravity» escribe UNA tarea para el agente externo. Sin IA: la tarea se arma con reglas. La app no crea carpetas ni notas por sí misma.
 
-import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Rocket, Search } from "lucide-react";
+import { api } from "../../lib/bridge";
+import { Bot, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Rocket, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   addAll, categoriesOf, countLabel, DEFAULT_FILTERS, essentialMissing, filterRows, groupByCategory, HARD_LIMIT, idsOf, IMPORTANCE_LABEL,
@@ -79,6 +80,22 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
       toast("error", (e as Error).message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  /** La interfaz AVANZADA: lo que elegiste a mano, escrito por la IA de la app (el progreso sale arriba, en la cola) */
+  const [autoBusy, setAutoBusy] = useState(false);
+  const generateSelected = async (): Promise<void> => {
+    setAutoBusy(true);
+    try {
+      const r = await api.studyCurriculumAutoStart({ areaId, entryIds: selected, confirm: true });
+      useCurriculum.getState().setAutoRun({ areaId, jobId: r.jobId });
+      setSelected([]);
+      toast("info", `Generando ${r.total} ${r.total === 1 ? "tema" : "temas"} con la IA de la app: el progreso está arriba.`);
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setAutoBusy(false);
     }
   };
 
@@ -214,7 +231,10 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
               <input type="checkbox" checked={withExercises} onChange={(e) => setWithExercises(e.target.checked)} data-testid="gaps-with-exercises" />
               Incluir ejercicios (si no, la app los genera después)
             </label>
-            <PrimaryButton className="ml-auto" disabled={state === "vacio" || state === "tope"} onClick={() => setConfirming(true)} data-testid="gaps-create">
+            <GhostButton className="ml-auto" disabled={state === "vacio" || autoBusy} onClick={() => void generateSelected()} data-testid="gaps-auto" title="La app escribe estos temas ella sola con tu IA, uno tras otro">
+              <Bot size={14} aria-hidden /> Generar con la IA de la app
+            </GhostButton>
+            <PrimaryButton disabled={state === "vacio" || state === "tope"} onClick={() => setConfirming(true)} data-testid="gaps-create">
               <Rocket size={14} aria-hidden /> Crear con Antigravity
             </PrimaryButton>
           </div>

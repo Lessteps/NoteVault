@@ -37,6 +37,7 @@ import { studySpaceApi } from "./modules/studySpace.js";
 import { topicRegenerateApi } from "./modules/topicRegenerate.js";
 import { topicRegenerateHandoffApi } from "./modules/topicRegenerateHandoff.js";
 import { curriculumCoverageApi } from "./modules/curriculumCoverage.js";
+import { curriculumAutoApi } from "./modules/curriculumAuto.js";
 import { curriculumHandoffApi } from "./modules/curriculumHandoff.js";
 import { tasksApi } from "./modules/tasks.js";
 import { vaultsApi } from "./modules/vaults.js";
@@ -79,6 +80,7 @@ export function buildRegistry(app: AppState): Registry {
     ...topicRegenerateHandoffApi(app),
     ...curriculumCoverageApi(app),
     ...curriculumHandoffApi(app),
+    ...curriculumAutoApi(app),
     ...practiceApi(app),
     ...ladderApi(app),
     ...canvasApi(app),

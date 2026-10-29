@@ -7,6 +7,11 @@ To start or resume in any session, paste only this:
 
 ---
 
+> **Two ways to create the topics.** In the app, «Temas por crear» has a switch: **Automático** (the app writes the topics itself with its
+> configured AI, one after another — no Antigravity needed) and **Manual (Antigravity)**, which is this document. Use this plan when the
+> app's AI is not available or when you prefer an external agent. The «Elegir los temas a mano» panel (advanced) offers both buttons
+> for a hand-picked selection: «Generar con la IA de la app» and «Crear con Antigravity».
+
 ## 0. What this is and why
 
 The vault learns HTML, CSS and the functions of a language **piece by piece**: one note per element, per property, per method — like

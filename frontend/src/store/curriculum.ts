@@ -38,6 +38,9 @@ interface CurriculumStore {
   /** sube al recalcular; las vistas que dependen de la cobertura lo leen para refrescarse */
   version: number;
   pending: CurriculumHandoffState[];
+  /** el trabajo AUTOMÁTICO en curso (lo lanzan la cola sencilla y la selección a mano; lo muestra la cola) */
+  autoRun: { areaId: string; jobId: string } | null;
+  setAutoRun: (r: { areaId: string; jobId: string } | null) => void;
   load: (force?: boolean) => Promise<void>;
   loadPending: () => Promise<void>;
   /** tras crear/validar: recalcula la cobertura y avisa a las vistas */
@@ -65,6 +68,8 @@ export const useCurriculum = create<CurriculumStore>((set, get) => ({
   error: "",
   version: 0,
   pending: [],
+  autoRun: null,
+  setAutoRun: (autoRun) => set({ autoRun }),
   load: async (force = false) => {
     if (get().loading || (get().loaded && !force)) return;
     set({ loading: true });

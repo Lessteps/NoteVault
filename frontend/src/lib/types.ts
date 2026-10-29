@@ -1925,6 +1925,23 @@ export interface CurriculumHandoffEntry {
   warnings: string[];
   progress: CurriculumProgress;
 }
+/** El trabajo del modo automático de «Temas por crear» (la app escribe los temas con su IA). */
+export interface CurriculumAutoJob {
+  id: string;
+  areaId: string;
+  areaTitle: string;
+  total: number;
+  finished: number;
+  current: string;
+  done: boolean;
+  cancelled: boolean;
+  error: string;
+  log: string[];
+  created: string[];
+  failed: Array<{ title: string; reason: string }>;
+  skipped: number;
+}
+
 /** La cola de un área: sus tareas pendientes en orden y el archivo maestro con UNA frase que las encadena. */
 export interface CurriculumQueue {
   tasks: CurriculumHandoff[];

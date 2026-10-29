@@ -369,7 +369,8 @@ describe("Mi plan por áreas y «Reorganizar por áreas»", () => {
     const cards = host.querySelectorAll("[data-testid=subplan-card]");
     expect(cards).toHaveLength(2);
     expect(cards[0]!.querySelector("[data-testid=area-objective]")!.textContent).toBe("Construir servicios y APIs sólidos y seguros");
-    expect(cards[0]!.textContent).toContain("Bases · 6");
+    // los fundamentos no son una asignatura del área: no salen entre sus grupos
+    expect(cards[0]!.querySelector("[aria-label^=\"Grupos de\"]")!.textContent).not.toContain("Bases");
     expect(cards[0]!.textContent).toContain("Lenguaje: Python · 5");
     expect(cards[0]!.textContent).toContain("Conocimientos de backend · 8");
     // el nombre sale de las áreas

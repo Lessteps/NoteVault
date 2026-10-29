@@ -14,8 +14,10 @@ export function SubjectStatsCard({
     "all"
   );
 
-  const groups = sub.groups && sub.groups.length > 0
-    ? sub.groups
+  // los fundamentos («Bases») no son una asignatura del área: tienen su propia pestaña
+  const own = (sub.groups ?? []).filter((g) => g.kind !== "bases");
+  const groups = own.length > 0
+    ? own
     : [{ id: "core", title: "Temas generales", kind: "knowledge" as const, order: 100 }];
 
   // Calcular estadísticas por asignatura

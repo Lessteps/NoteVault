@@ -282,9 +282,9 @@ export function SubplanCard({
         {d && <Chip large colour={DELIVERABLE_COLOUR[d.status]}>Entregable: {DELIVERABLE_LABEL[d.status]}</Chip>}
       </p>
 
-      {byAreas && sub.groups && sub.groups.length > 0 && (
+      {byAreas && sub.groups && sub.groups.some((g) => g.kind !== "bases") && (
         <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={`Grupos de ${title}`}>
-          {sub.groups.map((g) => {
+          {sub.groups.filter((g) => g.kind !== "bases").map((g) => {
             const inGroup = sub.topics.filter((t) => t.group === g.id);
             const n = inGroup.filter((t) => t.route !== "skipped").length;
             const out = inGroup.length - n;

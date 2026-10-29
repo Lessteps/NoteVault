@@ -3,9 +3,22 @@
 **Open a NEW conversation** in Antigravity for this. To start or resume, paste only this:
 
 > Read `/home/drawn/projects/Lessteps/NoteVault/docs/ANTIGRAVITY_PLAN_REGENERACION.md` and execute it. It is resumable: check what
-> already exists in the vault and continue with the first thing that is missing. Do not stop to ask; report at the end of each work package.
+> already exists in the vault and continue with the first thing that is missing. 
 
 ---
+
+## ONE GO — read this before anything else
+
+Do **ALL of it in a single run, without stopping**: package A, then **every one** of the topics in package B, in order, until
+`DESACTUALIZADOS.md` has no topic lines left. **Do not stop after a batch, a package or an area. Do not ask whether to continue. Do not
+write a summary and wait.** «Ready to continue whenever you want» is a failure: you were already told to continue. The only reasons to
+stop are the STOP conditions in §7 or the work being finished. Work in batches of ~10 only to run the checkers; commit after each batch
+and **go straight on to the next**. Write the report **once, at the very end**.
+
+**Resume**: if the run is cut (network error, limit), the person re-pastes the same sentence; you check what exists, delete nothing, skip
+what is finished and continue from the first topic still listed in `DESACTUALIZADOS.md`.
+
+**Ignore any other pending task** from earlier conversations (the browser, webview, anything in `frontend/` or `electron/`).
 
 ## 0. What this is
 
@@ -126,7 +139,7 @@ finished, delete its line from `DESACTUALIZADOS.md` (this is how you resume and 
 
 - After each **work package** (A, then each numbered group in B) run in the vault: `git add -A Programación && git commit -m "feat(programación): <what> (<n> topics)"`.
   Do not push unless the person asks.
-- Report after each package: topics created / regenerated, checker failures fixed, anything skipped and why. Never skip silently.
+- Report **once, at the end** of the whole run (not per package or batch): topics created / regenerated, checker failures fixed, anything skipped and why. Never skip silently.
 
 ## 7. STOP conditions
 

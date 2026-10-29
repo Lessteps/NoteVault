@@ -97,6 +97,10 @@ export type ChangeOp =
   | { op: "set_branches"; branches: Record<string, string[]>; preset: string; excluded: string[] }
   /** ORGANIZAR: el orden de los temas de cada área (o de `subplan`) sale de sus números/ids (tema general y luego sus piezas); `order` es el que propone una IA (se valida) y los genéricos antiguos pasan a opcionales; las semanas se recalculan */
   | { op: "organize"; subplan?: string; order?: string[] }
+  /** edita un proyecto PROPIO (`x:n`) añadido a mano o por el Mentor */
+  | { op: "edit_deliverable"; id: string; title?: string; description?: string; criteria?: string[]; subplan?: string; dueDate?: string }
+  /** quita un proyecto PROPIO (`x:n`); los derivados del plan (diario, semanal, mensual) no se pueden quitar */
+  | { op: "remove_deliverable"; id: string }
   | { op: "lighter" }
   | { op: "trim_to_fit" }
   | { op: "extend_to"; date: string }
@@ -505,6 +509,30 @@ export function applyOps(plan: Plan, ops: readonly ChangeOp[], ctx: ChangeCtx): 
           source: "ai",
         });
         applied++;
+        break;
+      }
+      case "edit_deliverable": {
+        const i = extras.findIndex((d) => d.id === op.id && d.id.startsWith("x:"));
+        if (i < 0) break;
+        const cur = extras[i]!;
+        const sub = op.subplan !== undefined ? (op.subplan ? subOf(op.subplan) : undefined) : undefined;
+        const due = op.dueDate !== undefined && isDate(op.dueDate) ? (op.dueDate < plan.start ? plan.start : op.dueDate > plan.end ? plan.end : op.dueDate) : cur.dueDate;
+        const { areaId: _a, ...rest } = cur;
+        extras[i] = {
+          ...rest,
+          title: op.title !== undefined ? oneLine(op.title, 140) || cur.title : cur.title,
+          description: op.description !== undefined ? oneLine(op.description, 600) : cur.description,
+          criteria: op.criteria !== undefined ? op.criteria.map((c) => oneLine(c, 200)).filter(Boolean).slice(0, 8) : cur.criteria,
+          dueDate: due,
+          ...(op.subplan !== undefined ? (sub?.areaId ? { areaId: sub.areaId } : {}) : cur.areaId ? { areaId: cur.areaId } : {}),
+        };
+        applied++;
+        break;
+      }
+      case "remove_deliverable": {
+        const before = extras.length;
+        extras = extras.filter((d) => !(d.id === op.id && d.id.startsWith("x:")));
+        if (extras.length < before) applied++;
         break;
       }
       case "set_purpose": {

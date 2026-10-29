@@ -48,7 +48,7 @@ export function mentorProjectLinksApi(app: AppState) {
     const f = linksPath(planId);
     if (!fs.existsSync(f)) return {};
     const raw = store.loadJson(f, null) as Record<string, unknown> | null;
-    return Object.fromEntries(Object.entries(raw ?? {}).filter(([k, v]) => /^mm:[\d-]+$/.test(k) && typeof v === "string")) as Record<string, string>;
+    return Object.fromEntries(Object.entries(raw ?? {}).filter(([k, v]) => /^(?:mm:[\d-]+|x:\d+)$/.test(k) && typeof v === "string")) as Record<string, string>;
   };
   const saveLinks = (planId: string, links: Record<string, string>): void => {
     fs.mkdirSync(path.dirname(linksPath(planId)), { recursive: true });
@@ -83,6 +83,25 @@ export function mentorProjectLinksApi(app: AppState) {
     return { total: now.length, done: now.filter((i) => i.status === project.done_column).length };
   }
 
+  /** Un proyecto PROPIO del plan (`x:n`) como proyecto real: un issue por criterio de «hecho», con la fecha de entrega. */
+  function createOwn(plan: Plan, id: string): { link: ProjectLink; created: boolean } {
+    const d = (plan.deliverables ?? []).find((x) => x.id === id);
+    if (!d) throw new ApiError("Ese proyecto ya no está en el plan.");
+    const pm = app.mgrs().projects;
+    const saved = loadLinks(plan.id);
+    const existing = saved[id] ? pm.get(saved[id]!) : null;
+    const countOf = (pid: string): { total: number; done: number } => {
+      const p = pm.get(pid)!;
+      const issues = pm.issues(pid);
+      return { total: issues.length, done: issues.filter((i) => i.status === p.done_column).length };
+    };
+    if (existing) return { link: { projectId: existing.id, name: existing.name, issues: countOf(existing.id), monthId: id }, created: false };
+    const project = pm.create(d.title, { description: [d.description, "", "## Se considera hecho cuando", list(d.criteria), "", "_Creado por el Mentor desde un proyecto propio del plan._"].join("\n"), start: plan.start, deadline: d.dueDate, status: P_ACTIVE });
+    for (const c of d.criteria) pm.createIssue(project.id, c, { due: d.dueDate, estimate_min: 60 });
+    saveLinks(plan.id, { ...saved, [id]: project.id });
+    return { link: { projectId: project.id, name: project.name, issues: countOf(project.id), monthId: id }, created: true };
+  }
+
   return {
     mentor_plan_project_links(opts: unknown): { links: Record<string, ProjectLink> } {
       const plan = planOf(opts);
@@ -92,9 +111,17 @@ export function mentorProjectLinksApi(app: AppState) {
       const pm = app.mgrs().projects;
       const out: Record<string, ProjectLink> = {};
       for (const [monthId, pid] of Object.entries(saved)) {
-        const month = chain.months.find((m) => m.id === monthId);
         const project = pm.get(pid);
-        if (!month || !project) continue; // el mes ya no existe o borraron el proyecto: no se enseña
+        if (!project) continue; // borraron el proyecto: no se enseña
+        if (monthId.startsWith("x:")) {
+          // un proyecto PROPIO: su avance son sus issues (se marcan en el módulo Proyectos)
+          if (!(plan.deliverables ?? []).some((d) => d.id === monthId)) continue;
+          const issues = pm.issues(pid);
+          out[monthId] = { projectId: pid, name: project.name, issues: { total: issues.length, done: issues.filter((i) => i.status === project.done_column).length }, monthId };
+          continue;
+        }
+        const month = chain.months.find((m) => m.id === monthId);
+        if (!month) continue; // el mes ya no existe
         out[monthId] = { projectId: pid, name: project.name, issues: sync(month, pid), monthId };
       }
       return { links: out };
@@ -104,6 +131,7 @@ export function mentorProjectLinksApi(app: AppState) {
       const plan = planOf(opts);
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, unknown>;
       const monthId = String(o.monthId ?? "");
+      if (/^x:\d+$/.test(monthId)) return createOwn(plan, monthId);
       const month = chainOf(plan).months.find((m) => m.id === monthId);
       if (!month) throw new ApiError("Ese mes ya no está en el plan.");
       const pm = app.mgrs().projects;

@@ -2,7 +2,7 @@
 // una ventana propia con TODO su material y su progreso (producto, hitos, semanas y piezas, archivos y el proyecto real del módulo Proyectos). Lo usan la
 // Planeación («Entregables») y la Ejecución («Proyectos»): el avance sale de la cadena del plan (las casillas de las carpetas), nunca se marca a mano.
 
-import { AlertTriangle, ArrowRight, Check, Circle, ExternalLink, FolderKanban, Lock, Plus, Target } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, Circle, ExternalLink, FolderKanban, Lock, Pencil, Plus, Target, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { weeklyBreakdown } from "../../lib/planAreaPractice";
@@ -11,9 +11,10 @@ import { shortOf } from "../../lib/planCurriculum";
 import { dateLabel } from "../../lib/planSchedule";
 import { todayIso } from "../../lib/tasks";
 import { useApp } from "../../store/app";
+import { useMentor } from "../../store/mentor";
 import { useProjects } from "../../store/projects";
 import { Chip, GhostButton, Modal, PrimaryButton } from "../common/forms";
-import { cn } from "../ui";
+import { cn, confirmAction } from "../ui";
 import { AreaSections } from "./AreaSections";
 import { DSTATUS_COLOUR, plural, StatusChip } from "./agendaKit";
 import { useDeliverableChain } from "./MonthlyDeliverables";
@@ -21,6 +22,7 @@ import { ProgressBar } from "./parts";
 import { NewProjectDialog } from "./NewProjectDialog";
 import { ProjectFolder } from "./ProjectFolder";
 import { ProjectsHub } from "./ProjectsHub";
+import type { PlanDeliverable } from "../../lib/planAreas";
 import type { Loaded } from "./planShared";
 
 type RealLink = { projectId: string; name: string; issues: { total: number; done: number }; monthId: string };
@@ -199,12 +201,68 @@ export function ProjectDetail({ month, data, link, onLink, onClose }: { month: C
   );
 }
 
+/** Un proyecto PROPIO del plan: editar, quitar y —como los mensuales— crearlo como proyecto real; su avance sale de los issues de ese proyecto (nunca a mano). */
+function OwnProject({ d, plan, link, onEdit, onLink }: { d: PlanDeliverable; plan: Loaded["plan"] & object; link: RealLink | undefined; onEdit: () => void; onLink: (l: RealLink) => void }) {
+  const toast = useApp((s) => s.toast);
+  const [busy, setBusy] = useState(false);
+  const status = link && link.issues.total > 0 ? (link.issues.done >= link.issues.total ? "hecho" : link.issues.done > 0 ? "en_curso" : "pendiente") : "pendiente";
+  const remove = async (): Promise<void> => {
+    if (!(await confirmAction("Quitar el proyecto", `«${d.title}» sale del plan (no se borra el proyecto real del módulo Proyectos, si lo creaste). Se puede deshacer desde «Preguntas y ajustes».`, "Quitar", true))) return;
+    setBusy(true);
+    try {
+      const body = { id: plan.id, label: `Quitar el proyecto «${d.title}»`, ops: [{ op: "remove_deliverable", id: d.id }] };
+      let r = await api.mentorPlanChange(body);
+      for (let i = 0; r.loading && i < 40; i++) {
+        await new Promise((ok) => setTimeout(ok, 1500));
+        r = await api.mentorPlanChange(body);
+      }
+      if (!r.loading) useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const makeReal = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      const r = await api.mentorPlanProjectCreate({ planId: plan.id, monthId: d.id });
+      onLink(r.link);
+      toast("info", r.created ? `Proyecto «${r.link.name}» creado en el módulo Proyectos, con ${r.link.issues.total} issues (uno por criterio).` : "Ese proyecto ya existe en el módulo Proyectos.");
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const openReal = async (): Promise<void> => {
+    if (!link) return;
+    await useProjects.getState().open(link.projectId);
+    useApp.getState().setModule("proyectos");
+  };
+  return (
+    <li className="min-w-0 space-y-1.5 rounded-2xl border border-line bg-card p-4" data-testid="board-own-project" data-status={status}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="min-w-0 flex-1 basis-48 break-words text-[15.5px] font-semibold">{d.title}</span><StatusChip status={status} /></div>
+      <p className="text-[13px] text-faint">Se entrega el {dateLabel(d.dueDate)}{d.areaId ? ` · ${plan.subplans.find((s) => (s.areaId ?? s.id) === d.areaId)?.area ?? d.areaId}` : ""}</p>
+      {d.description && <p className="text-[14px] text-dim">{d.description}</p>}
+      {d.criteria.length > 0 && <ul className="list-disc space-y-0.5 pl-5 text-[13.5px] text-dim">{d.criteria.map((c) => <li key={c}>{c}</li>)}</ul>}
+      {link ? <><ProgressBar pct={link.issues.total ? (link.issues.done / link.issues.total) * 100 : 0} label={`Avance de ${d.title}`} /><p className="text-[12.5px] text-dim">{link.issues.done} de {link.issues.total} issues hechos (se marcan en el módulo Proyectos)</p></> : <p className="text-[12.5px] text-faint">Créalo como proyecto real para seguir su avance: el estado se calcula, no se marca a mano.</p>}
+      <div className="flex flex-wrap gap-2 pt-1">
+        {link ? <GhostButton onClick={() => void openReal()} data-testid="own-open-real"><ExternalLink size={14} aria-hidden /> Abrir en Proyectos</GhostButton> : <PrimaryButton onClick={() => void makeReal()} disabled={busy} data-testid="own-create-real"><FolderKanban size={14} aria-hidden /> Crear como proyecto real</PrimaryButton>}
+        <GhostButton onClick={onEdit} disabled={busy} data-testid="own-edit"><Pencil size={14} aria-hidden /> Editar</GhostButton>
+        <GhostButton onClick={() => void remove()} disabled={busy} data-testid="own-remove"><Trash2 size={14} aria-hidden /> Quitar</GhostButton>
+      </div>
+    </li>
+  );
+}
+
 export function ProjectsBoard({ data, mode }: { data: Loaded; mode: "planeacion" | "ejecucion" }) {
   const plan = data.plan!;
   const chain = useDeliverableChain(data);
   const today = todayIso();
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<PlanDeliverable | null>(null);
   const [links, setLinks] = useState<Record<string, RealLink>>({});
   const loadLinks = useCallback(() => {
     Promise.resolve()
@@ -285,19 +343,13 @@ export function ProjectsBoard({ data, mode }: { data: Loaded; mode: "planeacion"
         <div className="space-y-2" data-testid="board-own">
           <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Proyectos propios · los que añadiste al plan</p>
           <ul className="grid gap-3 @3xl:grid-cols-2">
-            {own.map((d) => (
-              <li key={d.id} className="min-w-0 space-y-1.5 rounded-2xl border border-line bg-card p-4" data-testid="board-own-project">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="min-w-0 flex-1 basis-48 break-words text-[15.5px] font-semibold">{d.title}</span><StatusChip status={d.status} /></div>
-                <p className="text-[13px] text-faint">Se entrega el {dateLabel(d.dueDate)}{d.areaId ? ` · ${plan.subplans.find((s) => (s.areaId ?? s.id) === d.areaId)?.area ?? d.areaId}` : ""}</p>
-                {d.description && <p className="text-[14px] text-dim">{d.description}</p>}
-                {d.criteria.length > 0 && <ul className="list-disc space-y-0.5 pl-5 text-[13.5px] text-dim">{d.criteria.map((c) => <li key={c}>{c}</li>)}</ul>}
-              </li>
-            ))}
+            {own.map((d) => <OwnProject key={d.id} d={d} plan={plan} link={links[d.id]} onEdit={() => setEditing(d)} onLink={(l) => { setLinks((x) => ({ ...x, [d.id]: l })); loadLinks(); }} />)}
           </ul>
         </div>
       )}
 
       {adding && <NewProjectDialog plan={plan} onClose={() => setAdding(false)} />}
+      {editing && <NewProjectDialog plan={plan} edit={editing} onClose={() => setEditing(null)} />}
       {open && <ProjectDetail month={open} data={data} link={links[open.id]} onLink={(l) => { setLinks((s) => ({ ...s, [open.id]: l })); loadLinks(); }} onClose={() => setOpenId(null)} />}
     </section>
   );

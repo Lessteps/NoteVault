@@ -126,3 +126,56 @@ describe("Nuevo proyecto (add_deliverable por la API directa)", () => {
     expect(own[0]!.areaId).toBe("backend");
   });
 });
+
+describe("proyectos propios: editar, quitar y crear como proyecto real", () => {
+  const addOwn = async (plan: Plan) => {
+    setWarmApp(app);
+    await warmStudyIndex();
+    const m = mentorApi(app, vi.fn());
+    await m.mentor_plan_change({ id: plan.id, ops: [{ op: "add_deliverable", title: "API de reservas", description: "d", criteria: ["Tiene pruebas", "Se arranca con un comando"], dueDate: plan.end }] });
+    return m;
+  };
+  const own = () => (new PlanStore(dir).load(savedId)!.deliverables ?? []).filter((d) => d.id.startsWith("x:"));
+  let savedId = "";
+
+  it("edita título, criterios y fecha; los derivados del plan no se pueden editar ni quitar", async () => {
+    const plan = savePlan();
+    savedId = plan.id;
+    const m = await addOwn(plan);
+    const r: any = await m.mentor_plan_change({ id: plan.id, ops: [{ op: "edit_deliverable", id: "x:1", title: "API de reservas v2", criteria: ["Solo una"], dueDate: addDays(plan.start, 30) }] });
+    expect(r.applied).toBeTruthy();
+    expect(own()[0]).toMatchObject({ title: "API de reservas v2", criteria: ["Solo una"], dueDate: addDays(plan.start, 30), description: "d" });
+    const bad: any = await m.mentor_plan_change({ id: plan.id, ops: [{ op: "remove_deliverable", id: `mm:${plan.start.slice(0, 7)}` }, { op: "edit_deliverable", id: "dp:2026-01-01", title: "x" }] });
+    expect(bad.applied).toBeFalsy();
+    expect(own()).toHaveLength(1);
+  });
+
+  it("quitar lo saca del plan", async () => {
+    const plan = savePlan();
+    savedId = plan.id;
+    const m = await addOwn(plan);
+    const r: any = await m.mentor_plan_change({ id: plan.id, ops: [{ op: "remove_deliverable", id: "x:1" }] });
+    expect(r.applied).toBeTruthy();
+    expect(own()).toHaveLength(0);
+  });
+
+  it("crear como proyecto real: un issue por criterio, idempotente, y su avance sale de los issues", async () => {
+    const plan = savePlan();
+    savedId = plan.id;
+    await addOwn(plan);
+    const api = mentorProjectLinksApi(app);
+    const r = api.mentor_plan_project_create({ planId: plan.id, monthId: "x:1" });
+    expect(r.created).toBe(true);
+    expect(r.link.name).toBe("API de reservas");
+    expect(r.link.issues).toEqual({ total: 2, done: 0 });
+    expect(api.mentor_plan_project_create({ planId: plan.id, monthId: "x:1" }).created).toBe(false);
+    const pm = app.mgrs().projects;
+    const first = pm.issues(r.link.projectId)[0]!;
+    pm.setIssueStatus(r.link.projectId, first.id, pm.get(r.link.projectId)!.done_column);
+    expect(api.mentor_plan_project_links({ planId: plan.id }).links["x:1"]!.issues).toEqual({ total: 2, done: 1 });
+    // si el proyecto propio se quita del plan, su enlace deja de enseñarse
+    await mentorApi(app, vi.fn()).mentor_plan_change({ id: plan.id, ops: [{ op: "remove_deliverable", id: "x:1" }] });
+    expect(api.mentor_plan_project_links({ planId: plan.id }).links["x:1"]).toBeUndefined();
+    expect(() => api.mentor_plan_project_create({ planId: plan.id, monthId: "x:9" })).toThrow(/ya no está en el plan/);
+  });
+});

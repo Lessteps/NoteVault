@@ -300,7 +300,14 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged, hideFilter = fa
                           {entries.length > 1 && only === null && (
                             // Vista general: las áreas del día colapsadas en una sola línea (un punto por área + el total); el detalle por área está en la etiqueta del día y al abrirlo
                             <span className="flex items-center gap-1 text-[12.5px] leading-tight text-dim" aria-hidden data-testid="agenda-cell-collapsed" title={entries.map((e) => areaShort(e.areaId, e.area)).join(" · ")}>
-                              {entries.map((e) => <AreaDot key={e.subplanId} {...(e.areaId ? { areaId: e.areaId } : {})} />)}
+                              {entries.map((e) => (
+                                // un punto por área; el nombre y su cuenta quedan en texto para lectores de pantalla (no solo color)
+                                <span key={e.subplanId} className="inline-flex items-center" data-testid="agenda-cell-area" data-area={e.areaId ?? e.subplanId}>
+                                  <AreaDot {...(e.areaId ? { areaId: e.areaId } : {})} />
+                                  <span className="sr-only">{areaShort(e.areaId, e.area)}</span>
+                                  <span className="sr-only">{e.theoryTopics > 0 ? `${e.theoryTopics}t` : e.topics > 0 ? `${e.topics}t` : "rep."}{e.practiceBlocks > 0 ? " P" : ""}{e.project ? " ◆" : ""}</span>
+                                </span>
+                              ))}
                               <span className="whitespace-nowrap">{entries.length} áreas · {entries.reduce((n, e) => n + (e.theoryTopics || e.topics), 0)}t</span>
                             </span>
                           )}

@@ -4,6 +4,9 @@
 // contexto con los managers de la vault y se validan las entradas de la UI. La IA
 // (fase siguiente) consume `mentor_brief().text`: nunca lee notas completas.
 
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as store from "../../core/store.js";
 import { AIConfig, sendChat, type ChatMessage, type SendOpts } from "../../core/aiClient.js";
 import { CORE_GROUP_ID, evaluateAreaMethodology, FRONTEND_SUBJECT_GROUPS, frontendGroupForFolder } from "../../lib/planAreas.js";
 import { ApiError } from "../../core/errors.js";
@@ -159,7 +162,7 @@ import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
 import { curriculumAreas } from "../../core/curriculum/catalog.js";
-import { addTopicsToPlan, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, type AddTopicItem } from "../../core/mentor/planAddTopics.js";
+import { addTopicsToPlan, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, findAreaSubplan, type AddTopicItem } from "../../core/mentor/planAddTopics.js";
 
 const DEFAULT_BRIEF_CHARS = 6000;
 
@@ -2314,6 +2317,40 @@ export function mentorApi(app: AppState, send?: SendFn) {
         before: plan,
       });
       return { plan: saved, entry: viewOf(entry), history: hist.list(id).map(viewOf), added: res.added.map((a) => a.folder), addedTo: [...bySub.keys()], skipped, created: res.created.map((c) => c.id), changed: n, message: summary };
+    },
+
+    /**
+     * SINCRONIZAR lo nuevo de la vault con el plan, SOLO: los temas de las áreas de referencia (HTML, CSS, JavaScript Reference → Frontend; Java → Java) que existen en la
+     * vault, no están en el plan y cuya área SÍ está en el plan, entran solos (con su asignatura y organizados por números, como «Añadir al plan»). Lo que la persona
+     * quitó a mano no vuelve: cada tema solo se ofrece UNA vez (`.notevault/mentor/plan-sync/<plan>.json` recuerda lo ya ofrecido). Idempotente; nada en planes archivados.
+     */
+    mentor_plan_sync_reference(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const plan = new PlanStore(app.root).load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived || plan.proposed) return { loading: false as const, added: [] as string[], message: "" };
+      if (studyIndexCold(app)) return { loading: true as const };
+      const areas = curriculumAreas();
+      const inPlan = new Set(plan.subplans.flatMap((s) => s.topics.map((t) => t.folder)));
+      const file = path.join(app.root, ".notevault", "mentor", "plan-sync", `${id}.json`);
+      const offered = new Set<string>(((store.loadJson(file, null) as { offered?: unknown } | null)?.offered as string[] | undefined) ?? []);
+      const candidates = topicSnaps(app)
+        .map((t) => t.folder)
+        .filter((f) => {
+          if (inPlan.has(f)) return false;
+          const aid = curriculumAreaOfFolder(f, areas);
+          const target = aid ? CURRICULUM_PLAN_TARGET[aid] : undefined;
+          return !!target && !!findAreaSubplan(plan, target);
+        });
+      const fresh = candidates.filter((f) => !offered.has(f)).slice(0, 400);
+      if (!fresh.length) return { loading: false as const, added: [] as string[], message: "" };
+      const res = api.mentor_plan_add_topics({ planId: id, folders: fresh }) as { added?: string[]; message?: string };
+      for (const f of candidates) offered.add(f);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      store.writeJson(file, { offered: [...offered] });
+      return { loading: false as const, ...res, added: res.added ?? [] };
     },
 
     /**

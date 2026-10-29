@@ -149,7 +149,7 @@ describe("estructura de la Agenda", () => {
   it("la barra lateral (modo Planeación) lista la Vista general, un ítem por área y «Más»; las pestañas son las de la página", async () => {
     await openAgenda();
     const top = [...host.querySelectorAll("aside nav > div > button")].map((b) => b.getAttribute("data-testid")!.replace("nav-pl:", ""));
-    expect(top).toEqual(["general", "area/s1-backend", "area/s2-databases", "bases", "entregables", "registros", "preparar", "practica", "cambios"]);
+    expect(top).toEqual(["general", "area/s1-backend", "area/s2-databases", "add-area", "bases", "entregables", "registros", "preparar", "practica", "cambios"]);
     expect(host.querySelector("aside nav")!.textContent).toContain("Planificación");
     expect(host.querySelector("aside nav")!.textContent).toContain("Más");
     expect(host.querySelectorAll("[role=tablist]")).toHaveLength(1);
@@ -285,6 +285,7 @@ describe("calendario accesible", () => {
   it("rejilla role=grid con cabeceras, una etiqueta por día («miércoles 14 de octubre: N temas, M entregables») y resumen por semana en el margen", async () => {
     await openAgenda();
     await click(view("calendario"));
+    await click(byTest("toggle-cal-month"));
     const grid = byTest("agenda-grid");
     expect(grid.getAttribute("role")).toBe("grid");
     expect(grid.getAttribute("aria-label")).toBe("Calendario de Octubre 2026");
@@ -309,6 +310,7 @@ describe("calendario accesible", () => {
   it("un solo día en el orden de Tab; las flechas mueven la selección y el foco; Inicio/Fin, RePág/AvPág; Intro abre el día", async () => {
     await openAgenda();
     await click(view("calendario"));
+    await click(byTest("toggle-cal-month"));
     const grid = byTest("agenda-grid");
     const cells = [...grid.querySelectorAll<HTMLButtonElement>("button[data-date]")];
     expect(cells.filter((c) => c.tabIndex === 0).map((c) => c.dataset.date)).toEqual([TODAY]);
@@ -343,6 +345,7 @@ describe("calendario accesible", () => {
   it("no se sale del plan con las flechas y al hacer clic en un día se ve su detalle diario", async () => {
     await openAgenda(areasPlan(), { today: START });
     await click(view("calendario"));
+    await click(byTest("toggle-cal-month"));
     const grid = byTest("agenda-grid");
     const first = grid.querySelector<HTMLButtonElement>(`button[data-date='${START}']`)!;
     first.focus();

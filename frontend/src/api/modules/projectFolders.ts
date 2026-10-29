@@ -194,7 +194,7 @@ export function projectFoldersApi(app: AppState) {
         rel: path.relative(root, abs).split(path.sep).join("/"),
         dir,
         size: dir ? 0 : stat.size,
-        modified: Math.round(stat.mtimeMs),
+        modified: stat.mtimeMs,
       });
       if (out.length >= MAX_ENTRIES) return;
       if (dir) walk(root, abs, depth + 1, out);
@@ -316,12 +316,12 @@ export function projectFoldersApi(app: AppState) {
       const ext = path.extname(abs).toLowerCase();
       const kind = ext === ".md" || ext === ".markdown" ? "markdown" : ext === ".txt" ? "text" : ext === ".json" || ext === ".yml" || ext === ".yaml" || ext === ".csv" ? "code" : "binary";
       if (kind === "binary") {
-        return { raw: "", modified: Math.round(stat.mtimeMs), size: stat.size, kind, readonly: true };
+        return { raw: "", modified: stat.mtimeMs, size: stat.size, kind, readonly: true };
       }
       const raw = fs.readFileSync(abs, "utf-8");
       return {
         raw,
-        modified: Math.round(stat.mtimeMs),
+        modified: stat.mtimeMs,
         size: stat.size,
         kind,
         readonly: stat.size > READONLY_BYTES,
@@ -339,14 +339,14 @@ export function projectFoldersApi(app: AppState) {
       const stat = fs.existsSync(abs) ? fs.statSync(abs) : null;
       if (!stat) throw new ApiError("El archivo ya no existe.");
       if (expectedModified !== undefined && expectedModified !== null) {
-        if (Math.abs(stat.mtimeMs - Number(expectedModified)) > 1) {
-          return { ok: false, conflict: true, modified: Math.round(stat.mtimeMs) };
+        if (Math.abs(stat.mtimeMs - Number(expectedModified)) > 0.001) {
+          return { ok: false, conflict: true, modified: stat.mtimeMs };
         }
       }
       const tmp = `${abs}.nv-${process.pid}.tmp`;
       fs.writeFileSync(tmp, raw, "utf-8");
       fs.renameSync(tmp, abs);
-      return { ok: true, conflict: false, modified: Math.round(fs.statSync(abs).mtimeMs) };
+      return { ok: true, conflict: false, modified: fs.statSync(abs).mtimeMs };
     },
 
     projects_file_create(pid: string, folderId: string, rel: string, name: string, isFolder = false): { entry: TreeEntry } {
@@ -367,7 +367,7 @@ export function projectFoldersApi(app: AppState) {
           rel: path.relative(path.resolve(folder.path), abs).split(path.sep).join("/"),
           dir: Boolean(isFolder),
           size: stat.size,
-          modified: Math.round(stat.mtimeMs),
+          modified: stat.mtimeMs,
         },
       };
     },

@@ -549,7 +549,7 @@ describe("MentorModule: modo global y «Crear plan»", () => {
     expect(navIds()).toEqual(["nav-ej:general", "nav-ej:area:s1-programacion", "nav-ej:area:s2-ingles", "nav-ej:proyectos", "nav-ej:registros"]);
     expect(byTest("plan-run")).toBeTruthy();
     await click(byTest("mentor-mode-planeacion")!);
-    expect(navIds()).toEqual(["nav-pl:general", "nav-pl:area/s1-programacion", "nav-pl:area/s2-ingles", "nav-pl:entregables", "nav-pl:registros", "nav-pl:preparar", "nav-pl:cambios"]);
+    expect(navIds()).toEqual(["nav-pl:general", "nav-pl:area/s1-programacion", "nav-pl:area/s2-ingles", "nav-pl:add-area", "nav-pl:entregables", "nav-pl:registros", "nav-pl:preparar", "nav-pl:cambios"]);
     expect(byTest("plan-run")).toBeNull();
     expect(byTest("plan-agenda")).toBeTruthy();
     expect(useNavState.getState().values["mentor.mode"]).toBe("planeacion");

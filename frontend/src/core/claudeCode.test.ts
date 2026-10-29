@@ -99,7 +99,7 @@ describe("claude code: pure helpers", () => {
 
 describe("claude code: executable resolution", () => {
   const exe = "C:\\Users\\u\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe";
-  it("maps the npm shim in %APPDATA%\\npm to the real exe", () => {
+  it.skipIf(process.platform !== "win32")("maps the npm shim in %APPDATA%\\npm to the real exe", () => {
     const files = new Set([
       "C:\\Users\\u\\AppData\\Roaming\\npm\\claude.cmd",
       exe,

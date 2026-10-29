@@ -270,6 +270,7 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
   const counts: Record<WorkView, number> = { hoy: lists.hoy.length, semana: weekCount, pendientes: lists.pendientes.length, repasos: reviews.length };
   const [sel, setSel] = useState<WorkView>("hoy");
   const view = sel;
+  const showSubjects = view === "hoy" && !!sub && subjectGroups.some((g) => g.total > 0);
   const pa = practice?.areas.find((x) => x.areaId === areaId);
   const reviewsDue = buckets.today.length;
   const pendingToday = todayRows.filter((r) => !r.done).length;
@@ -361,7 +362,7 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
           <WeekView days={weekDays} today={today} colour={colour} areaKey={areaKey} planId={planId} weekNumber={weekNumber} {...(upcoming ? { upcoming } : {})} />
         )
       ) : view !== "repasos" ? (
-        lists[view].length === 0 ? (
+        lists[view].length === 0 && !showSubjects ? (
           <p className="rounded-2xl border border-dashed border-line p-5 text-[14.5px] text-dim" data-testid="work-empty">
             {view === "hoy" ? "Hoy no toca ningún tema de esta ruta." : view === "semana" ? "Esta semana no hay temas repartidos en esta ruta." : "No tienes nada pendiente: un tema pasa aquí solo cuando se acaba su tiempo previsto sin completarlo."}
           </p>
@@ -374,6 +375,7 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
                 {plannedMinutes > 0 && <span className="normal-case tracking-normal">{plannedMinutes} min en total</span>}
               </p>
             )}
+            {view === "hoy" && lists.hoy.length === 0 && <p className="mb-2 px-1.5 text-[14px] text-dim" data-testid="work-empty">Hoy no toca ningún tema de esta ruta. Estas son tus asignaturas: puedes adelantar los próximos temas de cualquiera.</p>}
             {view === "hoy" && sub ? (
               <div className="space-y-4">
                 {subjectGroups.map((grp) => {
@@ -381,20 +383,25 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
                     const t = sub.topics.find((x) => x.folder === r.folder);
                     return (t?.group ?? "core") === grp.id;
                   });
-                  if (!grpRows.length) return null;
+                  // TODAS las asignaturas con temas se ven en Ejecución, también las que hoy no tienen nada (HTML, CSS…): así se pueden seguir y adelantar
+                  if (!grpRows.length && grp.total === 0) return null;
                   return (
-                    <div key={grp.id} className="space-y-1.5" data-testid="today-subject-group" data-subject={grp.id}>
+                    <div key={grp.id} className="space-y-1.5" data-testid="today-subject-group" data-subject={grp.id} data-today={grpRows.length ? "true" : "false"}>
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-1 pt-1.5">
                         <span className="text-[13px] font-bold text-accent-text">{grp.title}</span>
                         <span className="text-[12px] font-medium text-dim" data-testid={`subject-progress-inline-${grp.id}`}>
                           {grp.done}/{grp.total} ({grp.pct}%)
                         </span>
                       </div>
-                      <ul className="space-y-1" aria-label={grp.title}>
-                        {grpRows.map((r) => (
-                          <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} planId={planId} />
-                        ))}
-                      </ul>
+                      {grpRows.length ? (
+                        <ul className="space-y-1" aria-label={grp.title} data-testid="work-list">
+                          {grpRows.map((r) => (
+                            <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} planId={planId} />
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="px-1 text-[13.5px] text-dim" data-testid="subject-nothing-today">Hoy no toca nada de esta asignatura ({grp.total - grp.done} {grp.total - grp.done === 1 ? "tema pendiente" : "temas pendientes"}).</p>
+                      )}
                       {plan && subplanId && (
                         <div className="pt-1" data-testid="subject-add-topic" data-subject={grp.id}>
                           <AddExtraTopic planId={planId} date={today} area={subplanId} lockArea lockSession minDate={plan.start} maxDate={plan.end} subject={{ title: grp.title, info: `${grp.done}/${grp.total} hechos (${grp.pct}%)` }} label={`Añadir más temas de ${grp.title}`} onChanged={bumpPlanVersion} />

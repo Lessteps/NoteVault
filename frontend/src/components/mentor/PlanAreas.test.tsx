@@ -108,6 +108,8 @@ const openAgenda = async (p: PlanData, v?: string) => {
   await open(p);
   await click(tab("agenda"));
   if (v) await click(view(v));
+  // el calendario abre por defecto en la vista semanal: estas pruebas miden la rejilla mensual
+  if (v === "calendario") await click(byTest("toggle-cal-month"));
 };
 const firstStudyDay = (p: PlanData, week = 2): string => buildSchedule(progressPlan(p as never, { today: TODAY })).days.find((d) => d.week === week && d.study && (d.blocks ?? []).length > 0)!.date;
 
@@ -411,6 +413,7 @@ describe("Calendario por áreas", () => {
     expect(nav("area/s-frontend").getAttribute("aria-current")).toBe("page");
     expect(byTest("plan-page-title").textContent).toBe("Frontend");
     await click(view("calendario"));
+    await click(byTest("toggle-cal-month"));
     expect([...cellOf(d).querySelectorAll("[data-testid=agenda-cell-area]")].map((a) => a.getAttribute("data-area"))).toEqual(["frontend"]);
     expect(cellOf(d).getAttribute("aria-label")).toMatch(/Frontend \d+ temas? y práctica/);
     expect(cellOf(d).getAttribute("aria-label")).not.toContain("Backend");
@@ -421,6 +424,7 @@ describe("Calendario por áreas", () => {
     await click(nav("general"));
     expect(nav("general").getAttribute("aria-current")).toBe("page");
     await click(view("calendario"));
+    await click(byTest("toggle-cal-month"));
     await click(cellOf(d));
     expect(all("agenda-day-area", byTest("agenda-calendar-detail"))).toHaveLength(4);
     expect(byTest("agenda-day-projects", byTest("agenda-calendar-detail"))).toBeTruthy();

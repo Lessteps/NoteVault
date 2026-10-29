@@ -107,7 +107,7 @@ describe("mentor_plan_dossier", () => {
 
 import { vi } from "vitest";
 import { mentorApi } from "./mentor.js";
-import { setWarmApp, warmStudyIndex } from "./study.js";
+import { clearStudySnapshotCache, setWarmApp, warmStudyIndex } from "./study.js";
 
 describe("Nuevo proyecto (add_deliverable por la API directa)", () => {
   it("añade un proyecto propio al plan, con sus criterios y fecha dentro del plan, y queda guardado", async () => {
@@ -177,5 +177,56 @@ describe("proyectos propios: editar, quitar y crear como proyecto real", () => {
     await mentorApi(app, vi.fn()).mentor_plan_change({ id: plan.id, ops: [{ op: "remove_deliverable", id: "x:1" }] });
     expect(api.mentor_plan_project_links({ planId: plan.id }).links["x:1"]).toBeUndefined();
     expect(() => api.mentor_plan_project_create({ planId: plan.id, monthId: "x:9" })).toThrow(/ya no está en el plan/);
+  });
+});
+
+describe("mentor_plan_sync_reference: lo nuevo de la vault entra solo al plan", () => {
+  const MANIFEST = (t: string) => `---\ntype: practica\nsubject: programming\ntitle: ${t}\ntopic_type: mixed\nskills: ["explain"]\nmin_per_skill: 6\ntarget_difficulty: 3\nexam: required\n---\n`;
+  const html = (n: string, t: string) => `Programación/5 Frontend/HTML/${n} ${t}`;
+  const make = (rel: string) => {
+    const name = rel.split("/").pop()!;
+    fs.mkdirSync(path.join(dir, ...rel.split("/")), { recursive: true });
+    fs.writeFileSync(path.join(dir, ...rel.split("/"), `${name}.practica.md`), MANIFEST(name));
+    fs.writeFileSync(path.join(dir, ...rel.split("/"), `${name}.md`), `---\ntype: teorica\ntitle: ${name}\n---\n# ${name}\n`);
+  };
+  const frontendHtml = (id: string) => (new PlanStore(dir).load(id)!.subplans.find((s) => s.areaId === "frontend")!.topics.filter((t) => t.group === "html").map((t) => t.folder.split("/").pop()));
+
+  it("detecta los temas de HTML nuevos, los añade a su asignatura, no vuelve a meter lo que se quitó y recoge lo siguiente", async () => {
+    const plan = savePlan();
+    setWarmApp(app);
+    make(html("5.18.4", "Skeleton"));
+    make(html("5.18.4.1", "html element"));
+    await warmStudyIndex();
+    const m = mentorApi(app, vi.fn());
+    const r1: any = m.mentor_plan_sync_reference({ planId: plan.id });
+    expect(r1.added.map((f: string) => f.split("/").pop())).toEqual(["5.18.4 Skeleton", "5.18.4.1 html element"]);
+    expect(frontendHtml(plan.id)).toEqual(["5.18.4 Skeleton", "5.18.4.1 html element"]);
+
+    // idempotente: sin nada nuevo no cambia nada
+    expect((m.mentor_plan_sync_reference({ planId: plan.id }) as { added: string[] }).added).toEqual([]);
+
+    // la persona quita uno a mano: no vuelve
+    await m.mentor_plan_route_set({ id: plan.id, folders: [html("5.18.4.1", "html element")], route: "skipped" });
+    expect((m.mentor_plan_sync_reference({ planId: plan.id }) as { added: string[] }).added).toEqual([]);
+
+    // un tema nuevo que aparece después SÍ entra
+    make(html("5.18.5", "Metadata"));
+    clearStudySnapshotCache();
+    await warmStudyIndex();
+    const r3: any = m.mentor_plan_sync_reference({ planId: plan.id });
+    expect(r3.added.map((f: string) => f.split("/").pop())).toEqual(["5.18.5 Metadata"]);
+  });
+
+  it("si el plan no tiene el área (Frontend) no mete nada; en planes archivados tampoco", async () => {
+    const plan = savePlan();
+    const store = new PlanStore(dir);
+    store.save({ ...plan, subplans: plan.subplans.filter((s) => s.areaId !== "frontend") });
+    setWarmApp(app);
+    make(html("5.18.4", "Skeleton"));
+    await warmStudyIndex();
+    const m = mentorApi(app, vi.fn());
+    expect((m.mentor_plan_sync_reference({ planId: plan.id }) as { added: string[] }).added).toEqual([]);
+    store.save({ ...plan, archived: true });
+    expect((m.mentor_plan_sync_reference({ planId: plan.id }) as { added: string[] }).added).toEqual([]);
   });
 });

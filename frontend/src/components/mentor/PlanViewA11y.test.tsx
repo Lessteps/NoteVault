@@ -101,7 +101,7 @@ describe("pestañas del plan (barra lateral)", () => {
     // las únicas pestañas (role=tab) son las de la página del plan, con su nombre
     expect(host.querySelector("[role=tablist]")!.getAttribute("aria-label")).toContain("Secciones de");
     // sin pista Programming practice no hay «Práctica»
-    expect([...host.querySelectorAll("aside nav > div > button")].map((t) => t.getAttribute("data-testid")!.replace("nav-pl:", ""))).toEqual(["general", "area/s1", "area/s2", "entregables", "registros", "preparar", "cambios"]);
+    expect([...host.querySelectorAll("aside nav > div > button")].map((t) => t.getAttribute("data-testid")!.replace("nav-pl:", ""))).toEqual(["general", "area/s1", "area/s2", "add-area", "entregables", "registros", "preparar", "cambios"]);
     expect(tabOn("plan")).toBe(true);
     expect(tabOn("entregables")).toBe(false);
     expect(panelsVisible()).toEqual(["plan"]);

@@ -205,11 +205,11 @@ describe("temas extra: marca «Extra», × y mismo resultado en Agenda y Ejecuci
 });
 
 describe("Ejecución: añadir tema y práctica", () => {
-  it("«Temas de hoy» ofrece «Próximos temas» (hoy, esta área) y «Práctica diaria» ofrece «Más práctica» con lista, hecho y quitar", async () => {
+  it("«Temas de hoy» ofrece «Añadir más temas» (hoy, esta área) y «Práctica diaria» ofrece «Añadir más práctica» con lista, hecho y quitar", async () => {
     await open("ejecucion");
     await click(runTab("area:s-be"));
     const addT = byTest("work-add-topic")!.querySelector<HTMLElement>("[data-testid=add-extra-topic]")!;
-    expect(addT.textContent).toContain("Próximos temas");
+    expect(addT.textContent).toContain("Añadir más temas");
     vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue(candidates("P/Back/T26", "Back 26"));
     const addTopic = vi.spyOn(api, "mentorPlanExtraTopicAdd").mockImplementation(async (o) => (saved = { ...basePlan(), extraTopics: [{ date: o.date!, folder: o.folder, addedAt: "x", source: "manual" }] }));
     await click(addT);
@@ -243,6 +243,6 @@ describe("Ejecución: añadir tema y práctica", () => {
     await open("ejecucion");
     const box = byTest("run-extras")!;
     expect(box.querySelector("[data-testid=add-extra-topic]")!.textContent).toContain("Próximos temas");
-    expect(box.querySelector("[data-testid=add-extra-practice]")!.textContent).toContain("Más práctica");
+    expect(box.querySelector("[data-testid=add-extra-practice]")!.textContent).toContain("Añadir más práctica");
   });
 });

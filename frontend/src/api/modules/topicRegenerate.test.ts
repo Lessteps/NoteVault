@@ -50,6 +50,7 @@ beforeEach(() => {
   hoisted.convDir = fs.mkdtempSync(path.join(os.tmpdir(), "nv_conv_"));
   Object.assign(hoisted.store, { provider: "openai", api_key: "k", model: "m", base_url: "http://x" });
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "nv_regen_"));
+  fs.mkdirSync(path.join(dir, ".notevault"), { recursive: true }); // el generador del mapa busca la raíz de la vault por esta carpeta
   put("Programación/Programación.resumen.md", "---\nsubject: programming\ntitle: Programación\n---\n# P\n");
   put(`${FOLDER}/4.1 Uno.md`, OLD_NOTE);
   put(`${FOLDER}/4.1 Uno — mapa.canvas`, OLD_CANVAS);

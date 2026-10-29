@@ -68,13 +68,15 @@ async function writeExpecting(rel: string, body: string): Promise<WatchEvent> {
   return pending;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "nv_watch_")));
   events = [];
   svc = new FileWatcherService(dir, (e: WatchEvent) => {
     events.push(e);
   });
   svc.start();
+  // en Linux el vigilante recursivo instala sus avisos de forma asíncrona: lo escrito en el mismo instante se pierde
+  if (process.platform !== "win32") await new Promise((r) => setTimeout(r, 150));
 });
 
 afterEach(() => {
@@ -90,7 +92,7 @@ describe("arrancar y parar", () => {
     expect(ev.eventType).toBeTruthy();
   });
 
-  it("las rutas llegan con / aunque el sistema las de con \\", async () => {
+  it.skipIf(process.platform !== "win32")("las rutas llegan con / aunque el sistema las de con \\", async () => {
     const ev = await writeExpecting("curso/tema.md", "x");
     expect(ev.relPath).not.toContain("\\");
     expect(ev.fullPath.includes("\\")).toBe(true); // la ruta completa es del SO

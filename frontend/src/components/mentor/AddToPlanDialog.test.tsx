@@ -131,7 +131,7 @@ describe("AddToPlanDialog: flujo de 3 pasos", () => {
     });
     await flush();
 
-    expect(host.textContent).toContain("¿Qué es esta carpeta?");
+    expect(host.textContent).toContain("¿Qué es esta carpeta o bloque?");
     expect(host.textContent).toContain("Para qué la añado");
 
     // Calcular impacto -> avanzar a paso 3

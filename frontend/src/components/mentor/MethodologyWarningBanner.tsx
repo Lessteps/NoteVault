@@ -46,7 +46,8 @@ export function MethodologyWarningBanner({
 
   return (
     <div
-      role="alert"
+      role="region"
+      aria-label="Aviso metodológico"
       data-testid="methodology-warning-banner"
       className="space-y-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-text"
     >

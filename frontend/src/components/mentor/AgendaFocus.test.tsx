@@ -266,6 +266,7 @@ describe("Semana, Mes y Calendario con enfoque", () => {
   it("Calendario: cada día muestra su enfoque en texto y la etiqueta lo dice («enfoque Backend, 2 teorías, 2 prácticas, proyecto diario»)", async () => {
     await openAgenda();
     await click(view("calendario"));
+    await click(byTest("toggle-cal-month"));
     const cell = byTest("agenda-grid").querySelector<HTMLButtonElement>("button[data-date='2026-10-14']")!;
     // la etiqueta da el desglose POR ÁREA, en el orden fijo
     expect(cell.getAttribute("aria-label")).toMatch(/^miércoles 14 de octubre: Backend \d+ temas? y práctica; Databases \d+ temas? y práctica, proyecto diario, \d+ entregables?/);

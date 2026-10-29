@@ -99,7 +99,7 @@ describe("PlanAreaTopics", () => {
     expect(titles()).toEqual(["4.2 REST"]);
     await click("area-tabs-frontend");
     expect(titles()).toEqual(["5.1 DOM"]);
-    expect(byTest("group-tabs")).toBeNull(); // sin grupos no hay segunda sub-barra
+    expect(byTest("group-tabs")!.querySelectorAll("button")).toHaveLength(1); // sin grupos solo hay «Todos»: la barra sigue para poder añadir una asignatura
     await click("area-tabs-__bases");
     expect(titles()).toEqual(["4.1 HTTP"]);
     expect(byTest("generate-area")).toBeNull(); // Bases se genera tema a tema

@@ -181,7 +181,7 @@ describe("AddExtraTopic", () => {
     expect((byLabel("Adelantar A 4") as HTMLButtonElement).disabled).toBe(false);
     const blocked = byLabel("Adelantar A 5") as HTMLButtonElement;
     expect(blocked.disabled).toBe(true);
-    expect(document.querySelector('[data-folder="A/5"]')!.textContent).toContain("Antes: A 4");
+    expect(document.querySelector('[data-folder="A/5"]')!.textContent).toContain("Sigue a: A 4");
     expect(document.querySelector('[data-testid="next-topics-planned"]')!.textContent).toContain("Alfa 2");
     const text = document.querySelector('[role="dialog"]')!.textContent!;
     expect(text).not.toMatch(/vault/i);

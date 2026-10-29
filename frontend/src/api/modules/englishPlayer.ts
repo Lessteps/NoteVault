@@ -192,7 +192,7 @@ export function englishPlayerApi(app: AppState) {
     const timed = transcript !== "" && isTimedFile(transcript) && fs.existsSync(transcript);
     // A plain-text transcript has no times: it is offered as text, not as subtitles.
     const plain = transcript && !timed && fs.existsSync(transcript) ? plainTextOfNote(fs.readFileSync(transcript, "utf-8")) : "";
-    return { ...(await load(media, toFloat(seconds), timed ? transcript : undefined)), ok: true, source: s, plain };
+    return { ...(await load(media, toFloat(seconds), timed ? transcript : undefined)), ok: true, source: { id: s.id, kind: s.kind, title: s.title, added: s.added }, plain };
   };
 
   /** The English cues of a media entry (empty when it has no English subtitles or they cannot be read). */

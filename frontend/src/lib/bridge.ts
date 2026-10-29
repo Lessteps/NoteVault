@@ -484,6 +484,7 @@ export const api = {
   mentorPlanProjectLinks: (opts: { planId: string }) => call<{ links: Record<string, { projectId: string; name: string; issues: { total: number; done: number }; monthId: string }> }>("mentor_plan_project_links", opts),
   mentorPlanProjectCreate: (opts: { planId: string; monthId: string }) => call<{ link: { projectId: string; name: string; issues: { total: number; done: number }; monthId: string }; created: boolean }>("mentor_plan_project_create", opts),
   mentorPlanDossier: (opts: { id: string; question?: string }) => call<{ rel: string; abs: string; answerRel: string; answerAbs: string; shortPrompt: string; topics: number }>("mentor_plan_dossier", opts),
+  mentorPlanSyncReference: (opts: { planId: string }) => call<{ loading: true } | { loading: false; added: string[]; message: string; plan?: import("./types").MentorPlan }>("mentor_plan_sync_reference", opts),
   mentorAreaTimesGet: (opts: { planId: string }) => call<{ times: import("./areaTimes").AreaTimes }>("mentor_area_times_get", opts),
   mentorAreaTimeSet: (opts: { planId: string; subplanId: string; start: string | null; durationMin?: number | null }) => call<{ times: import("./areaTimes").AreaTimes }>("mentor_area_time_set", opts),
   mentorPlanFolderCandidates: (opts: { planId: string }) => call<{ candidates: Array<{ folder: string; label: string; role?: import("./folderRoles").FolderRoleKind; objective?: string; topicCount: number; estMinutes: number }> }>("mentor_plan_folder_candidates", opts),

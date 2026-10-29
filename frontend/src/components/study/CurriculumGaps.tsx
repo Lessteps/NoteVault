@@ -14,6 +14,7 @@ import { Chip, GhostButton, Modal, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { CoverageRing, LEVEL_COLOUR, LEVEL_LABEL } from "./CurriculumBadges";
 import { CurriculumHandoffPanel } from "./CurriculumHandoffPanel";
+import { CurriculumQueue } from "./CurriculumQueue";
 
 const STATUS_COLOUR: Record<CoverageStatus, string> = { cubierto: "var(--nv-mint)", parcial: "var(--nv-warn)", faltante: "var(--nv-danger)" };
 const IMPORTANCE_COLOUR = { esencial: "var(--nv-accent)", recomendado: "var(--nv-info)", opcional: "var(--nv-dim)" } as const;
@@ -34,7 +35,6 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
   const toast = useApp((s) => s.toast);
   const { areas, loaded, error } = useCoverage();
   const loading = useCurriculum((s) => s.loading);
-  const pending = useCurriculum((s) => s.pending);
   const create = useCurriculum((s) => s.create);
   const area = areas.find((a) => a.areaId === areaId);
 
@@ -46,8 +46,6 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
   const [confirming, setConfirming] = useState(false);
   const [creating, setCreating] = useState(false);
   const [handoff, setHandoff] = useState<CurriculumHandoffState | null>(null);
-  const [batching, setBatching] = useState(false);
-  const [batches, setBatches] = useState<CurriculumHandoffState[]>([]);
 
   useEffect(() => {
     void useCurriculum.getState().loadPending();
@@ -65,7 +63,7 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
     setSelected((s) => (s.every((id) => valid.has(id)) ? s : s.filter((id) => valid.has(id))));
   }, [rows]);
 
-  const mine = pending.filter((h) => h.areaId === areaId);
+  const essentialCount = rows.filter((r) => r.status !== "cubierto" && r.entry.importance === "esencial").length;
   const state = selectionState(selected.length);
   const set = (patch: Partial<GapFilters>): void => setFilters((f) => ({ ...f, ...patch }));
 
@@ -81,20 +79,6 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
       toast("error", (e as Error).message);
     } finally {
       setCreating(false);
-    }
-  };
-
-  /** TODAS las tareas de golpe: lo esencial que falta en lotes (o todo lo que falta), una tarea por lote, listas para el agente */
-  const makeBatches = async (importance?: string): Promise<void> => {
-    setBatching(true);
-    try {
-      const list = await useCurriculum.getState().createBatches({ areaId, ...(importance ? { importance } : {}), withExercises });
-      setBatches(list);
-      toast("info", `${list.length} ${list.length === 1 ? "tarea escrita" : "tareas escritas"}: el agente las ejecuta en orden.`);
-    } catch (e) {
-      toast("error", (e as Error).message);
-    } finally {
-      setBatching(false);
     }
   };
 
@@ -134,20 +118,11 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
 
             {handoff && <CurriculumHandoffPanel handoff={handoff} onUpdate={setHandoff} onClose={() => setHandoff(null)} />}
 
-            {mine.length > 0 && (
-              <section className="rounded-xl border border-line bg-card p-3" data-testid="gaps-pending" aria-label="Tareas pendientes">
-                <h3 className="mb-1.5 text-[13.5px] font-semibold text-text">Tareas pendientes ({mine.length})</h3>
-                <ul className="space-y-1">
-                  {mine.map((h) => (
-                    <li key={h.id} className="flex flex-wrap items-center gap-2 text-[13px]" data-testid="gaps-pending-item">
-                      <span className="min-w-0 flex-1 break-words">{h.entries.length} {h.entries.length === 1 ? "tema" : "temas"} · {h.status === "failed" ? "con problemas" : "esperando al agente"}{h.createdAt ? ` · ${h.createdAt.slice(0, 10)}` : ""}</span>
-                      <GhostButton onClick={() => setHandoff(h)} data-testid="gaps-pending-open">Reabrir</GhostButton>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+            <CurriculumQueue areaId={areaId} areaTitle={area.title} missing={area.missing + area.partial} essentials={essentialCount} withExercises={withExercises} />
 
+            <details className="rounded-2xl border border-line bg-card p-3" data-testid="gaps-manual">
+              <summary className="inline-flex min-h-9 cursor-pointer items-center text-[14px] font-semibold text-text">Elegir los temas a mano</summary>
+              <div className="mt-3 space-y-4">
             {/* Filtros */}
             <div className="flex flex-wrap items-center gap-2" data-testid="gaps-filters">
               <div role="group" aria-label="Filtrar por estado" className="flex flex-wrap gap-1">
@@ -179,25 +154,6 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
                   );
                 })}
               </div>
-            )}
-
-            {/* Todas las tareas por lotes */}
-            {area.missing + area.partial > 0 && (
-              <section className="rounded-xl border border-line bg-card p-3" data-testid="gaps-batches" aria-label="Crear todas las tareas por lotes">
-                <h3 className="text-[13.5px] font-semibold text-text">Crear TODAS las tareas por lotes</h3>
-                <p className="mb-2 text-[13px] text-dim">En vez de elegir tema a tema: la app escribe una tarea por cada lote de ≈ 25 temas (el grupo y sus piezas juntos) para que Antigravity las ejecute en orden. Después validas cada una y la añades al plan.</p>
-                <div className="flex flex-wrap gap-2">
-                  <PrimaryButton large onClick={() => void makeBatches("esencial")} disabled={batching} data-testid="gaps-batches-essential">Solo lo esencial</PrimaryButton>
-                  <GhostButton large="md" onClick={() => void makeBatches()} disabled={batching} data-testid="gaps-batches-all">Todo lo que falta</GhostButton>
-                </div>
-                {batches.length > 0 && (
-                  <ol className="mt-2 list-decimal space-y-0.5 pl-6 text-[13px] text-dim" data-testid="gaps-batches-list">
-                    {batches.map((h) => (
-                      <li key={h.id} className="break-all">{h.entries.length} temas · <code>{h.taskPath}</code> <button type="button" className="text-accent-text hover:underline" onClick={() => setHandoff(h)}>Abrir</button></li>
-                    ))}
-                  </ol>
-                )}
-              </section>
             )}
 
             {/* Ayudas de selección */}
@@ -243,6 +199,8 @@ export function CurriculumGaps({ areaId, onBack }: { areaId: string; onBack?: ()
                 })}
               </div>
             )}
+              </div>
+            </details>
           </>
         )}
       </div>

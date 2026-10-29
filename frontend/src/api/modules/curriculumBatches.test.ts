@@ -53,17 +53,57 @@ describe("study_curriculum_handoff_batches", () => {
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  it("escribe una tarea por lote, ninguna pasa del máximo y las carpetas de piezas cuelgan de su grupo", async () => {
-    const api = curriculumHandoffApi(app, { now: () => new Date("2026-10-29T10:00:00Z") });
-    const list = await api.study_curriculum_handoff_batches({ areaId: "css", importance: "esencial", confirm: true });
-    expect(list.length).toBeGreaterThan(5);
-    for (const h of list) {
+  const NOW = () => new Date("2026-10-29T10:00:00Z");
+
+  it("escribe una tarea por lote y UN archivo maestro con todas, en orden; las piezas cuelgan de su grupo", async () => {
+    const api = curriculumHandoffApi(app, { now: NOW });
+    const { tasks, master } = await api.study_curriculum_handoff_batches({ areaId: "css", importance: "esencial", confirm: true });
+    expect(tasks.length).toBeGreaterThan(5);
+    for (const h of tasks) {
       expect(h.entries.length).toBeLessThanOrEqual(MAX_ENTRIES_PER_TASK);
       expect(fs.existsSync(path.join(dir, h.taskPath))).toBe(true);
     }
-    const folders = list.flatMap((h) => h.entries.map((e) => e.folder));
+    const folders = tasks.flatMap((h) => h.entries.map((e) => e.folder));
     expect(new Set(folders).size).toBe(folders.length);
     expect(folders.some((f) => /\/5\.19\.\d+\.\d+ flex-wrap$/.test(f))).toBe(true);
+
+    expect(master.count).toBe(tasks.length);
+    expect(master.shortPrompt).toContain(master.taskAbs);
+    const md = fs.readFileSync(master.taskAbs, "utf-8");
+    const listed = [...md.matchAll(/^\d+\. \[\d+ topics?\] `([^`]+)`$/gm)].map((m) => m[1]);
+    expect(listed).toEqual(tasks.map((h) => h.taskAbs));
+  });
+
+  it("pulsar dos veces no duplica nada: la misma cola, los mismos archivos", async () => {
+    const api = curriculumHandoffApi(app, { now: NOW });
+    const a = await api.study_curriculum_handoff_batches({ areaId: "html", importance: "esencial", confirm: true });
+    const files = () => fs.readdirSync(path.join(dir, "Programación", "_handoff", "crear")).sort();
+    const before = files();
+    const b = await api.study_curriculum_handoff_batches({ areaId: "html", importance: "esencial", confirm: true });
+    expect(b.tasks.map((h) => h.id)).toEqual(a.tasks.map((h) => h.id));
+    expect(files()).toEqual(before);
+    // pedir también lo recomendado SOLO añade tareas nuevas por lo que no estaba en la cola
+    const all = await api.study_curriculum_handoff_batches({ areaId: "html", confirm: true });
+    expect(all.tasks.length).toBeGreaterThan(a.tasks.length);
+    expect(all.tasks.slice(0, a.tasks.length).map((h) => h.id)).toEqual(a.tasks.map((h) => h.id));
+  });
+
+  it("empezar de nuevo borra solo las tareas pendientes del área y su maestro", async () => {
+    const api = curriculumHandoffApi(app, { now: NOW });
+    const { tasks, master } = await api.study_curriculum_handoff_batches({ areaId: "html", importance: "esencial", confirm: true });
+    const r = api.study_curriculum_handoff_discard({ areaId: "html" });
+    expect(r.removed).toBe(tasks.length);
+    expect(fs.existsSync(master.taskAbs)).toBe(false);
+    expect(tasks.every((h) => !fs.existsSync(path.join(dir, h.taskPath)))).toBe(true);
+    expect(api.study_curriculum_handoff_list()).toEqual([]);
+  });
+
+  it("validar todo con las notas sin escribir deja cada tarea «con problemas» y dice por qué", async () => {
+    const api = curriculumHandoffApi(app, { now: NOW });
+    const { tasks } = await api.study_curriculum_handoff_batches({ areaId: "html", importance: "esencial", confirm: true });
+    const res = await api.study_curriculum_handoff_validate_all({ areaId: "html" });
+    expect(res.length).toBe(tasks.length);
+    expect(res.every((h) => h.status === "failed" && h.entries.every((e) => e.problems.length > 0))).toBe(true);
   });
 
   it("pide confirmación y avisa cuando no falta nada", async () => {

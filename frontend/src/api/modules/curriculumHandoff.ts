@@ -112,6 +112,14 @@ interface State extends Omit<CurriculumHandoff, "entries" | "ready" | "taskAbs" 
   entries: StateEntry[];
 }
 
+/** El archivo maestro de la cola de un área. */
+export interface CurriculumMaster {
+  taskPath: string;
+  taskAbs: string;
+  shortPrompt: string;
+  count: number;
+}
+
 export interface CurriculumHandoffInput {
   areaId: string;
   entryIds: string[];
@@ -396,23 +404,104 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
     return { problems, warnings };
   };
 
+  /** Las tareas aún sin validar de un área, en el orden en que se crearon (y, dentro, en el natural del archivo). */
+  const pendingStates = (areaId: string): State[] => {
+    const dir = path.join(app.root, ".notevault", "regenerar");
+    let names: string[] = [];
+    try {
+      names = fs.readdirSync(dir).filter((n) => n.endsWith(".json"));
+    } catch {
+      return [];
+    }
+    const out: State[] = [];
+    for (const n of names) {
+      try {
+        const s = load(n.slice(0, -".json".length));
+        if (s.areaId === areaId && s.status !== "validated") out.push(s);
+      } catch {
+        /* de otro tipo o dañado */
+      }
+    }
+    return out.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.taskPath.replace(/\.md$/, "").localeCompare(b.taskPath.replace(/\.md$/, ""), "en", { numeric: true }));
+  };
+
+  /** El archivo maestro de la cola: una sola frase para pegar y las tareas, en orden. */
+  const writeMaster = (area: CurriculumArea, tasks: CurriculumHandoff[]): CurriculumMaster => {
+    const dirAbs = path.join(app.root, area.space, "_handoff", "crear");
+    const masterAbs = path.join(dirAbs, `TODAS_${area.id}.md`);
+    const shortPrompt = `Read \`${masterAbs}\` and execute it: it lists ${tasks.length} task file${tasks.length === 1 ? "" : "s"}; do them one after another, in order, and tell me when you finish each one.`;
+    const lines = [
+      `# NoteVault queue — ${area.title} · ${tasks.length} task${tasks.length === 1 ? "" : "s"} in order`,
+      "",
+      "To run this queue, paste only this:",
+      "",
+      `> ${shortPrompt}`,
+      "",
+      "---",
+      "",
+      "## How to work",
+      "",
+      "1. Do the tasks **in the order below, one after the other**. Open a task file, read it completely, do exactly what it says, run the checks it lists, fix what they report, and only then start the next one.",
+      "2. Each task file is self-contained and overrides anything here. Create only the folders and files it lists; never touch anything else; do not run git commands.",
+      "3. After each task write one line under its `## Done` heading (create the heading if missing) with the date and the number of topics, and tell the person «task N of M done».",
+      "4. If a task cannot be completed (a folder already exists, a check keeps failing after two honest attempts), STOP, say which task and why, and wait.",
+      "",
+      "## The tasks",
+      "",
+      ...tasks.map((h, i) => `${i + 1}. [${h.entries.length} topic${h.entries.length === 1 ? "" : "s"}] \`${h.taskAbs}\``),
+      "",
+    ];
+    fs.mkdirSync(dirAbs, { recursive: true });
+    fs.writeFileSync(masterAbs, lines.join("\n"), "utf-8");
+    return { taskPath: rel(masterAbs), taskAbs: masterAbs, shortPrompt, count: tasks.length };
+  };
+
   const api = {
     /**
-     * TODAS las tareas de un área de una vez: lo que falta (por importancia) repartido en lotes de ≤ `size` temas, una tarea por lote, en el orden del catálogo.
-     * Cada una es una tarea normal (se valida y se añade al plan igual). El agente las ejecuta en orden; la cobertura no cambia hasta que crea las notas.
+     * La COLA de un área: lo que falta (por importancia) repartido en lotes de ≤ `size` temas, una tarea por lote, en el orden del catálogo, MÁS un archivo
+     * maestro (`TODAS_<área>.md`) que lista las tareas en orden: la persona pega UNA sola frase y el agente las hace una detrás de otra. Es idempotente: lo que ya
+     * está en una tarea pendiente no se vuelve a pedir (pulsar dos veces no duplica nada); el maestro se reescribe con las pendientes en orden.
      */
-    async study_curriculum_handoff_batches(input: { areaId: string; importance?: string; size?: number; withExercises?: boolean; confirm?: boolean }): Promise<CurriculumHandoff[]> {
+    async study_curriculum_handoff_batches(input: { areaId: string; importance?: string; size?: number; withExercises?: boolean; refreshOnly?: boolean; confirm?: boolean }): Promise<{ tasks: CurriculumHandoff[]; master: CurriculumMaster }> {
       if (input?.confirm !== true) throw new ApiError("Falta la confirmación: las tareas piden a un agente externo que cree carpetas y notas en la vault.");
       const areaId = String(input.areaId ?? "");
+      const area = areasOf().find((a) => a.id === areaId);
       const imp = ["esencial", "recomendado", "opcional"].includes(String(input.importance)) ? (input.importance as "esencial" | "recomendado" | "opcional") : undefined;
       const size = Math.max(5, Math.min(MAX_ENTRIES_PER_TASK, Math.round(Number(input.size) || RECOMMENDED_BATCH)));
       const rows = curriculumCoverageFor(app).areas.find((a) => a.areaId === areaId)?.rows;
-      if (!rows) throw new ApiError("Esa área no está en el currículo.");
-      const batches = planBatches(rows, size, imp);
-      if (!batches.length) throw new ApiError("No falta nada de eso en esta área.");
+      if (!area || !rows) throw new ApiError("Esa área no está en el currículo.");
+      const queued = new Set(pendingStates(areaId).flatMap((s) => s.entries.map((e) => e.entryId)));
+      const batches = input.refreshOnly ? [] : planBatches(rows.filter((r) => !queued.has(r.entry.id)), size, imp);
+      if (!batches.length && !queued.size) throw new ApiError("No falta nada de eso en esta área.");
+      for (const entryIds of batches) await api.study_curriculum_handoff({ areaId, entryIds, ...(input.withExercises ? { withExercises: true } : {}), confirm: true });
+      const tasks = pendingStates(areaId).map(view);
+      return { tasks, master: writeMaster(area, tasks) };
+    },
+
+    /** Valida UNA TRAS OTRA todas las tareas pendientes del área (lo que el agente ya escribió); las que aún no tienen notas quedan «con problemas» con el motivo. */
+    async study_curriculum_handoff_validate_all(input: { areaId: string }): Promise<CurriculumHandoff[]> {
       const out: CurriculumHandoff[] = [];
-      for (const entryIds of batches) out.push(await api.study_curriculum_handoff({ areaId, entryIds, ...(input.withExercises ? { withExercises: true } : {}), confirm: true }));
+      for (const s of pendingStates(String(input?.areaId ?? ""))) out.push(await api.study_curriculum_handoff_validate(s.id));
       return out;
+    },
+
+    /** Empezar de nuevo: borra las tareas PENDIENTES del área (su archivo y su estado) y el maestro. No toca ninguna carpeta de temas ni lo ya validado. */
+    study_curriculum_handoff_discard(input: { areaId: string }): { removed: number } {
+      const areaId = String(input?.areaId ?? "");
+      const area = areasOf().find((a) => a.id === areaId);
+      let removed = 0;
+      for (const s of pendingStates(areaId)) {
+        for (const f of [abs(s.taskPath), stateFile(s.id)]) {
+          try {
+            fs.rmSync(f, { force: true });
+          } catch {
+            /* ya no estaba */
+          }
+        }
+        removed++;
+      }
+      if (area) fs.rmSync(path.join(app.root, area.space, "_handoff", "crear", `TODAS_${area.id}.md`), { force: true });
+      return { removed };
     },
 
     async study_curriculum_handoff(input: CurriculumHandoffInput): Promise<CurriculumHandoff> {

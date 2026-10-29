@@ -805,7 +805,9 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studyTopicRegenerateValidate: (id: string, restore = false) => call<import("./types").RegenHandoff>("study_topic_regenerate_validate", id, restore),
   /** «Crear con Antigravity»: escribe SOLO la tarea (sin IA) para que un agente externo cree los temas de referencia que faltan. Exige `confirm: true`; máximo 40 temas (lotes de ≤ 25). */
   studyCurriculumHandoff: (input: { areaId: string; entryIds: string[]; withExercises?: boolean; confirm: boolean }) => call<import("./types").CurriculumHandoff>("study_curriculum_handoff", input),
-  studyCurriculumHandoffBatches: (input: { areaId: string; importance?: string; size?: number; withExercises?: boolean; confirm: boolean }) => call<import("./types").CurriculumHandoff[]>("study_curriculum_handoff_batches", input),
+  studyCurriculumHandoffBatches: (input: { areaId: string; importance?: string; size?: number; withExercises?: boolean; refreshOnly?: boolean; confirm: boolean }) => call<import("./types").CurriculumQueue>("study_curriculum_handoff_batches", input),
+  studyCurriculumHandoffValidateAll: (input: { areaId: string }) => call<import("./types").CurriculumHandoff[]>("study_curriculum_handoff_validate_all", input),
+  studyCurriculumHandoffDiscard: (input: { areaId: string }) => call<{ removed: number }>("study_curriculum_handoff_discard", input),
   studyCurriculumHandoffStatus: (id: string) => call<import("./types").CurriculumHandoff>("study_curriculum_handoff_status", id),
   studyCurriculumHandoffValidate: (id: string) => call<import("./types").CurriculumHandoff>("study_curriculum_handoff_validate", id),
   /** Cobertura del currículo de referencia (HTML, CSS, JS reference, Java) frente a los temas existentes. */

@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { api } from "../lib/bridge";
 import type { AreaCoverage } from "../lib/curriculum";
-import type { CurriculumHandoff, MentorAddTopicsResult } from "../lib/types";
+import type { CurriculumHandoff, CurriculumQueue, MentorAddTopicsResult } from "../lib/types";
 
 export type CurriculumHandoffState = CurriculumHandoff;
 export type EntryProgressKey = "folder" | "note" | "manifest" | "exercises" | "map";
@@ -15,7 +15,9 @@ export type EntryProgressKey = "folder" | "note" | "manifest" | "exercises" | "m
 interface CurriculumApi {
   studyCurriculumCoverage?: (o?: { space?: string }) => Promise<{ areas: AreaCoverage[] }>;
   studyCurriculumHandoff?: (o: { areaId: string; entryIds: string[]; withExercises?: boolean; confirm: true }) => Promise<CurriculumHandoffState>;
-  studyCurriculumHandoffBatches?: (o: { areaId: string; importance?: string; size?: number; withExercises?: boolean; confirm: true }) => Promise<CurriculumHandoffState[]>;
+  studyCurriculumHandoffBatches?: (o: { areaId: string; importance?: string; size?: number; withExercises?: boolean; refreshOnly?: boolean; confirm: true }) => Promise<CurriculumQueue>;
+  studyCurriculumHandoffValidateAll?: (o: { areaId: string }) => Promise<CurriculumHandoffState[]>;
+  studyCurriculumHandoffDiscard?: (o: { areaId: string }) => Promise<{ removed: number }>;
   studyCurriculumHandoffStatus?: (id: string) => Promise<CurriculumHandoffState>;
   studyCurriculumHandoffValidate?: (id: string) => Promise<CurriculumHandoffState>;
   studyCurriculumHandoffList?: () => Promise<CurriculumHandoffState[]>;
@@ -42,7 +44,11 @@ interface CurriculumStore {
   refresh: () => Promise<void>;
   create: (o: { areaId: string; entryIds: string[]; withExercises?: boolean }) => Promise<CurriculumHandoffState>;
   /** una tarea por lote con TODO lo que falta (por importancia); el agente las ejecuta en orden */
-  createBatches: (o: { areaId: string; importance?: string; size?: number; withExercises?: boolean }) => Promise<CurriculumHandoffState[]>;
+  createBatches: (o: { areaId: string; importance?: string; size?: number; withExercises?: boolean; refreshOnly?: boolean }) => Promise<CurriculumQueue>;
+  /** valida una tras otra las tareas pendientes del área; las validadas salen de `pending` */
+  validateAll: (areaId: string) => Promise<CurriculumHandoffState[]>;
+  /** borra las tareas pendientes del área (no toca ninguna carpeta de temas) */
+  discard: (areaId: string) => Promise<number>;
   status: (id: string) => Promise<CurriculumHandoffState>;
   validate: (id: string) => Promise<CurriculumHandoffState>;
   /** «Añadir al plan»: lleva al final de la ruta del plan los temas validados (idempotente); no cambia la cobertura */
@@ -87,9 +93,19 @@ export const useCurriculum = create<CurriculumStore>((set, get) => ({
     return h;
   },
   createBatches: async (o) => {
-    const list = await need("studyCurriculumHandoffBatches")({ ...o, confirm: true });
-    set((s) => ({ pending: list.reduce((acc, h) => upsert(acc, h), s.pending) }));
+    const q = await need("studyCurriculumHandoffBatches")({ ...o, confirm: true });
+    set((s) => ({ pending: q.tasks.reduce((acc, h) => upsert(acc, h), s.pending) }));
+    return q;
+  },
+  validateAll: async (areaId) => {
+    const list = await need("studyCurriculumHandoffValidateAll")({ areaId });
+    set((s) => ({ pending: list.reduce((acc, h) => (h.status === "validated" ? acc.filter((x) => x.id !== h.id) : upsert(acc, h)), s.pending) }));
     return list;
+  },
+  discard: async (areaId) => {
+    const r = await need("studyCurriculumHandoffDiscard")({ areaId });
+    set((s) => ({ pending: s.pending.filter((h) => h.areaId !== areaId) }));
+    return r.removed;
   },
   status: async (id) => {
     const h = await need("studyCurriculumHandoffStatus")(id);

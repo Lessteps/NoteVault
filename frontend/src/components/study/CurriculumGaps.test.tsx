@@ -175,15 +175,41 @@ describe("vista «Temas por crear»", () => {
     expect((byId("gaps-create") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("«Volver» y la lista de tareas pendientes se pueden reabrir", async () => {
-    capi.studyCurriculumHandoffList = vi.fn(async () => [state({ areaId: "css", id: "p1" })]);
+  it("«Volver» funciona y las tareas pendientes salen como UNA cola con su cuenta (no como una lista de tareas sueltas)", async () => {
+    capi.studyCurriculumHandoffList = vi.fn(async () => [state({ areaId: "css", id: "p1" }), state({ areaId: "css", id: "p2" })]);
+    capi.studyCurriculumHandoffBatches = vi.fn(async () => ({ tasks: [], master: { taskPath: "x", taskAbs: "/v/TODAS_css.md", shortPrompt: "Read `/v/TODAS_css.md`", count: 2 } }));
     const back = vi.fn();
     await mount("css", back);
-    expect(byId("gaps-pending")!.textContent).toContain("Tareas pendientes (1)");
-    await click(byId("gaps-pending-open"));
-    expect(byId("curriculum-handoff-panel")).toBeTruthy();
+    expect(byId("queue-count")!.textContent).toContain("2 tareas");
+    expect(byId("gaps-pending")).toBeNull();
     await click(byId("gaps-back"));
     expect(back).toHaveBeenCalled();
+  });
+
+  it("sin cola: un botón «Solo lo esencial» deja la cola lista y lo único que hay que hacer es copiar una frase", async () => {
+    const make = vi.fn(async () => ({ tasks: [state({ areaId: "css", id: "q1" }), state({ areaId: "css", id: "q2" })], master: { taskPath: "P/_handoff/crear/TODAS_css.md", taskAbs: "/v/P/_handoff/crear/TODAS_css.md", shortPrompt: "Read `/v/P/_handoff/crear/TODAS_css.md` and execute it", count: 2 } }));
+    capi.studyCurriculumHandoffBatches = make;
+    await mount("css");
+    expect(byId("curriculum-queue")!.getAttribute("data-state")).toBe("empty");
+    await click(byId("queue-essential"));
+    expect(make).toHaveBeenCalledWith(expect.objectContaining({ areaId: "css", importance: "esencial", confirm: true }));
+    expect(byId("curriculum-queue")!.getAttribute("data-state")).toBe("queue");
+    expect(byId("queue-step-copy")).toBeTruthy();
+    // pulsar de nuevo (otra pantalla, otro clic) no crea nada nuevo: la cola es una
+    expect((byId("queue-copy") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("validar todo y «Empezar de nuevo» usan la cola entera", async () => {
+    capi.studyCurriculumHandoffList = vi.fn(async () => [state({ areaId: "css", id: "p1" })]);
+    capi.studyCurriculumHandoffBatches = vi.fn(async () => ({ tasks: [], master: { taskPath: "x", taskAbs: "/v/TODAS_css.md", shortPrompt: "Read", count: 1 } }));
+    const validateAll = vi.fn(async () => [state({ areaId: "css", id: "p1", status: "validated" })]);
+    const discard = vi.fn(async () => ({ removed: 1 }));
+    capi.studyCurriculumHandoffValidateAll = validateAll;
+    capi.studyCurriculumHandoffDiscard = discard;
+    await mount("css");
+    await click(byId("queue-validate"));
+    expect(validateAll).toHaveBeenCalledWith({ areaId: "css" });
+    expect(byId("queue-step-plan")).toBeTruthy();
   });
 
   it("área desconocida: lo dice en vez de romper", async () => {

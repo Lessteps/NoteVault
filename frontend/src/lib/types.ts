@@ -1925,6 +1925,12 @@ export interface CurriculumHandoffEntry {
   warnings: string[];
   progress: CurriculumProgress;
 }
+/** La cola de un área: sus tareas pendientes en orden y el archivo maestro con UNA frase que las encadena. */
+export interface CurriculumQueue {
+  tasks: CurriculumHandoff[];
+  master: { taskPath: string; taskAbs: string; shortPrompt: string; count: number };
+}
+
 export interface CurriculumHandoff {
   id: string;
   kind: "curriculum";

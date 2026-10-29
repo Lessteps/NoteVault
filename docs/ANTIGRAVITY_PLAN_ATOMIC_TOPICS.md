@@ -28,17 +28,17 @@ the `skills:` lines. Do not run git commands except where §6 says. Another AI m
 
 ## 2. Where the tasks come from
 
-The person opens the app → **Notas / Mentor → Áreas → «Ver temas por crear»** (or the plan's **«Verificar metodología»**) and presses
-**«Solo lo esencial»** (then, later, **«Todo lo que falta»**) in each reference area. For each area the app writes **one task file per
-batch** (≈ 25 topics, a group and its pieces together) into:
+The person opens the app → **Áreas → «Ver temas por crear»** (or the plan's **«Verificar metodología»**) and presses **«Solo lo esencial»**
+(later **«Todo lo que falta»**). The app writes the **queue** of that area and gives them ONE sentence to paste:
 
 ```
-C:\PROGRAMMING\Programación\_handoff\crear\<date>_<area>.md        (…_2.md, …_3.md for the following batches)
+C:\PROGRAMMING\Programación\_handoff\crear\TODAS_<area>.md       ← the master: lists every task, in order
+C:\PROGRAMMING\Programación\_handoff\crear\<date>_<area>.md       ← task 1  (…_2.md, …_3.md for the following ones)
 ```
 
-Each file starts with a one-line prompt and is self-contained: goal, rules, the exact folders, frontmatter, manifests, skills text,
-syllabus lines, verification commands and the checklist the app validates afterwards. **If there are no files there, STOP and say so**:
-the person has not pressed the button yet.
+**Start from the master**: read `TODAS_<area>.md`, then do the tasks it lists one after another, in that order. Each task file is
+self-contained (goal, rules, exact folders, frontmatter, manifests, skills text, syllabus lines, verification commands) and overrides
+anything here. **If there is no master file, STOP and say so**: the person has not pressed the button yet.
 
 ### Expected volume (today's vault, essentials only → «Todo lo que falta»)
 

@@ -175,7 +175,8 @@ describe("Antigravity -> validar -> vault -> Mentor", () => {
 
   it("lotes atómicos: la primera tarea de HTML se ejecuta, valida, entra al plan en la asignatura HTML y sube la cobertura", async () => {
     const api = curriculumHandoffApi(app, { now: NOW });
-    const batches = await api.study_curriculum_handoff_batches({ areaId: "html", importance: "esencial", confirm: true });
+    const { tasks: batches, master } = await api.study_curriculum_handoff_batches({ areaId: "html", importance: "esencial", confirm: true });
+    expect(fs.readFileSync(master.taskAbs, "utf-8")).toContain(batches[0]!.taskAbs);
     expect(batches.length).toBeGreaterThan(3);
     const h = batches[0]!;
     // el grupo va primero y sus piezas cuelgan de su número (N.M.K)
@@ -202,7 +203,10 @@ describe("Antigravity -> validar -> vault -> Mentor", () => {
 
     // con las notas creadas esas piezas ya no faltan
     const again = await api.study_curriculum_handoff_batches({ areaId: "html", importance: "esencial", confirm: true });
-    const left = again.flatMap((b) => b.entries.map((e) => e.folder));
+    // la cola ya no trae la tarea validada y el maestro tampoco
+    expect(again.tasks.length).toBe(batches.length - 1);
+    expect(fs.readFileSync(again.master.taskAbs, "utf-8")).not.toContain(h.taskAbs);
+    const left = again.tasks.flatMap((b) => b.entries.map((e) => e.folder));
     expect(left.some((f) => h.entries.some((e) => e.folder === f))).toBe(false);
   });
 

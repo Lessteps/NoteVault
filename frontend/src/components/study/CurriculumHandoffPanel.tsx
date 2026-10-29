@@ -24,7 +24,7 @@ const PIECES: Array<[EntryProgressKey, string]> = [
 ];
 
 /** Tras crear o validar, las áreas y la cobertura se leen de nuevo para que los temas nuevos aparezcan. */
-function refreshEverything(): void {
+export function refreshEverything(): void {
   void useCurriculum.getState().refresh();
   useStudyVersion.getState().bump();
   useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }));
@@ -41,7 +41,7 @@ export function problemsMessage(h: Pick<CurriculumHandoffState, "taskAbs" | "tas
 export const selectablePlans = (rows: readonly MentorPlanRow[]): MentorPlanRow[] => rows.filter((p) => !p.archived && p.status !== "terminado");
 
 /** Tras validar: lleva los temas nuevos al final de la ruta de su área del plan elegido (Frontend o Java) para que el Mentor los ejecute. */
-function AddToPlan({ folders }: { folders: string[] }) {
+export function AddToPlan({ folders }: { folders: string[] }) {
   const toast = useApp((s) => s.toast);
   const addToPlan = useCurriculum((s) => s.addToPlan);
   const [plans, setPlans] = useState<MentorPlanRow[]>([]);

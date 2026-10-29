@@ -123,7 +123,8 @@ export function TopicRow({ r, colour, areaKey, planId }: { r: BoardRow; colour: 
             <span className="sr-only">, {locked ? `bloqueado hasta terminar el ${dateLabel(r.unlockOn!)}` : r.done ? "completado" : STATE_LABEL[r.state]}</span>
           </>
         );
-        const cls = cn("min-w-0 flex-1 text-[15px] leading-snug", r.done && "text-faint line-through decoration-faint/60");
+        // basis fija: en una ventana estrecha la fila pasa los chips a la línea de abajo en vez de dejar el título en una palabra por línea
+        const cls = cn("min-w-0 flex-1 basis-[13rem] break-words text-[15px] leading-snug", r.done && "text-faint line-through decoration-faint/60");
         // pulsar el tema abre sus opciones: apunte (.md), archivo de práctica, canvas, Pomodoro y planeación
         return locked ? <span className={cls}>{label}</span> : <span className={cls}><TopicMenu folder={r.folder} title={r.title} trigger={label} {...(r.work ? { work: r.work } : {})} {...(areaKey ? { areaKey } : {})} planId={planId} className="w-full rounded-md hover:text-accent-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" /></span>;
       })()}

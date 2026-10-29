@@ -18,13 +18,20 @@ app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 // Configure GPU and rendering switches before app ready to maximize performance and respect settings
 try {
+  if (process.platform === "linux" && !app.commandLine.hasSwitch("ozone-platform")) {
+    app.commandLine.appendSwitch("ozone-platform", "x11");
+  }
   const rendering = AppConfig.get_rendering();
   if (rendering.mode === "software") {
     app.disableHardwareAcceleration();
   } else {
     app.commandLine.appendSwitch("ignore-gpu-blocklist");
     app.commandLine.appendSwitch("enable-gpu-rasterization");
-    app.commandLine.appendSwitch("enable-zero-copy");
+    if (process.platform !== "linux") {
+      app.commandLine.appendSwitch("enable-zero-copy");
+    } else {
+      app.commandLine.appendSwitch("disable-features", "UseChromeOSDirectVideoDecoder");
+    }
     if (rendering.angle !== "default") {
       app.commandLine.appendSwitch("use-angle", rendering.angle);
     }
@@ -79,6 +86,7 @@ function createWindow() {
       preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
   });
   win.on("maximize", () => win?.webContents.send("nv-window-state", { maximized: true }));
@@ -86,6 +94,9 @@ function createWindow() {
   const state = getAppState();
   if (state) state.window = win;
   browserManager.setWindow(win);
+  win.webContents.on("did-attach-webview", (_event, guestContents) => {
+    browserManager.attachGuest(guestContents);
+  });
   watchWindowHealth(win);
   installZoom(win);
   restartFileWatcher();

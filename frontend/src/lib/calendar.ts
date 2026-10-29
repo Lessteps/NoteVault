@@ -23,6 +23,7 @@ export const KIND_FILTERS: Array<[string, string, string]> = [
   ["routine", "Rutinas", "#2dd4bf"], ["event", "Eventos", "#ff9632"], ["habit", "Hábitos", "#7c5af0"],
   ["exercise", "Ejercicio", "#ff9632"], ["task", "Tareas", "#2383e2"], ["project", "Proyectos", "#a78bfa"],
   ["issue", "Issues de proyectos", "#a78bfa"], ["goal_item", "Metas", "#33b679"], ["saving", "Ahorros", "#eab308"],
+  ["mentor_study", "Estudio (Mentor)", "#38bdf8"],
 ];
 
 export function toMin(hm: string | null | undefined): number | null {

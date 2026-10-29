@@ -337,6 +337,11 @@ export function buildCurriculumTask(input: CurriculumTaskInput): CurriculumTask 
       "",
       fenced(noteFrontmatter(p, area, areaFolder), "yaml"),
       "",
+      ...(p.entry.parentId
+        ? [
+            `- ATOMIC TOPIC: this note is about ONE single piece — \`${p.entry.title}\` — which belongs to the group «${p.entry.category}». Do not tour the whole group: go deep on this one piece (what it does, every value or form it accepts, default, interaction with its neighbours, one common mistake, one realistic use) and link to the group topic with \`[[…]]\` for the rest. Learning is linear: the group overview comes first, each piece after it, in number order.`,
+          ]
+        : []),
       `- Items of the group (**every one must appear in the note**, as a numbered REFERENCE entry and in the cards where it is key): ${p.entry.items.length ? p.entry.items.map((x) => `\`${x}\``).join(", ") : "(none listed: cover the topic title)"}.`,
       ...(p.entry.keywords.length ? [`- Keywords: ${p.entry.keywords.join(", ")}.`] : []),
       `- Write the practice manifest: \`${p.name}.practica.md\` inside the folder, with EXACTLY this content (the skills are already chosen):`,

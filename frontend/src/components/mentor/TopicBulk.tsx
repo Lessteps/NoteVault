@@ -156,10 +156,10 @@ export function BulkToolbar({ count, busy, onAsk, onGenerateMissing, onHelper, g
               onClick={() => setMoveMenu((m) => !m)}
               disabled={off}
               aria-expanded={moveMenu}
-              title={why || "Mueve los temas seleccionados a otra sub-asignatura o grupo"}
+              title={why || "Mueve los temas seleccionados a otra asignatura"}
               data-testid="bulk-move-group-btn"
             >
-              <FolderInput size={14} aria-hidden /> Mover a sub-asignatura <ChevronDown size={14} aria-hidden />
+              <FolderInput size={14} aria-hidden /> Mover a asignatura <ChevronDown size={14} aria-hidden />
             </GhostButton>
             {moveMenu && (
               <ul role="menu" className="absolute left-0 z-20 mt-1 min-w-56 rounded-lg border border-line bg-card p-1 shadow-lg" data-testid="bulk-move-group-list">
@@ -186,13 +186,13 @@ export function BulkToolbar({ count, busy, onAsk, onGenerateMissing, onHelper, g
                     className="flex w-full items-center gap-1.5 rounded-md px-3 py-1.5 text-left text-[13.5px] font-medium text-accent hover:bg-hover"
                     onClick={() => {
                       setMoveMenu(false);
-                      const name = window.prompt("Nombre de la nueva sub-asignatura o grupo (ej: HTML, CSS, Atomic Design):");
+                      const name = window.prompt("Nombre de la nueva asignatura (ej: Python, FastAPI):");
                       if (name && name.trim()) {
                         onMoveGroup("__new", name.trim());
                       }
                     }}
                   >
-                    <Plus size={13} aria-hidden /> + Crear nueva sub-asignatura...
+                    <Plus size={13} aria-hidden /> + Crear nueva asignatura...
                   </button>
                 </li>
               </ul>

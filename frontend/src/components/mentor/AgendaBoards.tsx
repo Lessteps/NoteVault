@@ -230,6 +230,42 @@ function TopicRow({ m, r, seq, showArea }: { m: AgendaModel; r: WeekRow; seq: nu
   );
 }
 
+/** Las filas partidas por ASIGNATURA (HTML, CSS, JavaScript…) en el orden en que aparecen; una sola asignatura = un solo bloque sin título. */
+export function bySubject<T extends { t: { group?: string; groupTitle?: string } }>(rows: readonly T[]): Array<{ key: string; title: string; rows: T[] }> {
+  const out: Array<{ key: string; title: string; rows: T[] }> = [];
+  for (const r of rows) {
+    const key = r.t.group || "";
+    let g = out.find((x) => x.key === key);
+    if (!g) out.push((g = { key, title: r.t.groupTitle || "Conocimientos", rows: [] }));
+    g.rows.push(r);
+  }
+  return out;
+}
+
+/** Los temas de un área (o de un día) separados por asignatura, cada una con su título y su cuenta. */
+function SubjectLists({ m, rows, areaLabel, showArea, testid }: { m: AgendaModel; rows: WeekRow[]; areaLabel: string; showArea: boolean; testid: string }) {
+  const groups = bySubject(rows);
+  if (groups.length < 2) return <ol className="divide-y divide-line px-4" aria-label={areaLabel}>{rows.map((r, i) => <TopicRow key={`${r.t.folder}:${i}`} m={m} r={r} seq={i + 1} showArea={showArea} />)}</ol>;
+  return (
+    <div className="space-y-2 pb-2" data-testid={testid}>
+      {groups.map((g, gi) => {
+        // la numeración sigue a lo largo de todas las asignaturas (1…n del área), no se reinicia en cada una
+        const before = groups.slice(0, gi).reduce((n, x) => n + x.rows.length, 0);
+        return (
+        <section key={g.key || "core"} aria-label={`${g.title}: ${areaLabel}`} data-testid="week-subject" data-subject={g.key || "core"}>
+          <h5 className="flex items-center gap-2 bg-hover/60 px-4 py-1.5 text-[13px] font-semibold uppercase tracking-wide text-dim">
+            {g.title} <span className="font-normal normal-case tracking-normal text-faint">· {plural(g.rows.length, "tema", "temas")}</span>
+          </h5>
+          <ol className="divide-y divide-line px-4" aria-label={`${g.title}: ${areaLabel}`}>
+            {g.rows.map((r, i) => <TopicRow key={`${r.t.folder}:${i}`} m={m} r={r} seq={before + i + 1} showArea={showArea} />)}
+          </ol>
+        </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function CategoryCard({ m, s, total, lost }: { m: AgendaModel; s: WeekSection; total?: { topics: number; minutes: number; done: number }; lost?: ReadonlyArray<unknown> }) {
   const uid = useId();
   const cell = s.cell!;
@@ -248,9 +284,7 @@ function CategoryCard({ m, s, total, lost }: { m: AgendaModel; s: WeekSection; t
           <span className="whitespace-nowrap text-[13px] text-dim" data-testid="week-area-progress">{done}/{s.rows.length} hechos</span>
         </div>
       </div>
-      <ol className="divide-y divide-line px-4" aria-label={`Temas de ${cell.area} esta semana, en el orden de la ruta`}>
-        {s.rows.map((r, i) => <TopicRow key={r.t.folder} m={m} r={r} seq={i + 1} showArea={false} />)}
-      </ol>
+      <SubjectLists m={m} rows={s.rows} areaLabel={`Temas de ${cell.area} esta semana, en el orden de la ruta`} showArea={false} testid="week-subjects" />
       {total && <p className="border-t border-line px-4 py-2 text-[13px] text-dim" data-testid="week-area-total">En todo el plan: {plural(total.topics, "tema", "temas")} ({total.done} hechos){lost && lost.length > 0 ? ` · ${plural(lost.length, "tema sin día", "temas sin día")} en el reparto` : ""}</p>}
     </li>
   );
@@ -329,9 +363,17 @@ export function WeekCategories({ m, week, headingId, only = null }: { m: AgendaM
                   <h4 className="text-[16px] font-bold capitalize">{DAY_LONG[d.dow - 1]} {dayNum(d.date)} <span className="font-medium normal-case text-dim">· {plural(rows.length, "tema", "temas")}</span></h4>
                   {today && <Chip large colour="var(--nv-accent)">Hoy</Chip>}
                 </div>
-                <ol className="divide-y divide-line px-4" aria-label={`Temas del ${DAY_LONG[d.dow - 1]} ${dayNum(d.date)}`}>
-                  {rows.map((r, i) => <TopicRow key={`${r.t.folder}:${d.date}`} m={m} r={r} seq={i + 1} showArea={only === null} />)}
-                </ol>
+                {/* por área y, dentro de cada una, por asignatura (HTML, CSS, JavaScript…): el jueves se ve separado igual que la semana */}
+                {sections.map((s) => {
+                  const mine = s.rows.filter((r) => r.t.dates.includes(d.date));
+                  if (!mine.length) return null;
+                  return (
+                    <div key={s.key} className="border-t border-line first:border-t-0" data-testid="week-day-area" data-area={s.areaId ?? s.key}>
+                      {sections.length > 1 && <p className="flex items-center gap-2 px-4 pt-2 text-[14px] font-semibold">{s.cell && <AreaDot {...(s.areaId ? { areaId: s.areaId } : {})} />}{s.name} <span className="font-normal text-dim">· {plural(mine.length, "tema", "temas")}</span></p>}
+                      <SubjectLists m={m} rows={mine} areaLabel={`Temas de ${s.name} del ${DAY_LONG[d.dow - 1]} ${dayNum(d.date)}`} showArea={false} testid="week-day-subjects" />
+                    </div>
+                  );
+                })}
               </li>
             );
           })}

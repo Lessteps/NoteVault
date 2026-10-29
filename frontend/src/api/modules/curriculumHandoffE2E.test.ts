@@ -127,7 +127,7 @@ afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 describe("Antigravity -> validar -> vault -> Mentor", () => {
   it("la tarea se puede ejecutar tal cual, valida, los temas aparecen y se añaden al final de Frontend", async () => {
     const html = curriculumAreas().find((a) => a.id === "html")!;
-    const ids = html.entries.slice(0, 2).map((e) => e.id);
+    const ids = html.entries.filter((e) => !e.parentId).slice(0, 2).map((e) => e.id);
     const api = curriculumHandoffApi(app, { now: NOW });
     const h = await api.study_curriculum_handoff({ areaId: "html", entryIds: ids, confirm: true });
     expect(h.entries.map((e) => e.folder)).toEqual([
@@ -138,7 +138,7 @@ describe("Antigravity -> validar -> vault -> Mentor", () => {
     expect(fs.existsSync(abs("Programación/5 Frontend/HTML"))).toBe(false);
 
     const task = simulateAgent(h);
-    expect(task.topics.map((t) => t.items.length)).toEqual(html.entries.slice(0, 2).map((e) => e.items.length));
+    expect(task.topics.map((t) => t.items.length)).toEqual(html.entries.filter((e) => !e.parentId).slice(0, 2).map((e) => e.items.length));
     expect(task.heading).toBe("## 5 Frontend/HTML");
 
     vaultScan(app);

@@ -1,6 +1,6 @@
 // Mentor — de los enlaces de `mentorNav` a los ítems de la barra lateral (con sus iconos).
 
-import { BookOpenCheck, ClipboardList, Dumbbell, FolderKanban, Layers, LayoutList, MessageSquareText, NotebookText, PackageCheck, Sun, Wrench } from "lucide-react";
+import { BookOpenCheck, ClipboardList, Dumbbell, FolderKanban, Layers, LayoutList, MessageSquareText, NotebookText, PackageCheck, Plus, Sun, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import type { MentorPlan } from "../../lib/types";
 import type { SidebarItem } from "../ModuleSidebar";
@@ -18,6 +18,7 @@ const PLAN_ICON: Record<string, ReactNode> = {
   cambios: <MessageSquareText />,
   general: <LayoutList />,
   bases: <Layers />,
+  "add-area": <Plus />,
 };
 
 const toItem = (l: NavLink, icon: ReactNode): SidebarItem => ({

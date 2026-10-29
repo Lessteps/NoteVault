@@ -1491,6 +1491,9 @@ export interface MentorPlannedTopic {
   topicProject?: import("./planTopicProject").TopicProject;
   /** llegó al plan con «Añadir al plan» (temas de referencia creados con el agente externo) */
   addedFrom?: "curriculum";
+  /** identificador estable del tema (resiste cambios en la estructura de carpetas de la vault) */
+  topicId?: string;
+  tags?: string[];
 }
 export interface MentorWeekSlice { week: number; start: string; end: string; topics: string[]; minutes: number; capacityMinutes: number }
 export interface MentorRequiredGoal { goalId: string; itemId?: string; note: string }

@@ -17,6 +17,7 @@ import { useNavState, usePersistedNav } from "../../store/navState";
 import { Chip, GhostButton } from "../common/forms";
 import { cn } from "../ui";
 import { AgendaCalendar } from "./AgendaCalendar";
+import { AreaTimeInline, AreaTimesPanel } from "./AreaTimeEditor";
 import { PracticeCurriculumBar, MonthProjects, WeekProjects } from "./AgendaDayFocus";
 import { DayDetail, MonthDetail, WeekDetail } from "./AgendaViews";
 import { AreaDot, DeliverablesPendingNote } from "./AreaViews";
@@ -33,6 +34,9 @@ import { Tabs, TabPanel, type TabDef } from "./planKit";
 import { openPractice } from "./PracticeCard";
 import { ProgressBar } from "./parts";
 import { agendaDateKey, agendaViewKey, pageTabKey, STATUS_COLOUR, STATUS_LABEL, type Loaded } from "./planShared";
+import { MethodologyWarningBanner } from "./MethodologyWarningBanner";
+import { VaultSyncBanner } from "./VaultSyncBanner";
+import { api } from "../../lib/bridge";
 
 const PREFIX = "page-tabs";
 const SECTION = "text-[13px] font-semibold uppercase tracking-wider text-faint";
@@ -217,15 +221,106 @@ export function PlanScopePage(props: PlanScopePageProps) {
   const dayExtra = (date: string): ReactNode => <AddTopicSlot plan={plan} scope={scope} date={date} onChanged={onChanged} announce={announce} />;
   const status = data.today < plan.start ? "El plan aún no ha empezado: este es su calendario desde la fecha de inicio." : data.today > plan.end ? "El plan ya terminó: puedes repasar cualquier día." : "";
 
+  const activeSubplan = scope.kind === "area" ? plan.subplans.find((s) => s.id === scope.subplanId) : null;
+  const areaPhase = activeSubplan?.phase ?? { fromWeek: 1, toWeek: weeks };
+
+  const handleAreaWeeksChange = async (fromWeek: number, toWeek: number) => {
+    if (!activeSubplan) return;
+    try {
+      const res = await api.mentorPlanAreaUpdate({
+        planId: plan.id,
+        subplanId: activeSubplan.id,
+        fromWeek,
+        toWeek,
+      });
+      onChanged(res.plan);
+      announce(`Semanas de ${info.title} actualizadas a Semanas ${fromWeek}–${toWeek}`);
+    } catch (err: any) {
+      announce(err?.message || "No se pudieron actualizar las semanas");
+    }
+  };
+
+  const handleAreaStateChange = async (st: "en_curso" | "pendiente" | "completada") => {
+    if (!activeSubplan) return;
+    try {
+      const res = await api.mentorPlanAreaUpdate({
+        planId: plan.id,
+        subplanId: activeSubplan.id,
+        state: st,
+      });
+      onChanged(res.plan);
+      announce(`Estado de ${info.title} cambiado a ${st}`);
+    } catch (err: any) {
+      announce(err?.message || "No se pudo cambiar el estado del área");
+    }
+  };
+
   return (
     <div className="space-y-5 pt-4" data-testid="plan-agenda" data-scope={key}>
+      <VaultSyncBanner planId={plan.id} />
+      <MethodologyWarningBanner
+        plan={plan}
+        subplan={activeSubplan}
+        onChanged={onChanged}
+        announce={announce}
+      />
       <header data-testid="plan-head" className="space-y-3">
         <h1 id="plan-title" tabIndex={-1} className="font-serif text-[34px] font-bold leading-tight tracking-tight outline-none @3xl:text-[44px]" data-testid="plan-page-title">{info.title}</h1>
         <dl className="divide-y divide-line py-1" aria-label="Propiedades" data-testid="plan-props">
-          <Prop label="Estado" testid="prop-state">{stateChip}{plan.auto && scope.kind === "all" && <Chip large colour="var(--nv-warn)">Plan automático</Chip>}</Prop>
+          <Prop label="Estado" testid="prop-state">
+            {stateChip}
+            {scope.kind === "area" && (
+              <select
+                aria-label={`Cambiar estado de ${info.title}`}
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    void handleAreaStateChange(e.target.value as any);
+                    e.target.value = "";
+                  }
+                }}
+                className="ml-2 rounded-md border border-line bg-surface px-2 py-0.5 text-xs text-dim focus:outline-none"
+                data-testid="select-area-state"
+              >
+                <option value="" disabled>Modificar estado…</option>
+                <option value="en_curso">En curso</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="completada">Completada</option>
+              </select>
+            )}
+            {plan.auto && scope.kind === "all" && <Chip large colour="var(--nv-warn)">Plan automático</Chip>}
+          </Prop>
           <Prop label="Fechas" testid="prop-dates">
             <span>{rangeLabel(dates.start, dates.end)}</span>
             <Chip large>{weeksLabel(weeks)}</Chip>
+            {scope.kind === "area" && (
+              <div className="ml-2 flex items-center gap-1.5 text-xs text-dim" data-testid="area-calendar-weeks">
+                <span>Calendario: Sem.</span>
+                <select
+                  aria-label="Semana inicio"
+                  value={areaPhase.fromWeek}
+                  onChange={(e) => void handleAreaWeeksChange(Number(e.target.value), Math.max(Number(e.target.value), areaPhase.toWeek))}
+                  className="rounded border border-line bg-surface px-1.5 py-0.5 text-xs"
+                  data-testid="select-area-from-week"
+                >
+                  {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
+                <span>a</span>
+                <select
+                  aria-label="Semana fin"
+                  value={areaPhase.toWeek}
+                  onChange={(e) => void handleAreaWeeksChange(Math.min(Number(e.target.value), areaPhase.fromWeek), Number(e.target.value))}
+                  className="rounded border border-line bg-surface px-1.5 py-0.5 text-xs"
+                  data-testid="select-area-to-week"
+                >
+                  {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </Prop>
           {routeEnd && routeEnd !== plan.end && (
             <Prop label="Tu ruta" testid="prop-route-end">
@@ -332,7 +427,14 @@ export function PlanScopePage(props: PlanScopePageProps) {
       </TabPanel>
 
       <TabPanel prefix={PREFIX} id="calendario" active={tab === "calendario"} className="pt-0">
-        <>{tab === "calendario" && <AgendaCalendar m={m} anchor={anchor} onSelect={setAnchor} onChanged={onChanged} hideFilter />}</>
+        <>
+          {tab === "calendario" && (
+            <>
+              {scope.kind === "all" ? <AreaTimesPanel plan={plan} /> : scope.kind === "area" ? <AreaTimeInline plan={plan} subplanId={scope.subplanId} /> : null}
+              <AgendaCalendar m={m} anchor={anchor} onSelect={setAnchor} onChanged={onChanged} hideFilter />
+            </>
+          )}
+        </>
       </TabPanel>
 
       {scope.kind !== "all" && (

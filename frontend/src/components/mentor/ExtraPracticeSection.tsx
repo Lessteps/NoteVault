@@ -83,11 +83,11 @@ export function ExtraPracticeSection({ plan, date, subplanId, all, topics, stand
         <AddExtraPractice
           planId={plan.id}
           date={date}
-          {...(subplanId ? { area: subplanId } : {})}
+          {...(subplanId ? { area: subplanId, lockSession: true } : {})}
           {...(topics ? { topics } : {})}
           minDate={plan.start}
           maxDate={plan.end}
-          label="Más práctica"
+          label="+ Añadir más práctica al aprendizaje diario"
           onChanged={(p) => {
             onChanged?.(p);
             bumpPlanVersion();

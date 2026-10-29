@@ -12,6 +12,7 @@ import { HabitManager } from "../core/habitManager.js";
 import { LibraryStore } from "../core/libraryStore.js";
 import { NutritionManager } from "../core/nutritionManager.js";
 import { ProjectCalendarSource, ProjectManager } from "../core/projectManager.js";
+import { MentorCalendarSource } from "../core/mentor/mentorCalendarSource.js";
 import { ScheduleManager } from "../core/scheduleManager.js";
 import { TaskManager } from "../core/taskManager.js";
 
@@ -51,6 +52,7 @@ export class Managers {
     this.schedule.registerSource("metas", new GoalCalendarSource(this.goals));
     this.schedule.registerSource("proyectos", new ProjectCalendarSource(this.projects));
     this.schedule.registerSource("finanzas", new FinanceCalendarSource(this.finances));
+    this.schedule.registerSource("mentor", new MentorCalendarSource(root));
   }
 
   /** Forget in-memory caches that are not checked against the disk. In the

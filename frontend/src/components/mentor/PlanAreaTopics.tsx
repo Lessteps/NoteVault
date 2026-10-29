@@ -24,7 +24,7 @@ import { buildSchedule, progressPlan, type PlanSchedule } from "../../lib/planSc
 import { timeTagOf, topicTimes } from "../../lib/planTopicTime";
 import { todayIso } from "../../lib/tasks";
 import type { MentorPlan } from "../../lib/types";
-import { Chip } from "../common/forms";
+import { Chip, Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { TimeChip, TopicMenu } from "./PlanBoard";
 import { LoadState, ProgressBar } from "./parts";
@@ -37,6 +37,7 @@ import { areaScope, GenerateButton, GenerateTopicButton, topicScope } from "./To
 import { TopicInsight } from "./TopicInsight";
 import { RegeneratePanel } from "./TopicRegenerate";
 import { AddToPlanDialog } from "./AddToPlanDialog";
+import { MethodologyCheckButton } from "./MethodologyCheck";
 import { PlanReviewScreen } from "./PlanReviewScreen";
 import type { PlanReview } from "../../lib/types";
 
@@ -147,6 +148,46 @@ function Mark({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   );
 }
 
+const TITLE_W_KEY = "nv.areaTable.titleW";
+const TITLE_W_MIN = 220;
+const TITLE_W_MAX = 900;
+const clampTitleW = (n: number): number => Math.min(TITLE_W_MAX, Math.max(TITLE_W_MIN, Math.round(n)));
+
+/** Ancho de la columna «Tema» (arrastrable, se recuerda en el navegador): el nombre del tema siempre se lee entero. */
+function useTitleWidth(): [number, (n: number) => void, (e: React.PointerEvent<HTMLElement>) => void] {
+  const [w, setW] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem(TITLE_W_KEY));
+      return v ? clampTitleW(v) : 384;
+    } catch {
+      return 384;
+    }
+  });
+  const set = (n: number): void => {
+    const v = clampTitleW(n);
+    setW(v);
+    try {
+      localStorage.setItem(TITLE_W_KEY, String(v));
+    } catch {
+      /* sin almacenamiento: solo no se recuerda */
+    }
+  };
+  const start = (e: React.PointerEvent<HTMLElement>): void => {
+    e.preventDefault();
+    const x0 = e.clientX;
+    const w0 = w;
+    const move = (ev: PointerEvent): void => setW(clampTitleW(w0 + ev.clientX - x0));
+    const up = (ev: PointerEvent): void => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      set(w0 + ev.clientX - x0);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  return [w, set, start];
+}
+
 export function PlanAreaTopics({ plan, schedule, today, started, progress, only }: { plan: MentorPlan; /** fija la página en UN área (su subplan o «__bases»): sin barra de áreas, la de la página del área */ only?: string; /** avance (0–100) de cada tema, de la práctica: el mismo que enseña el resumen del área */ progress?: ReadonlyMap<string, number>; /** el reparto del plan (si no se da, se calcula) */ schedule?: PlanSchedule; today?: string; /** ¿ha empezado la ruta? (si no se da, cuando hay algún tema completado) */ started?: boolean }) {
   const uid = useId();
   const day = today ?? todayIso();
@@ -158,6 +199,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
   const [groupId, setGroupId] = useState("");
   // temas desplegados (su panel de «Regenerar»); se recuerdan al cambiar de área
   const [openRows, setOpenRows] = useState<ReadonlySet<string>>(new Set());
+  const [titleW, setTitleWidth, startTitleResize] = useTitleWidth();
   const toggleRow = (folder: string): void => setOpenRows((s) => { const n = new Set(s); if (!n.delete(folder)) n.add(folder); return n; });
   // selección para el lote, filtro por estado, modo puente de la IA y la cola
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -171,6 +213,9 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
   const [reviews, setReviews] = useState<PlanReview[]>([]);
   const [selectedReview, setSelectedReview] = useState<PlanReview | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addTopicsOpen, setAddTopicsOpen] = useState(false);
+  const [newTopicsText, setNewTopicsText] = useState("");
+  const [addingTopics, setAddingTopics] = useState(false);
 
   useEffect(() => {
     if (plan.id) {
@@ -259,17 +304,40 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
     else setGenChain(todo);
   };
 
+  // «Agregar nuevos temas» + «Verificar metodología» del alcance donde estás (la asignatura, o el área si no hay asignaturas); arriba y abajo de la tabla
+  const realGroup = Boolean(group && group.id && group.id !== "bases" && group.id !== "core" && group.id !== "__otros");
+  const scopeTopics = useMemo(() => shown.map((r) => ({ folder: r.folder, title: r.title, group: r.group })), [shown]);
+  const addTopicsBar = (testid: string) => (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setAddTopicsOpen(true)}
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-dashed border-accent/60 bg-accent-soft/20 px-3.5 py-1.5 text-[13.5px] font-medium text-accent-text transition-colors hover:border-accent hover:bg-accent-soft"
+        data-testid={testid}
+      >
+        <Plus size={15} aria-hidden /> Agregar nuevos temas...
+      </button>
+      {active && (
+        <MethodologyCheckButton
+          scope={realGroup && group ? { kind: "group", label: group.title, areaName: active.area, groupId: group.id, groupTitle: group.title } : { kind: "area", label: active.area, areaName: active.area }}
+          topics={scopeTopics}
+          testid={`${testid}-methodology`}
+        />
+      )}
+    </div>
+  );
+
   const handleCreateGroup = async (): Promise<void> => {
     if (!sub) return;
-    const title = window.prompt("Nombre de la nueva sub-asignatura o grupo (ej: HTML, CSS, Atomic Design):");
+    const title = window.prompt("Nombre de la nueva asignatura (ej: Python, Conocimientos de backend, HTML):");
     if (!title || !title.trim()) return;
     try {
       await api.mentorPlanGroupCreate({ planId: plan.id, subplanId: sub.id, title: title.trim() });
-      useApp.getState().toast("info", `Sub-asignatura «${title.trim()}» creada`);
+      useApp.getState().toast("info", `Asignatura «${title.trim()}» creada`);
       useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
       reload();
     } catch (err: any) {
-      useApp.getState().toast("error", err?.message || "No se pudo crear la sub-asignatura");
+      useApp.getState().toast("error", err?.message || "No se pudo crear la asignatura");
     }
   };
 
@@ -279,7 +347,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
     if (!title || !title.trim() || title.trim() === group.title) return;
     try {
       await api.mentorPlanGroupRename({ planId: plan.id, subplanId: sub.id, groupId: group.id, title: title.trim() });
-      useApp.getState().toast("info", `Sub-asignatura renombrada a «${title.trim()}»`);
+      useApp.getState().toast("info", `Asignatura renombrada a «${title.trim()}»`);
       useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
       reload();
     } catch (err: any) {
@@ -289,15 +357,71 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
 
   const handleDeleteGroup = async (): Promise<void> => {
     if (!sub || !group || !group.id || group.id === "bases" || group.id === "core" || group.id === "__otros") return;
-    if (!window.confirm(`¿Eliminar la sub-asignatura «${group.title}»? Los temas que contenga se moverán a Conocimientos.`)) return;
+    if (!window.confirm(`¿Eliminar la asignatura «${group.title}»? Los temas que contenga se moverán a Conocimientos.`)) return;
     try {
       await api.mentorPlanGroupDelete({ planId: plan.id, subplanId: sub.id, groupId: group.id });
       setGroupId("");
-      useApp.getState().toast("info", `Sub-asignatura eliminada`);
+      useApp.getState().toast("info", `Asignatura eliminada`);
       useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
       reload();
     } catch (err: any) {
       useApp.getState().toast("error", err?.message || "No se pudo eliminar");
+    }
+  };
+
+  const handleUpdateTopicWeek = async (folder: string, week: number): Promise<void> => {
+    try {
+      await api.mentorPlanTopicUpdate({ planId: plan.id, subplanId: sub?.id, folder, targetWeek: week });
+      useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+      reload();
+    } catch (err: any) {
+      useApp.getState().toast("error", err?.message || "No se pudo actualizar la semana del tema");
+    }
+  };
+
+  const handleUpdateTopicRoute = async (folder: string, route: "core" | "optional" | "skipped" | "completed"): Promise<void> => {
+    try {
+      if (route === "completed") {
+        await api.mentorPlanTopicUpdate({ planId: plan.id, subplanId: sub?.id, folder, completed: true, route: "core" });
+      } else {
+        await api.mentorPlanTopicUpdate({ planId: plan.id, subplanId: sub?.id, folder, completed: false, route });
+      }
+      useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+      reload();
+    } catch (err: any) {
+      useApp.getState().toast("error", err?.message || "No se pudo actualizar el estado del tema");
+    }
+  };
+
+  const handleAddTopicsToSubject = async (): Promise<void> => {
+    if (!sub || !newTopicsText.trim()) return;
+    const lines = newTopicsText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!lines.length) return;
+    setAddingTopics(true);
+    try {
+      const topics = lines.map((title) => ({
+        title,
+        folder: `${sub.area}/${group?.id || "core"}/${title}`,
+        estMinutes: 45,
+      }));
+      const res = await api.mentorPlanSubjectAddTopics({
+        planId: plan.id,
+        subplanId: sub.id,
+        groupId: group?.id || "core",
+        topics,
+      });
+      useApp.getState().toast("info", `Se agregaron ${res.added} temas a «${group?.title || "la asignatura"}»`);
+      setNewTopicsText("");
+      setAddTopicsOpen(false);
+      useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+      reload();
+    } catch (err: any) {
+      useApp.getState().toast("error", err?.message || "No se pudieron agregar los temas");
+    } finally {
+      setAddingTopics(false);
     }
   };
 
@@ -349,17 +473,11 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
 
       {catalog && active && group && (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {!only && <TabBar label="Áreas del plan" tabs={areaTabsView(tabs)} active={active.key} onSelect={pickArea} level={1} testid="area-tabs" />}
-            <button
-              type="button"
-              onClick={() => setAddDialogOpen(true)}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[13px] font-medium text-dim hover:bg-hover hover:text-text"
-              data-testid="add-area-or-subject-btn"
-            >
-              <Plus size={14} aria-hidden /> Añadir área o asignatura
-            </button>
-          </div>
+          {!only && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <TabBar label="Áreas del plan" tabs={areaTabsView(tabs)} active={active.key} onSelect={pickArea} level={1} testid="area-tabs" />
+            </div>
+          )}
 
           {reviews.find((r) => sub && r.subplanId === sub.id && (!r.groupId || r.groupId === group.id)) && (
             <div className="flex items-center justify-between rounded-xl border border-accent/40 bg-accent-soft p-3 text-[13.5px] text-accent-text" data-testid="review-notice-bar">
@@ -402,17 +520,17 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
           {sub && (
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2" data-testid="groups-bar">
               <div className="flex flex-wrap items-center gap-2">
-                {groups.length > 1 && (
-                  <TabBar label={`Grupos de ${active.area}`} tabs={groupTabsView(groups, reviews)} active={group.id} onSelect={pickGroup} level={2} testid="group-tabs" />
+                {groups.length > 0 && (
+                  <TabBar label={`Asignaturas de ${active.area}`} tabs={groupTabsView(groups, reviews)} active={group.id} onSelect={pickGroup} level={2} testid="group-tabs" />
                 )}
                 <button
                   type="button"
                   onClick={handleCreateGroup}
                   className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-dashed border-line px-2.5 text-[13px] text-dim hover:border-accent hover:bg-hover hover:text-text"
-                  title="Crear una nueva sub-asignatura o grupo dentro de esta área"
+                  title="Añadir una nueva asignatura dentro de esta área"
                   data-testid="create-group-btn"
                 >
-                  <Plus size={14} aria-hidden /> Nueva sub-asignatura
+                  <Plus size={14} aria-hidden /> Añadir una nueva asignatura
                 </button>
               </div>
               {group.id && group.id !== "bases" && group.id !== "core" && group.id !== "__otros" && (
@@ -421,7 +539,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                     type="button"
                     onClick={handleRenameGroup}
                     className="inline-flex items-center gap-1 rounded px-2 py-1 hover:bg-hover hover:text-text"
-                    title={`Renombrar la sub-asignatura «${group.title}»`}
+                    title={`Renombrar la asignatura «${group.title}»`}
                   >
                     <Edit3 size={13} aria-hidden /> Renombrar
                   </button>
@@ -466,16 +584,25 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                   {visible.every((r) => openRows.has(r.folder)) ? "Contraer todo" : "Expandir todo"}
                 </button>
               </div>
+              <div className="flex items-center justify-between pt-1">
+                {addTopicsBar("add-topics-btn")}
+              </div>
               <BulkToolbar count={selectedRows.length} busy={queueBusy} onAsk={(w) => ask(w, selectedRows)} onGenerateMissing={generateMissing} onHelper={helper} groups={groups} onMoveGroup={handleMoveTopics} />
               {queue && <BulkProgress queue={queue} onStop={stop} onClose={dismiss} />}
             </>
           )}
 
           {shown.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-empty">Esta sección no tiene temas.</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pt-1">
+                {addTopicsBar("add-topics-btn")}
+              </div>
+              <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-empty">Esta sección no tiene temas.</p>
+            </div>
           ) : visible.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-filter-empty">Ningún tema cumple ese estado.</p>
           ) : (
+            <>
             <div className="overflow-x-auto rounded-xl border border-line">
               <table className="w-full min-w-[74rem] border-collapse text-left text-[14px]" data-testid="area-table">
                 <caption className="sr-only">Temas de {active.area}{group.id ? `, grupo ${group.title}` : ""}</caption>
@@ -493,9 +620,29 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                         className="h-4 w-4 accent-[var(--nv-accent)]"
                       />
                     </th>
-                    {["Sem.", "Tema", "Avance", "Previsto", "Nota", "Mapa", ".practica", "Ejercicios", "Estado", "Regenerar", "Generar"].map((h) => (
-                      <th key={h} scope="col" className="px-3 py-2 font-semibold">{h}</th>
-                    ))}
+                    {["Sem.", "Tema", "Avance", "Previsto", "Nota", "Mapa", ".practica", "Ejercicios", "Estado", "Regenerar", "Generar"].map((h) =>
+                      h === "Tema" ? (
+                        <th key={h} scope="col" className="relative px-3 py-2 font-semibold" style={{ width: titleW, minWidth: titleW, maxWidth: titleW }}>
+                          {h}
+                          <span
+                            role="separator"
+                            aria-orientation="vertical"
+                            aria-label="Arrastra para cambiar el ancho de la columna Tema"
+                            title="Arrastra para cambiar el ancho"
+                            tabIndex={0}
+                            data-testid="topic-col-resize"
+                            className="absolute right-0 top-0 h-full w-2 cursor-col-resize touch-none select-none hover:bg-accent/40"
+                            onPointerDown={startTitleResize}
+                            onKeyDown={(e) => {
+                              if (e.key === "ArrowRight") setTitleWidth(titleW + 24);
+                              if (e.key === "ArrowLeft") setTitleWidth(titleW - 24);
+                            }}
+                          />
+                        </th>
+                      ) : (
+                        <th key={h} scope="col" className="px-3 py-2 font-semibold">{h}</th>
+                      ),
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -530,8 +677,20 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                       <td className="px-3 py-2">
                         <input type="checkbox" aria-label={`Seleccionar ${r.title}`} checked={selected.has(r.folder)} onChange={() => toggleSel(r.folder)} disabled={queueBusy} data-testid="row-select" className="mt-1 h-4 w-4 accent-[var(--nv-accent)]" />
                       </td>
-                      <td className="px-3 py-2 tabular-nums text-dim">{r.week}</td>
-                      <th scope="row" className="min-w-0 max-w-[24rem] px-3 py-2 font-normal">
+                      <td className="px-3 py-2 tabular-nums text-dim">
+                        <select
+                          aria-label={`Semana de ${r.title}`}
+                          value={r.week}
+                          onChange={(e) => void handleUpdateTopicWeek(r.folder, Number(e.target.value))}
+                          data-testid={`select-week-${r.folder}`}
+                          className="rounded border border-line bg-card px-1 py-0.5 text-xs text-dim hover:text-text cursor-pointer"
+                        >
+                          {Array.from({ length: 26 }, (_, i) => i + 1).map((w) => (
+                            <option key={w} value={w}>{w}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <th scope="row" className="min-w-0 px-3 py-2 font-normal" style={{ width: titleW, minWidth: titleW, maxWidth: titleW }}>
                         <span className="flex min-w-0 items-start gap-1">
                         <button
                           type="button"
@@ -545,7 +704,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                         </button>
                         <span className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <TopicMenu folder={r.folder} title={r.title} trigger={<span className="block truncate" title={r.folder} data-testid="area-open">{r.title}</span>} className="font-semibold text-accent-text underline-offset-2 hover:underline" />
+                            <TopicMenu folder={r.folder} title={r.title} trigger={<span className="block whitespace-normal break-words text-left" title={r.folder} data-testid="area-open">{r.title}</span>} className="font-semibold text-accent-text underline-offset-2 hover:underline" />
                             {sub && groups.length > 1 && (
                               <select
                                 value={r.group || "core"}
@@ -579,13 +738,28 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                         )}
                       </td>
                       <td className="px-3 py-2 text-[13.5px]">
-                        {(() => {
-                          if (r.completed) return <Chip large colour="var(--nv-mint)"><Check size={12} aria-hidden /> Completado</Chip>;
-                          const t = timeTagOf(times.get(r.folder), false, day, begun);
-                          // pendiente solo cuando la ruta empezó y su tiempo previsto ya pasó
-                          return t?.status === "pending" ? <Chip large colour="var(--nv-warn)">Pendiente</Chip> : <span className="text-dim">{t?.status === "current" ? "En su tiempo" : "Programado"}</span>;
-                        })()}
-                        {r.route !== "core" && <span className="block text-dim">{ROUTE_LABEL[r.route]}</span>}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            {(() => {
+                              if (r.completed) return <Chip large colour="var(--nv-mint)"><Check size={12} aria-hidden /> Completado</Chip>;
+                              const t = timeTagOf(times.get(r.folder), false, day, begun);
+                              return t?.status === "pending" ? <Chip large colour="var(--nv-warn)">Pendiente</Chip> : <span className="text-dim">{t?.status === "current" ? "En su tiempo" : "Programado"}</span>;
+                            })()}
+                            {r.route !== "core" && <span className="text-dim text-xs">({ROUTE_LABEL[r.route]})</span>}
+                          </div>
+                          <select
+                            aria-label={`Cambiar estado de ${r.title}`}
+                            value={r.completed ? "completed" : r.route}
+                            onChange={(e) => void handleUpdateTopicRoute(r.folder, e.target.value as any)}
+                            data-testid={`select-route-${r.folder}`}
+                            className="w-fit rounded border border-line bg-card px-1 py-0.5 text-[11px] text-dim hover:text-text cursor-pointer"
+                          >
+                            <option value="core">En ruta (Programado)</option>
+                            <option value="completed">Completado</option>
+                            <option value="optional">Opcional</option>
+                            <option value="skipped">Omitido</option>
+                          </select>
+                        </div>
                       </td>
                       <td className="px-3 py-2"><RowQuickActions row={r} busy={queueBusy} onAsk={(w, row) => ask(w, [row])} /></td>
                       <td className="px-3 py-2">
@@ -607,6 +781,8 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                 </tbody>
               </table>
             </div>
+            <div className="flex items-center justify-between pt-2" data-testid="add-topics-bottom">{addTopicsBar("add-topics-btn-bottom")}</div>
+            </>
           )}
         </>
       )}
@@ -647,6 +823,49 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
             }}
           />
         </div>
+      )}
+
+      {addTopicsOpen && (
+        <Modal title={`Agregar nuevos temas a «${group?.title || "la asignatura"}»`} onClose={() => setAddTopicsOpen(false)} width={540}>
+          <div className="space-y-4">
+            <p className="text-[13.5px] text-dim">
+              Escribe el nombre de los nuevos temas a estudiar (uno por línea). Se añadirán directamente a la asignatura <strong>{group?.title}</strong> dentro de <strong>{active?.area}</strong>:
+            </p>
+
+            <section aria-label={`Temas actuales de ${group?.title ?? "la asignatura"}`} data-testid="add-topics-current">
+              <p className="mb-1 text-[13px] font-semibold text-text">
+                Ya tiene {shown.length} {shown.length === 1 ? "tema" : "temas"} · {shown.filter((r) => r.completed).length} completados
+              </p>
+              <ol className="max-h-44 list-decimal space-y-0.5 overflow-y-auto rounded-lg border border-line bg-panel py-2 pl-8 pr-3 text-[13.5px] text-dim">
+                {shown.map((r) => <li key={r.folder} className="break-words">{r.title}</li>)}
+                {shown.length === 0 && <li className="list-none text-faint">Aún no tiene temas.</li>}
+              </ol>
+              <p className="mt-1 text-[12.5px] text-faint">Si es una materia de patrones (HTML, CSS, funciones…), añade <strong>un tema por elemento, propiedad o función</strong>, no uno que los junte todos. «Verificar metodología» te dice cuáles faltan.</p>
+            </section>
+
+            <Field label="Títulos de los temas (uno por línea)">
+              <textarea
+                value={newTopicsText}
+                onChange={(e) => setNewTopicsText(e.target.value)}
+                placeholder={"Ej:\nConceptos básicos\nInstalación y entorno\nPrimeros pasos y ejemplos"}
+                rows={5}
+                className={cn(input, "resize-y font-sans leading-relaxed")}
+                data-testid="textarea-new-topics"
+              />
+            </Field>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <GhostButton onClick={() => setAddTopicsOpen(false)}>Cancelar</GhostButton>
+              <PrimaryButton
+                onClick={handleAddTopicsToSubject}
+                disabled={addingTopics || !newTopicsText.trim()}
+                data-testid="btn-confirm-add-topics"
+              >
+                {addingTopics ? "Agregando…" : "Agregar temas"}
+              </PrimaryButton>
+            </div>
+          </div>
+        </Modal>
       )}
     </section>
   );

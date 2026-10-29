@@ -53,7 +53,7 @@ export function WebRail() {
   if (!open) return null;
 
   const newPage = async () => {
-    const url = await askText("Nueva página del navegador", "https://", "Abrir");
+    const url = await askText("Nueva página del navegador", "https://www.google.com", "Abrir");
     if (url === null) return;
     add(url.trim());
   };

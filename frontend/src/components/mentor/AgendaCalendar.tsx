@@ -5,7 +5,7 @@
 // (Inicio/Fin: lunes/domingo de la semana; RePág/AvPág: mes anterior/siguiente), Intro o Espacio para abrir el día (el foco pasa a su
 // detalle) y una etiqueta por día para el lector de pantalla («martes 6 de octubre: 3 temas, 1 entregable»).
 
-import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { addDays, addMonthsToDate, isoDow } from "../../lib/planTime";
 import { dateLabel, deliverablesText, longDateLabel, monthName, topicsText } from "../../lib/planSchedule";
 import { areaShort, dayAreasText, dayByArea } from "../../lib/planTopicsByArea";
@@ -16,6 +16,7 @@ import { DayDetail } from "./AgendaViews";
 import { AreaDot, AreaFilter } from "./AreaViews";
 import { focusColour, type AgendaModel } from "./agendaKit";
 import { DAY_LONG, DAY_SHORT } from "./planShared";
+import { DayNotionPeek } from "./DayNotionPeek";
 
 const monthStart = (d: string): string => `${d.slice(0, 7)}-01`;
 
@@ -50,6 +51,8 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged, hideFilter = fa
   const detailRef = useRef<HTMLDivElement>(null);
   const wantFocus = useRef(false);
   const month = anchor.slice(0, 7);
+  const [peekDate, setPeekDate] = useState<string | null>(null);
+  const [calMode, setCalMode] = useState<"week" | "month">(hideFilter ? "week" : "week");
   // filtro por área (se recuerda por plan); un valor que ya no existe equivale a «Todas»
   const [storedArea, setStoredArea] = usePersistedNav<string>(`mentor.agendaArea.${plan.id}`, "");
   const only = storedArea && plan.subplans.some((s) => s.id === storedArea) ? storedArea : null;
@@ -65,6 +68,12 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged, hideFilter = fa
     return rows;
   }, [anchor]);
   const inPlan = (d: string): boolean => d >= plan.start && d <= plan.end;
+
+  const currentWeekDays = useMemo(() => {
+    const dow = isoDow(anchor);
+    const monday = addDays(anchor, 1 - dow);
+    return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  }, [anchor]);
 
   useEffect(() => {
     if (!wantFocus.current) return;
@@ -105,126 +114,240 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged, hideFilter = fa
 
   return (
     <div className="space-y-4" data-testid="agenda-calendar">
-      {!hideFilter && <AreaFilter plan={plan} value={only} onChange={(id) => setStoredArea(id ?? "")} />}
-      {/* en un contenedor estrecho la rejilla se desplaza DENTRO de su propio contenedor (las celdas con áreas necesitan sitio para su texto) */}
-      <div className="overflow-x-auto rounded-2xl" data-testid="agenda-grid-scroll">
-      <div
-        ref={gridRef}
-        role="grid"
-        aria-label={`Calendario de ${monthName(month)}`}
-        aria-describedby="agenda-cal-help"
-        onKeyDown={onKeyDown}
-        className="min-w-[40rem] overflow-hidden rounded-2xl border border-line bg-card"
-        data-testid="agenda-grid"
-      >
-        <div role="row" className="grid grid-cols-[4.5rem_repeat(7,minmax(0,1fr))] border-b border-line bg-surface text-[13px] font-semibold uppercase tracking-wide text-faint @3xl:grid-cols-[7rem_repeat(7,minmax(0,1fr))]">
-          <div role="columnheader" className="px-2 py-2">Semana</div>
-          {DAY_SHORT.map((d, i) => (
-            <div key={d} role="columnheader" className="px-1 py-2 text-center" aria-label={DAY_LONG[i]}>
-              <span aria-hidden>{DAY_LONG[i]!.slice(0, 3)}</span>
-            </div>
-          ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {!hideFilter && <AreaFilter plan={plan} value={only} onChange={(id) => setStoredArea(id ?? "")} />}
+        <div className="flex items-center gap-1 rounded-xl border border-line bg-surface p-1" data-testid="calendar-view-toggle">
+          <button
+            type="button"
+            onClick={() => setCalMode("week")}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors",
+              calMode === "week" ? "bg-accent text-white" : "text-dim hover:bg-hover hover:text-text"
+            )}
+            data-testid="toggle-cal-week"
+          >
+            Vista semanal por día
+          </button>
+          <button
+            type="button"
+            onClick={() => setCalMode("month")}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors",
+              calMode === "month" ? "bg-accent text-white" : "text-dim hover:bg-hover hover:text-text"
+            )}
+            data-testid="toggle-cal-month"
+          >
+            Vista mensual
+          </button>
         </div>
-        {weeks.filter((row) => row.some(inPlan)).map((row) => {
-          // las semanas del plan son bloques de 7 días desde su inicio y no coinciden con las filas lunes–domingo: el margen resume LA FILA y dice qué
-          // semana(s) del plan toca
-          const sumDays = row.map((d) => m.schedule.byDate.get(d)).filter((x): x is NonNullable<typeof x> => !!x);
-          const wkA = sumDays[0]?.week ?? 1;
-          const wkB = sumDays[sumDays.length - 1]?.week ?? wkA;
-          const wk = wkA === wkB ? String(wkA) : `${wkA}–${wkB}`;
-          const topics = new Set(sumDays.flatMap((d) => d.topics.map((t) => t.folder))).size;
-          const dels = row.reduce((n, d) => n + (m.dueByDate.get(d)?.length ?? 0), 0);
-          const rowTopics = only ? new Set(sumDays.flatMap((d) => d.topics.filter((t) => t.subplanId === only).map((t) => t.folder))).size : topics;
-          const hasWeek = sumDays.length > 0;
-          return (
-            <div key={row[0]} role="row" className="grid grid-cols-[4.5rem_repeat(7,minmax(0,1fr))] border-b border-line last:border-b-0 @3xl:grid-cols-[7rem_repeat(7,minmax(0,1fr))]">
-              <div role="rowheader" className="flex flex-col justify-center border-r border-line bg-surface px-2 py-1.5 text-[13px] leading-snug" data-testid="agenda-week-margin" aria-label={hasWeek ? `${wkA === wkB ? "Semana" : "Semanas"} ${wk}: ${topicsText(rowTopics)}${m.deliverablesDefined ? `, ${deliverablesText(dels)}` : ""}` : "Fuera del plan"}>
-                {hasWeek ? (
-                  <>
-                    <span className="font-semibold text-text">{wkA === wkB ? "Sem." : "Sems."} {wk}</span>
-                    <span className="text-dim">{rowTopics} {rowTopics === 1 ? "tema" : "temas"}</span>
-                    {m.deliverablesDefined && <span className="text-dim">{dels} ent.</span>}
-                  </>
-                ) : (
-                  <span className="text-faint">—</span>
-                )}
-              </div>
-              {row.map((date) => {
-                const day = m.schedule.byDate.get(date);
-                const ok = inPlan(date);
-                const selected = date === anchor;
-                const outsideMonth = date.slice(0, 7) !== month;
-                const due = m.deliverablesDefined ? (m.dueByDate.get(date) ?? []).filter((d) => d.kind !== "daily_project") : [];
-                const pendingDue = due.some((d) => d.status !== "hecho");
-                const entries = day && ok ? dayByArea(plan, day, m.dueByDate.get(date) ?? []).filter((e) => only === null || e.subplanId === only) : [];
+      </div>
+
+      {calMode === "week" ? (
+        <div className="overflow-x-auto rounded-2xl" data-testid="agenda-week-grid-scroll">
+          <div className="min-w-[48rem] rounded-2xl border border-line bg-card p-3" data-testid="agenda-week-grid">
+            <div className="grid grid-cols-7 gap-2">
+              {currentWeekDays.map((dStr, idx) => {
+                const dayObj = m.schedule.byDate.get(dStr);
+                const isAnchor = dStr === anchor;
+                const isCurrentToday = dStr === m.today;
+                const dayEntries = dayObj && inPlan(dStr) ? dayByArea(plan, dayObj, m.dueByDate.get(dStr) ?? []).filter((e) => only === null || e.subplanId === only) : [];
+
                 return (
-                  <div key={date} role="gridcell" aria-selected={ok ? selected : undefined} aria-disabled={ok ? undefined : true} className={cn("min-h-[7.5rem] border-r border-line last:border-r-0", outsideMonth && "bg-surface/60")}>
-                    <button
-                      type="button"
-                      data-date={date}
-                      data-selected={selected ? "true" : undefined}
-                      tabIndex={ok && selected ? 0 : -1}
-                      disabled={!ok}
-                      onClick={() => ok && onSelect(date)}
-                      aria-label={cellLabel(m, date, only)}
-                      aria-current={date === m.today ? "date" : undefined}
-                      className={cn(
-                        "flex h-full min-h-[7.5rem] w-full flex-col items-stretch gap-1 px-1.5 py-1.5 text-left text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-text focus-visible:ring-inset",
-                        !ok && "cursor-default opacity-40",
-                        ok && !selected && "hover:bg-hover",
-                        selected && "bg-accent-soft ring-2 ring-inset ring-accent",
-                      )}
-                    >
-                      <span className={cn("flex items-center gap-1 font-semibold", outsideMonth ? "text-faint" : "text-text")} aria-hidden>
-                        <span className={cn("grid h-6 min-w-6 place-items-center rounded-full px-1", date === m.today && "bg-[var(--nv-btn,var(--nv-accent))] text-white")}>{Number(date.slice(8))}</span>
-                        {Number(date.slice(8)) === 1 && <span className="text-[13px] font-medium uppercase text-dim">{dateLabel(date).split(" ")[1]}</span>}
+                  <button
+                    key={dStr}
+                    type="button"
+                    onClick={() => {
+                      onSelect(dStr);
+                      setPeekDate(dStr);
+                    }}
+                    data-date={dStr}
+                    data-selected={isAnchor ? "true" : undefined}
+                    className={cn(
+                      "flex min-h-[16rem] flex-col rounded-xl border p-2.5 text-left transition-all hover:border-accent hover:shadow-sm",
+                      isAnchor ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-line bg-surface/60",
+                      !inPlan(dStr) && "opacity-40"
+                    )}
+                    data-testid="week-day-column"
+                  >
+                    <div className="flex items-center justify-between border-b border-line pb-1.5">
+                      <span className="text-[12px] font-semibold uppercase tracking-wider text-faint">
+                        {DAY_SHORT[idx]}
                       </span>
-                      {entries.length > 0 && (
-                        <span className="flex flex-col gap-0.5" aria-hidden data-testid="agenda-cell-areas">
-                          {entries.map((e) => (
-                            <span key={e.subplanId} className="flex items-center gap-1 text-[12.5px] leading-tight text-text" data-testid="agenda-cell-area" data-area={e.areaId ?? e.subplanId}>
+                      <span
+                        className={cn(
+                          "grid h-6 w-6 place-items-center rounded-full text-[13px] font-bold",
+                          isCurrentToday ? "bg-accent text-white" : "text-text"
+                        )}
+                      >
+                        {Number(dStr.slice(8))}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 flex-1 space-y-1.5 overflow-y-auto">
+                      {dayEntries.length > 0 ? (
+                        dayEntries.map((e) => (
+                          <div
+                            key={e.subplanId}
+                            className="rounded-lg border border-line/80 bg-card p-2 text-[12px]"
+                            data-testid="week-col-entry"
+                          >
+                            <div className="flex items-center gap-1.5 font-bold text-text">
                               <AreaDot {...(e.areaId ? { areaId: e.areaId } : {})} />
-                              <span className="truncate font-medium">{areaShort(e.areaId, e.area)}</span>
-                              <span className="whitespace-nowrap text-dim">
-                                {e.theoryTopics > 0 ? `${e.theoryTopics}t` : e.topics > 0 ? `${e.topics}t` : "rep."}
-                                {e.practiceBlocks > 0 ? " P" : ""}
-                                {e.project ? " ◆" : ""}
-                              </span>
-                            </span>
-                          ))}
-                        </span>
+                              <span className="truncate">{areaShort(e.areaId, e.area)}</span>
+                            </div>
+                            <div className="mt-1.5 flex items-center justify-between text-[11px] text-faint">
+                              <span>{e.theoryMinutes + e.practiceMinutes}m</span>
+                              {e.practiceBlocks > 0 && <span className="font-semibold text-accent-text">P</span>}
+                            </div>
+                          </div>
+                        ))
+                      ) : dayObj?.study ? (
+                        <p className="text-[12px] text-faint">Sin temas asignados</p>
+                      ) : (
+                        <p className="text-[12px] text-faint">Descanso</p>
                       )}
-                      {day?.focus && ok && entries.length === 0 && !only && (
-                        <span className="flex items-center gap-1 truncate text-[12.5px] font-medium text-text" aria-hidden data-testid="agenda-cell-focus">
-                          <span className="inline-block h-2 w-2 flex-none rounded-sm" style={{ background: focusColour(day.focus.id) }} />
-                          <span className="truncate">{day.focus.label}</span>
-                        </span>
-                      )}
-                      {day && ok && (
-                        <span className="flex flex-wrap items-center gap-1 text-[13px]" aria-hidden>
-                          {entries.length === 0 && day.topics.length > 0 && <span className="rounded bg-accent-soft px-1 font-semibold text-accent-text" title="Temas">{day.topics.length} t</span>}
-                          {!only && day.practice.kata && <span className="rounded border border-line px-1 font-semibold text-dim" title="Kata">K</span>}
-                          {!only && day.practice.project && <span className="rounded border border-line px-1 font-semibold text-dim" title="Sesión de proyecto">S</span>}
-                          {due.length > 0 && (
-                            <span className={cn("rounded px-1 font-semibold", pendingDue ? "border border-line text-dim" : "bg-mint/20 text-text")} title="Entregables">◆{due.length > 1 ? due.length : ""}</span>
-                          )}
-                        </span>
-                      )}
-                    </button>
-                  </div>
+                    </div>
+                  </button>
                 );
               })}
             </div>
-          );
-        })}
-      </div>
-      </div>
+          </div>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl" data-testid="agenda-grid-scroll">
+          <div
+            ref={gridRef}
+            role="grid"
+            aria-label={`Calendario de ${monthName(month)}`}
+            aria-describedby="agenda-cal-help"
+            onKeyDown={onKeyDown}
+            className="min-w-[40rem] overflow-hidden rounded-2xl border border-line bg-card"
+            data-testid="agenda-grid"
+          >
+            <div role="row" className="grid grid-cols-[4.5rem_repeat(7,minmax(0,1fr))] border-b border-line bg-surface text-[13px] font-semibold uppercase tracking-wide text-faint @3xl:grid-cols-[7rem_repeat(7,minmax(0,1fr))]">
+              <div role="columnheader" className="px-2 py-2">Semana</div>
+              {DAY_SHORT.map((d, i) => (
+                <div key={d} role="columnheader" className="px-1 py-2 text-center" aria-label={DAY_LONG[i]}>
+                  <span aria-hidden>{DAY_LONG[i]!.slice(0, 3)}</span>
+                </div>
+              ))}
+            </div>
+            {weeks.filter((row) => row.some(inPlan)).map((row) => {
+              const sumDays = row.map((d) => m.schedule.byDate.get(d)).filter((x): x is NonNullable<typeof x> => !!x);
+              const wkA = sumDays[0]?.week ?? 1;
+              const wkB = sumDays[sumDays.length - 1]?.week ?? wkA;
+              const wk = wkA === wkB ? String(wkA) : `${wkA}–${wkB}`;
+              const topics = new Set(sumDays.flatMap((d) => d.topics.map((t) => t.folder))).size;
+              const dels = row.reduce((n, d) => n + (m.dueByDate.get(d)?.length ?? 0), 0);
+              const rowTopics = only ? new Set(sumDays.flatMap((d) => d.topics.filter((t) => t.subplanId === only).map((t) => t.folder))).size : topics;
+              const hasWeek = sumDays.length > 0;
+              return (
+                <div key={row[0]} role="row" className="grid grid-cols-[4.5rem_repeat(7,minmax(0,1fr))] border-b border-line last:border-b-0 @3xl:grid-cols-[7rem_repeat(7,minmax(0,1fr))]">
+                  <div role="rowheader" className="flex flex-col justify-center border-r border-line bg-surface px-2 py-1.5 text-[13px] leading-snug" data-testid="agenda-week-margin" aria-label={hasWeek ? `${wkA === wkB ? "Semana" : "Semanas"} ${wk}: ${topicsText(rowTopics)}${m.deliverablesDefined ? `, ${deliverablesText(dels)}` : ""}` : "Fuera del plan"}>
+                    {hasWeek ? (
+                      <>
+                        <span className="font-semibold text-text">{wkA === wkB ? "Sem." : "Sems."} {wk}</span>
+                        <span className="text-dim">{rowTopics} {rowTopics === 1 ? "tema" : "temas"}</span>
+                        {m.deliverablesDefined && <span className="text-dim">{dels} ent.</span>}
+                      </>
+                    ) : (
+                      <span className="text-faint">—</span>
+                    )}
+                  </div>
+                  {row.map((date) => {
+                    const day = m.schedule.byDate.get(date);
+                    const ok = inPlan(date);
+                    const selected = date === anchor;
+                    const outsideMonth = date.slice(0, 7) !== month;
+                    const due = m.deliverablesDefined ? (m.dueByDate.get(date) ?? []).filter((d) => d.kind !== "daily_project") : [];
+                    const pendingDue = due.some((d) => d.status !== "hecho");
+                    const entries = day && ok ? dayByArea(plan, day, m.dueByDate.get(date) ?? []).filter((e) => only === null || e.subplanId === only) : [];
+                    return (
+                      <div key={date} role="gridcell" aria-selected={ok ? selected : undefined} aria-disabled={ok ? undefined : true} className={cn("min-h-[7.5rem] border-r border-line last:border-r-0", outsideMonth && "bg-surface/60")}>
+                        <button
+                          type="button"
+                          data-date={date}
+                          data-selected={selected ? "true" : undefined}
+                          tabIndex={ok && selected ? 0 : -1}
+                          disabled={!ok}
+                          onClick={() => {
+                            if (ok) {
+                              onSelect(date);
+                              setPeekDate(date);
+                            }
+                          }}
+                          aria-label={cellLabel(m, date, only)}
+                          aria-current={date === m.today ? "date" : undefined}
+                          className={cn(
+                            "flex h-full min-h-[7.5rem] w-full flex-col items-stretch gap-1 px-1.5 py-1.5 text-left text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-text focus-visible:ring-inset",
+                            !ok && "cursor-default opacity-40",
+                            ok && !selected && "hover:bg-hover",
+                            selected && "bg-accent-soft ring-2 ring-inset ring-accent",
+                          )}
+                        >
+                          <span className={cn("flex items-center gap-1 font-semibold", outsideMonth ? "text-faint" : "text-text")} aria-hidden>
+                            <span className={cn("grid h-6 min-w-6 place-items-center rounded-full px-1", date === m.today && "bg-[var(--nv-btn,var(--nv-accent))] text-white")}>{Number(date.slice(8))}</span>
+                            {Number(date.slice(8)) === 1 && <span className="text-[13px] font-medium uppercase text-dim">{dateLabel(date).split(" ")[1]}</span>}
+                          </span>
+                          {entries.length > 0 && (
+                            <span className="flex flex-col gap-0.5" aria-hidden data-testid="agenda-cell-areas">
+                              {entries.map((e) => (
+                                <span key={e.subplanId} className="flex items-center gap-1 text-[12.5px] leading-tight text-text" data-testid="agenda-cell-area" data-area={e.areaId ?? e.subplanId}>
+                                  <AreaDot {...(e.areaId ? { areaId: e.areaId } : {})} />
+                                  <span className="truncate font-medium">{areaShort(e.areaId, e.area)}</span>
+                                  <span className="whitespace-nowrap text-dim">
+                                    {e.theoryTopics > 0 ? `${e.theoryTopics}t` : e.topics > 0 ? `${e.topics}t` : "rep."}
+                                    {e.practiceBlocks > 0 ? " P" : ""}
+                                    {e.project ? " ◆" : ""}
+                                  </span>
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                          {day?.focus && ok && entries.length === 0 && !only && (
+                            <span className="flex items-center gap-1 truncate text-[12.5px] font-medium text-text" aria-hidden data-testid="agenda-cell-focus">
+                              <span className="inline-block h-2 w-2 flex-none rounded-sm" style={{ background: focusColour(day.focus.id) }} />
+                              <span className="truncate">{day.focus.label}</span>
+                            </span>
+                          )}
+                          {day && ok && (
+                            <span className="flex flex-wrap items-center gap-1 text-[13px]" aria-hidden>
+                              {entries.length === 0 && day.topics.length > 0 && <span className="rounded bg-accent-soft px-1 font-semibold text-accent-text" title="Temas">{day.topics.length} t</span>}
+                              {!only && day.practice.kata && <span className="rounded border border-line px-1 font-semibold text-dim" title="Kata">K</span>}
+                              {!only && day.practice.project && <span className="rounded border border-line px-1 font-semibold text-dim" title="Sesión de proyecto">S</span>}
+                              {due.length > 0 && (
+                                <span className={cn("rounded px-1 font-semibold", pendingDue ? "border border-line text-dim" : "bg-mint/20 text-text")} title="Entregables">◆{due.length > 1 ? due.length : ""}</span>
+                              )}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <p id="agenda-cal-help" className="text-[13.5px] text-dim">
         Flechas para moverte entre días, Inicio/Fin para el lunes/domingo, Re Pág/Av Pág para cambiar de mes e Intro para abrir el día. Cada línea es un área (en este orden: Backend, Frontend, Databases, Tooling and Quality, Automation): «t» = temas de teoría, «P» = práctica del área, «◆» = proyecto del área; «K» = kata, «S» = sesión del proyecto semanal.
       </p>
+
       <div ref={detailRef} tabIndex={-1} className="rounded-2xl border border-line bg-card p-4 outline-none @3xl:p-5" data-testid="agenda-calendar-detail">
         <DayDetail m={m} date={anchor} onChanged={onChanged} headingId="agenda-cal-detail-h" level={2} areaFilter={only} />
       </div>
+
+      {peekDate && (
+        <DayNotionPeek
+          m={m}
+          date={peekDate}
+          areaFilter={only}
+          onClose={() => setPeekDate(null)}
+          onChanged={onChanged}
+        />
+      )}
     </div>
   );
 }

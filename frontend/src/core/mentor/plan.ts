@@ -86,6 +86,10 @@ export interface PlannedTopic {
   topicProject?: TopicProject;
   /** de dónde llegó al plan sin estar en su ruta original: `curriculum` = temas de referencia creados con «Crear con Antigravity» y añadidos con «Añadir al plan» */
   addedFrom?: "curriculum";
+  /** identificador estable del tema (resiste cambios en la estructura de carpetas de la vault) */
+  topicId?: string;
+  /** tags o etiquetas metodológicas del tema */
+  tags?: string[];
 }
 
 export interface WeekSlice {
@@ -1022,6 +1026,8 @@ function cleanTopic(raw: any): PlannedTopic | null {
   const tp = sanitizeTopicProject(raw.topicProject);
   if (tp) t.topicProject = tp;
   if (raw.addedFrom === "curriculum") t.addedFrom = "curriculum";
+  const topicId = oneLine(raw.topicId, 120);
+  if (topicId) t.topicId = topicId;
   return t;
 }
 

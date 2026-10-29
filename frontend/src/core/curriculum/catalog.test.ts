@@ -17,7 +17,8 @@ describe("catálogo de currículo de referencia", () => {
     expect(new Set(areas.map((a) => a.space))).toEqual(new Set(["Programación"]));
   });
 
-  for (const area of curriculumAreas()) {
+  for (const full of curriculumAreas()) {
+    const area = { ...full, entries: full.entries.filter((e) => !e.parentId) };
     describe(area.id, () => {
       it("el número de entradas está en el rango previsto", () => {
         const [lo, hi] = RANGES[area.id]!;
@@ -56,4 +57,41 @@ describe("catálogo de currículo de referencia", () => {
       });
     });
   }
+
+  describe("granularidad atómica (una nota por propiedad / elemento / método)", () => {
+    const atomic = areas.filter((a) => a.atomic);
+
+    it("HTML, CSS y JavaScript Reference son atómicos; Atomic Design y Java no", () => {
+      expect(atomic.map((a) => a.id)).toEqual(["html", "css", "js-reference"]);
+    });
+
+    for (const area of atomic) {
+      it(`${area.id}: cada subtema cuelga de su grupo, con ids y títulos únicos dentro del grupo`, () => {
+        const byId = new Map(area.entries.map((e) => [e.id, e]));
+        const kids = area.entries.filter((e) => e.parentId);
+        expect(kids.length).toBeGreaterThan(area.entries.length / 2);
+        expect(new Set(area.entries.map((e) => e.id)).size).toBe(area.entries.length);
+        for (const k of kids) {
+          const parent = byId.get(k.parentId!);
+          expect(parent, k.id).toBeDefined();
+          expect(k.category, k.id).toBe(parent!.title);
+          expect(k.importance, k.id).not.toBe("opcional");
+          expect(k.title.length, k.id).toBeLessThanOrEqual(72);
+          expect(k.title, k.id).not.toMatch(/[/\\:*?"<>|]/);
+        }
+      });
+    }
+
+    it("CSS tiene flex-wrap y gap como notas propias bajo «Flex container properties»", () => {
+      const css = areas.find((a) => a.id === "css")!;
+      const titles = css.entries.filter((e) => e.parentId === "css.flex-container").map((e) => e.title);
+      expect(titles).toEqual(expect.arrayContaining(["flex-direction", "flex-wrap", "gap"]));
+    });
+
+    it("HTML tiene un tema por elemento de estructura (header, nav, main, footer, aside)", () => {
+      const html = areas.find((a) => a.id === "html")!;
+      const titles = html.entries.filter((e) => e.parentId === "html.landmarks").map((e) => e.title);
+      expect(titles).toEqual(expect.arrayContaining(["header element", "nav element", "main element", "footer element", "aside element"]));
+    });
+  });
 });

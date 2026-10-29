@@ -64,7 +64,7 @@ function quotePlus(text: string): string {
  * https:// added, or a web search for anything else. */
 export function normalizeUrl(text: string): string {
   const t = (text || "").trim();
-  if (!t) return HOME_URL;
+  if (!t || /^https?:\/?\/?$/i.test(t) || /google\.com\/search\?q=https?%3A/i.test(t)) return HOME_URL;
   if (SCHEME_RE.test(t) || BARE_SCHEMES.some((s) => t.toLowerCase().startsWith(s))) {
     return t;
   }

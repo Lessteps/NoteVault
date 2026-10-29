@@ -139,7 +139,7 @@ export function areaTabsOf(plan: Pick<MentorPlan, "subplans">, catalog: Readonly
 
 /** Las pestañas de grupo de un área: «Todos» y cada grupo con temas (los temas sin grupo conocido caen en «Otros»). Sin grupos, solo «Todos». */
 export function groupTabsOf(sub: MentorSubplan, rows: ReadonlyArray<AreaTopicRow>): GroupTab[] {
-  const groups = sub.groups ?? [];
+  const groups = (sub.groups ?? []).filter((g) => g.kind !== "bases");
   const all: GroupTab = { id: "", title: "Todos", total: rows.length, missing: rows.filter(pendingGenerate).length };
   if (!groups.length) return [all];
   const known = new Set(groups.map((g) => g.id));
@@ -149,7 +149,7 @@ export function groupTabsOf(sub: MentorSubplan, rows: ReadonlyArray<AreaTopicRow
   });
   const rest = rows.filter((r) => !known.has(r.group));
   if (rest.length) tabs.push({ id: "__otros", title: "Otros", total: rest.length, missing: rest.filter(pendingGenerate).length });
-  return [all, ...tabs.filter((t) => t.total > 0)];
+  return [all, ...tabs];
 }
 
 /** Las filas de un grupo (`""` = todas, en orden progresivo de ejecución; un grupo concreto, en su orden natural). */

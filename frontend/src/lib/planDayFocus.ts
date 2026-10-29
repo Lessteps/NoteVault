@@ -711,9 +711,14 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
           // un resto pequeño se termina hoy (no se deja un trozo de 5 min para mañana)
           if (g.seg.remaining - g.minutes <= MIN_CHUNK * 0.5) g.minutes = g.seg.remaining;
           g.seg.remaining -= g.minutes;
+          const qIdx = l.queue.indexOf(g.seg);
           if (g.seg.remaining < 0.5) {
-            l.queue.splice(l.queue.indexOf(g.seg), 1);
+            if (qIdx >= 0) l.queue.splice(qIdx, 1);
             l.lastTitles.push(g.seg.topic.title);
+          } else if (qIdx >= 0 && g.minutes > 0.4) {
+            // Rotar al final de la cola activa para que mañana y pasado mañana proyecten los siguientes temas de la ruta
+            l.queue.splice(qIdx, 1);
+            l.queue.push(g.seg);
           }
         }
         const done = got.filter((g) => g.minutes > 0.4);

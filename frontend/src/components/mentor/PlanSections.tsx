@@ -313,7 +313,7 @@ function PrepararView(ctx: PlanSectionCtx) {
   const active = deep ?? PREPARE_TABS.find((t) => t.id === stored)?.id ?? "ejecutar";
   return (
     <div id="sec-preparar" tabIndex={-1} className={cn(anchor, "space-y-5")} data-testid="plan-prepare">
-      <p className="text-[14px] text-dim">Lo que prepara el contenido del plan. Para estudiar no hace falta entrar aquí: está todo en «Ejecución».</p>
+      <p className="text-[14px] text-dim">Lo que prepara el contenido del plan: verificar que no falten áreas ni temas (con la metodología de una nota por elemento o propiedad), crear lo que falta y traspasarlo a otra IA. Para estudiar no hace falta entrar aquí: está todo en «Ejecución».</p>
       <div role="group" aria-label="Qué preparar" className="inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-line bg-card p-1">
         {PREPARE_TABS.map((t) => (
           <button key={t.id} type="button" aria-pressed={active === t.id} title={t.hint} onClick={() => { setStored(t.id); setSection("preparar"); }} data-testid={`prepare-${t.id}`} className={cn("inline-flex min-h-9 items-center rounded-lg px-3 text-[14px] font-medium", active === t.id ? "bg-accent text-white" : "text-dim hover:bg-hover hover:text-text")}>

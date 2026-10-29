@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight, Bookmark, ExternalLink, Globe, LayoutDashboard, 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type BrowserState } from "../../lib/bridge";
 import { newId } from "../../lib/canvas";
+import { normalizeUrl } from "../../lib/webUrl";
 import { useApp } from "../../store/app";
 import { useCanvas } from "../../store/canvas";
 import { IconButton } from "../ui";
@@ -58,6 +59,12 @@ export function BrowserPanel({
     return () => { live = false; };
   }, [state.url]);
 
+  const initialUrlRef = useRef(initialUrl);
+  const lastRequestedUrlRef = useRef(initialUrl);
+  const initialWebviewSrcRef = useRef(normalizeUrl(initialUrl));
+  const onPageStateRef = useRef(onPageState);
+  onPageStateRef.current = onPageState;
+
   const updateBounds = useCallback(() => {
     if (!surfaceRef.current) return;
     const r = surfaceRef.current.getBoundingClientRect();
@@ -71,7 +78,9 @@ export function BrowserPanel({
     if (bounds.width > 0 && bounds.height > 0) {
       if (!attached.current) {
         attached.current = true;
-        api.browserAttach(bounds, initialUrl).then((s) => {
+        const startUrl = normalizeUrl(initialUrlRef.current);
+        lastRequestedUrlRef.current = startUrl;
+        api.browserAttach(bounds, startUrl).then((s) => {
           if (s) {
             setState(s);
             if (s.url && s.url !== "about:blank") setInputUrl(s.url);
@@ -88,7 +97,7 @@ export function BrowserPanel({
       attached.current = false;
       void api.browserDetach().catch(() => undefined);
     }
-  }, [initialUrl]);
+  }, []);
 
   // Another functionality took the screen: the native view has to go away with
   // it, and come back attached to the same page.
@@ -115,7 +124,7 @@ export function BrowserPanel({
 
     const unsubState = api.onBrowserState((newState) => {
       setState(newState);
-      onPageState?.(newState);
+      onPageStateRef.current?.(newState);
       if (newState.url && newState.url !== "about:blank") {
         setInputUrl(newState.url);
       }
@@ -140,16 +149,18 @@ export function BrowserPanel({
 
   // The rail picked another page: the one native view navigates to it.
   useEffect(() => {
+    initialUrlRef.current = initialUrl;
     if (!url || !attached.current) return;
-    if (url === state.url) return;
-    api.browserNavigate(url).then((s) => {
+    const target = normalizeUrl(url);
+    if (target === state.url || target === lastRequestedUrlRef.current) return;
+    lastRequestedUrlRef.current = target;
+    api.browserNavigate(target).then((s) => {
       if (s) {
         setState(s);
-        onPageState?.(s);
+        onPageStateRef.current?.(s);
       }
     }).catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  }, [url, initialUrl, state.url]);
 
   const handleNavigate = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -287,12 +298,19 @@ export function BrowserPanel({
       </div>
 
       {/* Embedded browser surface or web fallback */}
-      <div ref={surfaceRef} className="relative min-h-0 flex-1 w-full bg-surface">
-        {!isElectron && (
+      <div ref={surfaceRef} className="relative flex min-h-0 flex-1 flex-col w-full bg-surface">
+        {isElectron ? (
+          <webview
+            src={initialWebviewSrcRef.current}
+            partition="persist:nvweb"
+            allowpopups
+            className="h-full w-full flex-1 border-none"
+          />
+        ) : (
           <iframe
             src={state.url}
             title={state.title || "Navegador web"}
-            className="h-full w-full border-none"
+            className="h-full w-full flex-1 border-none"
             sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
           />
         )}

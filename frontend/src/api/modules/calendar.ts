@@ -32,7 +32,7 @@ const _NAMED: Record<string, string> = {
   red: "#d50000",
   yellow: "#f6bf26",
 };
-export const MODULE_SOURCES = ["metas", "proyectos", "finanzas"] as const;
+export const MODULE_SOURCES = ["metas", "proyectos", "finanzas", "mentor"] as const;
 
 export function colourHex(value: string | null | undefined): string {
   if (value && _HEX_RE.test(value)) {

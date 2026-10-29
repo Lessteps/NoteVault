@@ -151,8 +151,10 @@ export function computeAreaCoverage(area: CurriculumArea, topics: ExistingTopic[
   let partial = 0;
   let missing = 0;
   let index = 0;
+  const parentNumber = new Map<string, string>();
+  const childCount = new Map<string, number>();
   for (const entry of area.entries) {
-    index++;
+    if (!entry.parentId) index++;
     const strong: string[] = [];
     const weak: string[] = [];
     for (const p of prepared) {
@@ -179,10 +181,22 @@ export function computeAreaCoverage(area: CurriculumArea, topics: ExistingTopic[
     }
     let suggestedFolder = "";
     if (status !== "cubierto") {
-      let n = index;
-      while (used.has(n)) n++;
-      used.add(n);
-      suggestedFolder = `${area.space}/${area.areaFolder}/${prefix ? `${prefix}.${n}` : String(n)} ${entry.title}`;
+      if (entry.parentId && parentNumber.has(entry.parentId)) {
+        // subtema atómico: el número del grupo + su orden (`5.19.7.3`), plano en la carpeta del área
+        const k = (childCount.get(entry.parentId) ?? 0) + 1;
+        childCount.set(entry.parentId, k);
+        suggestedFolder = `${area.space}/${area.areaFolder}/${parentNumber.get(entry.parentId)}.${k} ${entry.title}`;
+      } else {
+        let n = index;
+        while (used.has(n)) n++;
+        used.add(n);
+        const number = prefix ? `${prefix}.${n}` : String(n);
+        parentNumber.set(entry.id, number);
+        suggestedFolder = `${area.space}/${area.areaFolder}/${number} ${entry.title}`;
+      }
+    } else if (!entry.parentId) {
+      const m = /(\d+(?:\.\d+)*)\s/.exec(baseName(matchedFolders[0] ?? ""));
+      if (m) parentNumber.set(entry.id, m[1]!);
     }
     rows.push({ entry, status, matchedFolders, suggestedFolder });
   }

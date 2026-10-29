@@ -31,13 +31,27 @@ interface Persisted {
 
 const EMPTY: Persisted = { pages: [], activeId: null, open: false };
 
+function sanitizeStoredPage(p: WebPage): WebPage {
+  const u = (p.url || "").trim();
+  if (/^https?:\/?\/?$/i.test(u) || /google\.com\/search\?q=https?%3A/i.test(u)) {
+    return {
+      ...p,
+      url: "https://www.google.com",
+      title: p.title?.startsWith("https:") ? "Google" : p.title,
+    };
+  }
+  return p;
+}
+
 function stored(): Persisted {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as Partial<Persisted>) : null;
     if (!parsed || !Array.isArray(parsed.pages)) return EMPTY;
     return {
-      pages: parsed.pages.filter((p): p is WebPage => Boolean(p && typeof p.id === "string")),
+      pages: parsed.pages
+        .filter((p): p is WebPage => Boolean(p && typeof p.id === "string"))
+        .map(sanitizeStoredPage),
       activeId: typeof parsed.activeId === "string" ? parsed.activeId : null,
       open: localStorage.getItem(OPEN_KEY) === "1",
     };

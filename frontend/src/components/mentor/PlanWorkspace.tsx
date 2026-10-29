@@ -2,7 +2,7 @@
 // La barra NO guarda estado propio: escribe las mismas claves de `navState` que ya leían `PlanView`, la Agenda y `PlanRun`
 // (`mentor.planTab.<id>`, `mentor.planSection.<id>`, `mentor.agendaView.<id>`, `mentor.agendaArea.<id>`, `mentor.runTab.<id>`), así que los enlaces profundos siguen valiendo.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { clampToPlan } from "../../lib/planSchedule";
 import { dayBases, deliverablesDefined } from "../../lib/planTopicsByArea";
 import { useMentor } from "../../store/mentor";
@@ -11,14 +11,16 @@ import { liveDoneOf, scheduleOf } from "./agendaKit";
 import { useReviewItems } from "./AreaWork";
 import { MentorSidebar } from "./MentorSidebar";
 import {
-  activePlaneacionId, ejecucionLinks, modeSubject, PLAN_NAV_PREFIX, RUN_NAV_PREFIX, RUN_TAB_GENERAL, runHints, runTabKey, selectEjecucion, selectPlaneacion, useMentorMode,
+  activePlaneacionId, ejecucionLinks, modeSubject, PAGE_ADD_AREA, PLAN_NAV_PREFIX, RUN_NAV_PREFIX, RUN_TAB_GENERAL, runHints, runTabKey, selectEjecucion, selectPlaneacion, useMentorMode,
 } from "./mentorNav";
 import { ejecucionItems, planeacionItems } from "./mentorNavItems";
 import { DEFAULT_SECTION } from "./PlanSections";
 import { PlanView } from "./PlanView";
 import { agendaAreaKey, planSectionKey, planTabKey, usePlanData } from "./planShared";
+import { AddToPlanDialog } from "./AddToPlanDialog";
 
 export function PlanWorkspace({ planId }: { planId: string }) {
+  const [addAreaOpen, setAddAreaOpen] = useState(false);
   const source = usePlanData(planId);
   const plan = source.data?.plan ?? null;
   const [mode, setMode] = useMentorMode(modeSubject(useMentor((s) => s.plans.find((p) => p.id === planId)), plan), planId);
@@ -56,6 +58,10 @@ export function PlanWorkspace({ planId }: { planId: string }) {
       ? activePlaneacionId(tab, section, agendaArea, plan.subplans.map((x) => x.id), !!plan.programmingPractice)
       : `${RUN_NAV_PREFIX}${ejecucionLinks(plan, runOpts).some((l) => l.tab === runTab) ? runTab : RUN_TAB_GENERAL}`;
   const onSelect = (id: string): void => {
+    if (id === `${PLAN_NAV_PREFIX}${PAGE_ADD_AREA}`) {
+      setAddAreaOpen(true);
+      return;
+    }
     if (id.startsWith(PLAN_NAV_PREFIX)) selectPlaneacion(planId, id);
     else selectEjecucion(planId, id);
   };
@@ -66,6 +72,20 @@ export function PlanWorkspace({ planId }: { planId: string }) {
       <main className="@container flex min-w-0 flex-1 flex-col bg-surface" aria-label={`Mentor: ${mode === "planeacion" ? "Planeación" : "Ejecución"}`}>
         <PlanView planId={planId} source={source} />
       </main>
+      {plan && (
+        <AddToPlanDialog
+          plan={plan}
+          open={addAreaOpen}
+          initialMode="area"
+          lockMode
+          onClose={() => setAddAreaOpen(false)}
+          onAdded={(updatedPlan) => {
+            source.setData((d) => (d ? { ...d, plan: updatedPlan } : d));
+            useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+            void source.reload();
+          }}
+        />
+      )}
     </>
   );
 }

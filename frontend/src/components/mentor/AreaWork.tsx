@@ -26,6 +26,7 @@ import { ExtraPracticeSection } from "./ExtraPracticeSection";
 import { openTopic } from "./openTopic";
 import { ProgressBar } from "./parts";
 import { TopicRow, type BoardPractice, type BoardRow } from "./PlanBoard";
+import { usePersistedNav } from "../../store/navState";
 
 export type WorkView = "hoy" | "semana" | "pendientes" | "repasos";
 const VIEWS: ReadonlyArray<{ id: WorkView; label: string }> = [
@@ -229,6 +230,30 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
   weekNumber?: number;
 }) {
   const areaKey = subplanId ?? areaId ?? "bases";
+  const sub = plan?.subplans.find((s) => s.id === subplanId || s.areaId === subplanId);
+  const [selectedSubject, setSelectedSubject] = usePersistedNav<string>(
+    `mentor.runSubject.${plan?.id ?? "none"}.${subplanId ?? "none"}`,
+    "all"
+  );
+
+  const subjectGroups = useMemo(() => {
+    const groups = sub?.groups && sub.groups.length > 0
+      ? sub.groups
+      : [{ id: "core", title: "Temas generales", kind: "knowledge" as const, order: 100 }];
+    const allTopics = sub?.topics ?? [];
+    return groups.map((g) => {
+      const gTopics = allTopics.filter((t) => (t.group ?? "core") === g.id);
+      const doneN = gTopics.filter((t) => !!t.completedAt).length;
+      return {
+        id: g.id,
+        title: g.title,
+        done: doneN,
+        total: gTopics.length,
+        pct: gTopics.length > 0 ? Math.round((doneN / gTopics.length) * 100) : 0,
+      };
+    });
+  }, [sub]);
+
   const buckets = useMemo(() => bucketReviews(reviews, today), [reviews, today]);
   const todayTag = { text: "Hoy", colour };
   const lists = useMemo(() => {
@@ -291,6 +316,41 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
         ))}
       </div>
 
+      {view === "semana" && subjectGroups.length > 1 && (
+        <nav aria-label="Asignaturas de la semana" className="flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface p-1.5" data-testid="week-subjects-subnav">
+          <button
+            type="button"
+            aria-pressed={selectedSubject === "all"}
+            onClick={() => setSelectedSubject("all")}
+            data-testid="week-subject-tab-all"
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
+              selectedSubject === "all" ? "bg-accent text-white" : "text-dim hover:bg-hover hover:text-text"
+            )}
+          >
+            Todas las asignaturas ({lists.semana.length})
+          </button>
+          {subjectGroups.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              aria-pressed={selectedSubject === g.id}
+              onClick={() => setSelectedSubject(g.id)}
+              data-testid={`week-subject-tab-${g.id}`}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
+                selectedSubject === g.id ? "bg-accent text-white" : "text-dim hover:bg-hover hover:text-text"
+              )}
+            >
+              <span>{g.title}</span>
+              <span className={cn("rounded-full px-1.5 py-0.2 text-[11px]", selectedSubject === g.id ? "bg-white/20 text-white" : "bg-card text-dim")}>
+                {g.done}/{g.total}
+              </span>
+            </button>
+          ))}
+        </nav>
+      )}
+
       {view === "semana" && weekDays ? (
         weekCount === 0 ? (
           <div className="space-y-4">
@@ -314,9 +374,36 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
                 {plannedMinutes > 0 && <span className="normal-case tracking-normal">{plannedMinutes} min en total</span>}
               </p>
             )}
-            <ul className="space-y-1" aria-label={VIEWS.find((v) => v.id === view)!.label} data-testid="work-list">
-              {lists[view].map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} planId={planId} />)}
-            </ul>
+            {view === "hoy" && sub ? (
+              <div className="space-y-4">
+                {subjectGroups.map((grp) => {
+                  const grpRows = lists.hoy.filter((r) => {
+                    const t = sub.topics.find((x) => x.folder === r.folder);
+                    return (t?.group ?? "core") === grp.id;
+                  });
+                  if (!grpRows.length) return null;
+                  return (
+                    <div key={grp.id} className="space-y-1.5" data-testid="today-subject-group" data-subject={grp.id}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-1 pt-1.5">
+                        <span className="text-[13px] font-bold text-accent-text">{grp.title}</span>
+                        <span className="text-[12px] font-medium text-dim" data-testid={`subject-progress-inline-${grp.id}`}>
+                          {grp.done}/{grp.total} ({grp.pct}%)
+                        </span>
+                      </div>
+                      <ul className="space-y-1" aria-label={grp.title}>
+                        {grpRows.map((r) => (
+                          <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} planId={planId} />
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <ul className="space-y-1" aria-label={VIEWS.find((v) => v.id === view)!.label} data-testid="work-list">
+                {lists[view].map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} areaKey={areaKey} planId={planId} />)}
+              </ul>
+            )}
           </div>
         )
       ) : reviews.length === 0 ? (
@@ -335,8 +422,8 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
 
       {view === "hoy" && plan && subplanId && (
         <div className="flex flex-wrap items-center gap-2" data-testid="work-add-topic">
-          <AddExtraTopic planId={planId} date={today} area={subplanId} lockArea minDate={plan.start} maxDate={plan.end} label="Próximos temas" onChanged={bumpPlanVersion} />
-          <span className="text-[13px] text-dim">Mira los temas de las próximas semanas y adelanta el siguiente de la ruta.</span>
+          <AddExtraTopic planId={planId} date={today} area={subplanId} lockArea lockSession minDate={plan.start} maxDate={plan.end} label="Añadir más temas al aprendizaje diario" onChanged={bumpPlanVersion} />
+          <span className="text-[13px] text-dim">Mira los próximos temas de esta área y añádelos a la sesión diaria.</span>
         </div>
       )}
 

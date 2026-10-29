@@ -20,6 +20,8 @@ export interface AddExtraTopicProps {
   area?: string;
   /** si true, solo permite ver y adelantar temas de esta área (oculta selector todas las áreas) */
   lockArea?: boolean;
+  /** si true (modo Ejecución), fija la fecha a la sesión actual (date), oculta selector de fecha y permite añadir próximos temas sin bloqueo por orden */
+  lockSession?: boolean;
   /** límites del selector de fecha (los del plan) */
   minDate?: string;
   maxDate?: string;
@@ -44,11 +46,11 @@ interface Data {
   plannedByArea: Record<string, number>;
 }
 
-function TopicRow({ c, day, busy, onAdd, dayText }: { c: MentorTopicCandidate; day: string; busy: boolean; onAdd: () => void; dayText: string }) {
+function TopicRow({ c, day, busy, onAdd, dayText, lockSession }: { c: MentorTopicCandidate; day: string; busy: boolean; onAdd: () => void; dayText: string; lockSession?: boolean }) {
   const state = c.state ?? "pendiente";
   const here = !!c.onDay;
-  const blocked = !here && !!c.blockedBy;
-  const hint = here ? (state === "adelantado" ? `Adelantado a ${dateLabel(day)}` : `Ya está planeado para ${dateLabel(day)}`) : blocked ? `Antes: ${c.blockedBy}` : state === "adelantado" ? `Adelantado el ${(c.addedDates[0] && dateLabel(c.addedDates[0])) ?? ""}` : c.plannedDate ? `Cae el ${dateLabel(c.plannedDate)}` : "";
+  const blocked = !lockSession && !here && !!c.blockedBy;
+  const hint = here ? (state === "adelantado" ? `Adelantado a ${dateLabel(day)}` : `Ya está planeado para ${dateLabel(day)}`) : c.blockedBy ? `Sigue a: ${c.blockedBy}` : state === "adelantado" ? `Adelantado el ${(c.addedDates[0] && dateLabel(c.addedDates[0])) ?? ""}` : c.plannedDate ? `Cae el ${dateLabel(c.plannedDate)}` : "";
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2" data-testid="extra-topic-candidate" data-folder={c.folder} data-blocked={blocked || here ? "true" : "false"}>
       <span className="w-12 flex-none font-mono text-[12.5px] text-faint" title="Posición en la ruta del área">{c.position}/{c.total}</span>
@@ -69,7 +71,7 @@ function TopicRow({ c, day, busy, onAdd, dayText }: { c: MentorTopicCandidate; d
   );
 }
 
-export function AddExtraTopic({ planId, date, area, lockArea, minDate, maxDate, onChanged, label = "Próximos temas", className }: AddExtraTopicProps) {
+export function AddExtraTopic({ planId, date, area, lockArea, lockSession, minDate, maxDate, onChanged, label = "Añadir más temas al aprendizaje diario", className }: AddExtraTopicProps) {
   const toast = useApp((s) => s.toast);
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState(date);
@@ -80,7 +82,7 @@ export function AddExtraTopic({ planId, date, area, lockArea, minDate, maxDate, 
   const seq = useRef(0);
   useEffect(() => setDay(date), [date]);
 
-  const scope = (allAreas && !lockArea) ? undefined : area;
+  const scope = lockSession ? area : (allAreas && !lockArea) ? undefined : area;
   const load = useCallback(async () => {
     const mine = ++seq.current;
     setError("");
@@ -143,19 +145,25 @@ export function AddExtraTopic({ planId, date, area, lockArea, minDate, maxDate, 
         <ArrowUpRight size={15} aria-hidden /> {label}
       </GhostButton>
       {open && (
-        <Modal title="Próximos temas" onClose={close} width={760}>
-          <p className="text-[14px] text-dim">Estos son los temas de las próximas semanas, en el orden de la ruta. Puedes adelantar a un día solo el siguiente de cada área.</p>
-          <div className="grid items-end gap-3 sm:grid-cols-[auto_1fr]">
-            <Field label="Día">
-              <input type="date" className={input} value={day} min={minDate} max={maxDate} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Día" />
-            </Field>
-            {area && !lockArea && (
-              <div className="flex flex-wrap items-center gap-2">
-                <GhostButton large="md" aria-pressed={!allAreas} onClick={() => setAllAreas(false)} className={cn(!allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Esta área</GhostButton>
-                <GhostButton large="md" aria-pressed={allAreas} onClick={() => setAllAreas(true)} className={cn(allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Todas las áreas</GhostButton>
-              </div>
-            )}
-          </div>
+        <Modal title={lockSession ? "Añadir más temas al aprendizaje diario" : "Próximos temas"} onClose={close} width={760}>
+          <p className="text-[14px] text-dim">
+            {lockSession
+              ? "Selecciona los próximos temas de esta área para añadirlos a tu sesión de aprendizaje diario."
+              : "Estos son los temas de las próximas semanas, en el orden de la ruta. Puedes adelantar a un día solo el siguiente de cada área."}
+          </p>
+          {!lockSession && (
+            <div className="grid items-end gap-3 sm:grid-cols-[auto_1fr]">
+              <Field label="Día">
+                <input type="date" className={input} value={day} min={minDate} max={maxDate} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Día" />
+              </Field>
+              {area && !lockArea && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <GhostButton large="md" aria-pressed={!allAreas} onClick={() => setAllAreas(false)} className={cn(!allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Esta área</GhostButton>
+                  <GhostButton large="md" aria-pressed={allAreas} onClick={() => setAllAreas(true)} className={cn(allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Todas las áreas</GhostButton>
+                </div>
+              )}
+            </div>
+          )}
           {data && planned.length > 0 && (
             <p className="text-[13.5px] text-dim" data-testid="next-topics-planned">
               Ya planeados el {dateLabel(day)}:{" "}
@@ -180,7 +188,7 @@ export function AddExtraTopic({ planId, date, area, lockArea, minDate, maxDate, 
                         {g.name}
                         <span className="font-normal text-dim"> · hoy {data.plannedByArea[key] ?? 0} {(data.plannedByArea[key] ?? 0) === 1 ? "planeado" : "planeados"}</span>
                       </p>
-                      <ul className="space-y-1.5">{g.rows.map((c) => <TopicRow key={c.folder} c={c} day={day} busy={busy} dayText={dayText} onAdd={() => void add(c)} />)}</ul>
+                      <ul className="space-y-1.5">{g.rows.map((c) => <TopicRow key={c.folder} c={c} day={day} busy={busy} dayText={dayText} lockSession={lockSession} onAdd={() => void add(c)} />)}</ul>
                     </div>
                   ))}
                 </section>

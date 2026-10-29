@@ -25,12 +25,18 @@ export function AddToPlanDialog({
   onClose,
   onAdded,
   initialFolder,
+  initialMode = "area",
+  initialSubplanId,
+  lockMode = false,
 }: {
   plan: MentorPlan;
   open: boolean;
   onClose: () => void;
   onAdded: (updatedPlan: MentorPlan) => void;
   initialFolder?: string;
+  initialMode?: "area" | "subject";
+  initialSubplanId?: string;
+  lockMode?: boolean;
 }) {
   const toast = useApp((s) => s.toast);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -39,8 +45,8 @@ export function AddToPlanDialog({
 
   // Form state
   const [folder, setFolder] = useState(initialFolder || "");
-  const [mode, setMode] = useState<"area" | "subject">("area");
-  const [subplanId, setSubplanId] = useState<string>(plan.subplans[0]?.id || "");
+  const [mode, setMode] = useState<"area" | "subject">(initialMode);
+  const [subplanId, setSubplanId] = useState<string>(initialSubplanId || plan.subplans[0]?.id || "");
   const [name, setName] = useState("");
   const [objective, setObjective] = useState("");
 
@@ -54,9 +60,13 @@ export function AddToPlanDialog({
     if (!open) {
       setStep(1);
       setFolder(initialFolder || "");
+      setMode(initialMode);
+      if (initialSubplanId) setSubplanId(initialSubplanId);
       setImpact(null);
       return;
     }
+    setMode(initialMode);
+    if (initialSubplanId) setSubplanId(initialSubplanId);
     setLoadingCandidates(true);
     api.mentorPlanFolderCandidates({ planId: plan.id })
       .then((res) => {
@@ -66,29 +76,46 @@ export function AddToPlanDialog({
           if (match) {
             setFolder(match.folder);
             setName(match.label);
-            if (match.role === "subject") setMode("subject");
+            if (!lockMode && match.role === "subject") setMode("subject");
             if (match.objective) setObjective(match.objective);
           }
         }
       })
       .catch(() => {})
       .finally(() => setLoadingCandidates(false));
-  }, [open, plan.id, initialFolder]);
+  }, [open, plan.id, initialFolder, initialMode, initialSubplanId, lockMode]);
 
   if (!open) return null;
 
   const handleSelectCandidate = (c: Candidate) => {
     setFolder(c.folder);
     setName(c.label);
-    if (c.role === "subject") setMode("subject");
-    else setMode("area");
+    if (!lockMode) {
+      if (c.role === "subject") setMode("subject");
+      else setMode("area");
+    }
     if (c.objective) setObjective(c.objective);
     setStep(2);
   };
 
   const handleGoToImpact = async () => {
+    if (!folder.trim() && !name.trim()) {
+      toast("error", "Indica una carpeta o escribe un nombre.");
+      return;
+    }
+    // Si no hay carpeta existente o el usuario crea directamente por nombre
     if (!folder.trim()) {
-      toast("error", "Elige o escribe una carpeta.");
+      setImpact({
+        addedTopics: 0,
+        addedMinutes: 0,
+        weeklyMinutesBefore: 0,
+        weeklyMinutesAfter: 0,
+        endDate: plan.end,
+        fits: true,
+        fixOptions: [],
+      });
+      setWarnings([]);
+      setStep(3);
       return;
     }
     setPreviewing(true);
@@ -105,7 +132,18 @@ export function AddToPlanDialog({
       setWarnings(res.preview.warnings || []);
       setStep(3);
     } catch (err: any) {
-      toast("error", err?.message || "No se pudo calcular el impacto.");
+      // Si la carpeta es nueva en la vault, permitir proceder
+      setImpact({
+        addedTopics: 0,
+        addedMinutes: 0,
+        weeklyMinutesBefore: 0,
+        weeklyMinutesAfter: 0,
+        endDate: plan.end,
+        fits: true,
+        fixOptions: [],
+      });
+      setWarnings([err?.message || "No se detectaron temas en la carpeta; se creará vacía en el plan."]);
+      setStep(3);
     } finally {
       setPreviewing(false);
     }
@@ -114,6 +152,28 @@ export function AddToPlanDialog({
   const handleConfirmAdd = async () => {
     setSubmitting(true);
     try {
+      if (mode === "area" && !folder.trim() && name.trim()) {
+        const res = await api.mentorPlanAreaCreate({
+          planId: plan.id,
+          name: name.trim(),
+          objective: objective.trim() || undefined,
+        });
+        toast("info", `Área «${name.trim()}» añadida al plan.`);
+        onAdded(res.plan);
+        onClose();
+        return;
+      }
+      if (mode === "subject" && !folder.trim() && name.trim()) {
+        const res = await api.mentorPlanGroupCreate({
+          planId: plan.id,
+          subplanId,
+          title: name.trim(),
+        });
+        toast("info", `Asignatura «${name.trim()}» añadida al plan.`);
+        onAdded(res.plan);
+        onClose();
+        return;
+      }
       const res = await api.mentorPlanFolderAdd({
         planId: plan.id,
         folder: folder.trim(),
@@ -123,7 +183,7 @@ export function AddToPlanDialog({
         objective: objective.trim() || undefined,
         source: "manual",
       });
-      toast("info", `${mode === "area" ? "Área" : "Sub-asignatura"} añadida al plan.`);
+      toast("info", `${mode === "area" ? "Área" : "Asignatura"} añadida al plan.`);
       onAdded(res.plan);
       onClose();
     } catch (err: any) {
@@ -203,7 +263,7 @@ export function AddToPlanDialog({
 
             <div className="flex justify-end gap-2 pt-2">
               <GhostButton onClick={onClose}>Cancelar</GhostButton>
-              <PrimaryButton onClick={() => setStep(2)} disabled={!folder.trim()} data-testid="btn-next-step">
+              <PrimaryButton onClick={() => setStep(2)} disabled={!folder.trim() && !name.trim()} data-testid="btn-next-step">
                 Siguiente
               </PrimaryButton>
             </div>
@@ -213,42 +273,44 @@ export function AddToPlanDialog({
         {/* Paso 2: Propiedades */}
         {step === 2 && (
           <div className="space-y-3.5">
-            <div>
-              <span className="mb-1 block font-mono text-[10.5px] uppercase tracking-wider text-faint">
-                ¿Qué es esta carpeta?
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMode("area")}
-                  className={cn(
-                    "flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors",
-                    mode === "area" ? "border-accent bg-accent-soft text-accent-text" : "border-line bg-surface hover:bg-hover",
-                  )}
-                  data-testid="mode-area-btn"
-                >
-                  <div className="flex items-center gap-1.5 font-semibold text-[13.5px]">
-                    <Layers size={16} /> Área nueva
-                  </div>
-                  <span className="text-[12px] opacity-80">Materia completa con sus propias sub-asignaturas y ruta.</span>
-                </button>
+            {!lockMode && (
+              <div>
+                <span className="mb-1 block font-mono text-[10.5px] uppercase tracking-wider text-faint">
+                  ¿Qué es esta carpeta o bloque?
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMode("area")}
+                    className={cn(
+                      "flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors",
+                      mode === "area" ? "border-accent bg-accent-soft text-accent-text" : "border-line bg-surface hover:bg-hover",
+                    )}
+                    data-testid="mode-area-btn"
+                  >
+                    <div className="flex items-center gap-1.5 font-semibold text-[13.5px]">
+                      <Layers size={16} /> Área nueva
+                    </div>
+                    <span className="text-[12px] opacity-80">Materia completa con sus propias asignaturas y ruta.</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setMode("subject")}
-                  className={cn(
-                    "flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors",
-                    mode === "subject" ? "border-accent bg-accent-soft text-accent-text" : "border-line bg-surface hover:bg-hover",
-                  )}
-                  data-testid="mode-subject-btn"
-                >
-                  <div className="flex items-center gap-1.5 font-semibold text-[13.5px]">
-                    <Sparkles size={16} /> Sub-asignatura
-                  </div>
-                  <span className="text-[12px] opacity-80">Bloque dentro de un área que ya está en el plan.</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("subject")}
+                    className={cn(
+                      "flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors",
+                      mode === "subject" ? "border-accent bg-accent-soft text-accent-text" : "border-line bg-surface hover:bg-hover",
+                    )}
+                    data-testid="mode-subject-btn"
+                  >
+                    <div className="flex items-center gap-1.5 font-semibold text-[13.5px]">
+                      <Sparkles size={16} /> Asignatura
+                    </div>
+                    <span className="text-[12px] opacity-80">Bloque dentro de un área que ya está en el plan.</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {mode === "subject" && (
               <Field label="Área de destino">
@@ -272,7 +334,7 @@ export function AddToPlanDialog({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Nombre para el plan (opcional)"
+                placeholder={mode === "area" ? "Nombre del área (ej: Backend, Mobile, Cloud)" : "Nombre de la asignatura (ej: Python, Docker)"}
                 className={input}
                 data-testid="input-name"
               />

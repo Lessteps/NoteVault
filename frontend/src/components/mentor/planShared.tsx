@@ -205,14 +205,27 @@ export function usePlanData(id: string | undefined) {
   // herramienta lo cambia con la ventana abierta, la vista se quedaba con la copia vieja. Al volver a la ventana se vuelve a leer.
   useEffect(() => {
     let last = Date.now();
+    let lastDay = new Date().toISOString().slice(0, 10);
     const refresh = (): void => {
-      if (document.visibilityState === "hidden" || Date.now() - last < REFOCUS_MIN_MS || inflight.current > 0) return;
+      const nowDay = new Date().toISOString().slice(0, 10);
+      const dayChanged = nowDay !== lastDay;
+      if (document.visibilityState === "hidden" || (!dayChanged && Date.now() - last < REFOCUS_MIN_MS) || inflight.current > 0) return;
       last = Date.now();
+      lastDay = nowDay;
       void load();
     };
+    const dayTimer = window.setInterval(() => {
+      const nowDay = new Date().toISOString().slice(0, 10);
+      if (nowDay !== lastDay && inflight.current === 0) {
+        lastDay = nowDay;
+        last = Date.now();
+        void load();
+      }
+    }, 60_000);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => {
+      window.clearInterval(dayTimer);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };

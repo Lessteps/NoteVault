@@ -5,6 +5,7 @@
 // (fase siguiente) consume `mentor_brief().text`: nunca lee notas completas.
 
 import { AIConfig, sendChat, type ChatMessage, type SendOpts } from "../../core/aiClient.js";
+import { CORE_GROUP_ID, evaluateAreaMethodology, FRONTEND_SUBJECT_GROUPS, frontendGroupForFolder } from "../../lib/planAreas.js";
 import { ApiError } from "../../core/errors.js";
 import { examSlug, listExamRecords } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
@@ -18,6 +19,12 @@ import { buildPracticeTrack, practiceDayMinutes, practiceItemsFor, sanitizePract
 import { derivePracticeStatus, kataDates, manualPracticeOf, phasesDone, ppAreaDir, readPpProjects, type PracticeStatus } from "../../core/mentor/practiceState.js";
 import { loadProfile, suggestFocus } from "../../core/ppractice/profile.js";
 import { objectiveText, resolveObjective, sanitizeObjective, subjectLabel } from "../../core/mentor/objective.js";
+import {
+  canonicalTopicId,
+  checkPlanVaultSync,
+  reconcilePlanWithVault,
+  resolveAndEnsureTopicAssets,
+} from "../../core/mentor/topicIdResolver.js";
 import {
   buildPlan,
   DELIVERABLE_STATUSES,
@@ -144,6 +151,7 @@ import { mentorRecordsApi } from "./mentorRecords.js";
 import { dailyProjectDoneOf, mentorProjectsApi } from "./mentorProjects.js";
 import { mentorAreaPracticeApi } from "./mentorAreaPractice.js";
 import { mentorPlanFoldersApi } from "./mentorPlanFolders.js";
+import { mentorAreaTimesApi } from "./mentorAreaTimes.js";
 import { mentorDayCloseApi } from "./mentorDayClose.js";
 import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
@@ -2341,6 +2349,301 @@ export function mentorApi(app: AppState, send?: SendFn) {
     },
 
     /**
+     * Crea una nueva área al final de `plan.subplans` (`mentor_plan_area_create({ planId, name, objective?, fromWeek?, toWeek? })`).
+     */
+    mentor_plan_area_create(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const name = String(o.name ?? "").trim();
+      if (!name) throw new ApiError("Indica un nombre para el área.");
+      const objective = String(o.objective ?? "").trim() || `Avanzar en ${name}`;
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived) throw new ApiError("Ese plan está archivado.");
+      const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "area";
+      if (plan.subplans.some((s) => s.id === slug || s.area.toLowerCase() === name.toLowerCase())) {
+        throw new ApiError(`Ya existe un área llamada «${name}».`);
+      }
+      const totalWeeks = Math.max(1, weekRangesOf(plan.start, plan.end).length);
+      const fromWeek = Math.max(1, Math.min(totalWeeks, Math.round(Number(o.fromWeek) || 1)));
+      const toWeek = Math.max(fromWeek, Math.min(totalWeeks, Math.round(Number(o.toWeek) || totalWeeks)));
+      const newSub = {
+        id: slug,
+        area: name,
+        areaId: slug,
+        objective,
+        topics: [],
+        groups: [{ id: "core", title: `Conocimientos de ${name.toLowerCase()}`, kind: "knowledge" as const, order: 30 }],
+        phase: { fromWeek, toWeek },
+        weeks: [],
+        requiredGoals: [],
+      };
+      plan.subplans.push(newSub);
+      const saved = st.save(plan);
+      return { plan: saved, subplan: newSub };
+    },
+
+    /**
+     * Agrega uno o varios temas a una asignatura específica (`mentor_plan_subject_add_topics({ planId, subplanId, groupId, topics })`).
+     * `topics` puede ser lista de `{ folder, title, estMinutes?, targetWeek? }`.
+     */
+    mentor_plan_subject_add_topics(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const subplanId = String(o.subplanId ?? "").trim();
+      const groupId = String(o.groupId ?? "").trim() || "core";
+      const rawTopics = Array.isArray(o.topics) ? o.topics : [];
+      if (!rawTopics.length) throw new ApiError("Indica al menos un tema para agregar.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived) throw new ApiError("Ese plan está archivado.");
+      const sub = plan.subplans.find((s) => s.id === subplanId || s.areaId === subplanId);
+      if (!sub) throw new ApiError("El área indicada no existe en el plan.");
+      const existingFolders = new Set(plan.subplans.flatMap((s) => s.topics.map((t) => t.folder)));
+      let addedCount = 0;
+      let maxWeek = sub.phase?.fromWeek ?? 1;
+      for (const t of sub.topics) {
+        if (Number(t.targetWeek) > maxWeek) maxWeek = Number(t.targetWeek);
+      }
+      for (const item of rawTopics) {
+        const title = String(item?.title ?? "").trim();
+        if (!title) continue;
+        const folder = String(item?.folder ?? "").trim() || `${sub.area}/${groupId}/${title}`;
+        if (existingFolders.has(folder)) continue;
+        existingFolders.add(folder);
+        const tw = Number(item?.targetWeek) > 0 ? Math.round(Number(item.targetWeek)) : maxWeek;
+        sub.topics.push({
+          folder,
+          title,
+          estMinutes: Number(item?.estMinutes) > 0 ? Number(item.estMinutes) : 45,
+          group: groupId,
+          targetWeek: tw,
+          topicId: canonicalTopicId(sub.areaId ?? sub.id, folder),
+        });
+        addedCount++;
+      }
+      if (!addedCount) throw new ApiError("Los temas indicados ya están en el plan.");
+      const saved = st.save(plan);
+      return { plan: saved, added: addedCount };
+    },
+
+    /**
+     * Actualiza las semanas en el calendario (`fromWeek`, `toWeek`), el objetivo o el estado global de un área
+     * (`mentor_plan_area_update({ planId, subplanId, fromWeek?, toWeek?, objective?, state? })`).
+     */
+    mentor_plan_area_update(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const subplanId = String(o.subplanId ?? "").trim();
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived) throw new ApiError("Ese plan está archivado.");
+      const sub = plan.subplans.find((s) => s.id === subplanId || s.areaId === subplanId);
+      if (!sub) throw new ApiError("El área indicada no existe en el plan.");
+
+      const totalWeeks = Math.max(1, weekRangesOf(plan.start, plan.end).length);
+      if (o.fromWeek !== undefined || o.toWeek !== undefined) {
+        const curFrom = sub.phase?.fromWeek ?? 1;
+        const curTo = sub.phase?.toWeek ?? totalWeeks;
+        const fromWeek = Math.max(1, Math.min(totalWeeks, Math.round(Number(o.fromWeek ?? curFrom) || 1)));
+        const toWeek = Math.max(fromWeek, Math.min(totalWeeks, Math.round(Number(o.toWeek ?? curTo) || totalWeeks)));
+        sub.phase = { fromWeek, toWeek };
+        // Sincronizar temas del área dentro de la nueva ventana del calendario
+        const span = Math.max(1, toWeek - fromWeek + 1);
+        sub.topics.forEach((t, idx) => {
+          if (t.targetWeek < fromWeek || t.targetWeek > toWeek) {
+            t.targetWeek = fromWeek + (idx % span);
+          }
+        });
+      }
+      if (typeof o.objective === "string" && o.objective.trim()) {
+        sub.objective = o.objective.trim();
+      }
+      if (o.state === "completada") {
+        const today = localDate();
+        for (const t of sub.topics) {
+          if (t.route !== "skipped" && !t.completedAt) {
+            t.completedAt = today;
+          }
+        }
+      } else if (o.state === "pendiente") {
+        for (const t of sub.topics) {
+          delete t.completedAt;
+        }
+      } else if (o.state === "en_curso") {
+        if (sub.topics.length > 0 && sub.topics.every((t) => !!t.completedAt)) {
+          delete sub.topics[sub.topics.length - 1]!.completedAt;
+        }
+      }
+
+      const saved = st.save(plan);
+      const updatedSub = saved.subplans.find((s) => s.id === sub.id) ?? sub;
+      return { plan: saved, subplan: updatedSub };
+    },
+
+    /**
+     * Modifica el estado (`completed`, `route`) o la semana (`targetWeek`) de un tema del plan
+     * (`mentor_plan_topic_update({ planId, subplanId?, folder, targetWeek?, completed?, route? })`).
+     */
+    mentor_plan_topic_update(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const folder = String(o.folder ?? "").trim();
+      if (!folder) throw new ApiError("Indica el tema a actualizar.");
+      const subplanId = String(o.subplanId ?? "").trim();
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived) throw new ApiError("Ese plan está archivado.");
+
+      const sub = subplanId
+        ? plan.subplans.find((s) => s.id === subplanId || s.areaId === subplanId)
+        : plan.subplans.find((s) => s.topics.some((t) => t.folder === folder));
+      if (!sub) throw new ApiError("El área indicada no existe en el plan.");
+      const topic = sub.topics.find((t) => t.folder === folder);
+      if (!topic) throw new ApiError("El tema indicado no existe en el área.");
+
+      const totalWeeks = Math.max(1, weekRangesOf(plan.start, plan.end).length);
+      if (o.targetWeek !== undefined) {
+        topic.targetWeek = Math.max(1, Math.min(totalWeeks, Math.round(Number(o.targetWeek) || 1)));
+        topic.pinned = true;
+      }
+      if (o.completed === true) {
+        topic.completedAt = topic.completedAt || localDate();
+      } else if (o.completed === false) {
+        delete topic.completedAt;
+      }
+      if (o.route !== undefined) {
+        const r = String(o.route ?? "");
+        if (r === "core" || r === "") {
+          delete topic.route;
+          delete topic.skippedReason;
+        } else if (r === "optional" || r === "skipped") {
+          topic.route = r;
+        }
+      }
+      if (Array.isArray(o.tags)) {
+        topic.tags = o.tags.map((t: unknown) => String(t).trim()).filter(Boolean);
+      }
+
+      const saved = st.save(plan);
+      return { plan: saved, topic };
+    },
+
+    /**
+     * Resuelve por ID la ubicación real de un tema en la vault aunque haya cambiado la estructura de carpetas
+     * y, si `ensureCanvas` es true, genera el `.canvas` explicativo determinista si existe la nota `.md`.
+     */
+    mentor_topic_resolve(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const folder = String(o.folder ?? "").trim();
+      if (!folder) throw new ApiError("Indica la carpeta del tema.");
+      const res = resolveAndEnsureTopicAssets(app.root, {
+        folder,
+        ...(o.topicId ? { topicId: String(o.topicId) } : {}),
+        ...(o.title ? { title: String(o.title) } : {}),
+        ...(o.areaId ? { areaId: String(o.areaId) } : {}),
+        ensureCanvas: o.ensureCanvas !== false,
+      });
+      if (res.canvasGenerated) {
+        clearTopicSnapCache(app.root);
+      }
+      return res;
+    },
+
+    /**
+     * Verifica si el plan tiene temas cuya estructura de carpetas cambió en la vault o a los que les falta
+     * generar su `.canvas` explicativo.
+     */
+    mentor_plan_vault_check(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      return checkPlanVaultSync(app.root, plan);
+    },
+
+    /**
+     * Corrige avisos metodológicos de un área (p. ej. HTML y CSS en Frontend):
+     * añade o asegura las asignaturas correspondientes en los grupos, reclasifica temas y añade los recomendados.
+     */
+    mentor_plan_fix_methodology(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const subplanId = String(o.subplanId ?? "").trim();
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.archived) throw new ApiError("Ese plan está archivado.");
+
+      const sub = plan.subplans.find((s) => s.id === subplanId || s.areaId === subplanId);
+      if (!sub) throw new ApiError("El área indicada no existe en el plan.");
+
+      const warnings = evaluateAreaMethodology(sub);
+      if (!warnings.length) return { plan, addedCount: 0 };
+
+      let groups = sub.groups ? [...sub.groups] : [];
+      for (const fg of FRONTEND_SUBJECT_GROUPS) {
+        if (!groups.some((g) => g.id === fg.id)) {
+          groups.push({ ...fg });
+        }
+      }
+      groups.sort((a, b) => a.order - b.order);
+      sub.groups = groups;
+
+      // Reclasificar temas existentes según frontendGroupForFolder
+      for (const t of sub.topics) {
+        const fg = frontendGroupForFolder(t.folder);
+        if (fg && (!t.group || t.group === CORE_GROUP_ID)) {
+          t.group = fg.id;
+        }
+      }
+
+      // Solo estructura: la asignatura y la reclasificación. Los temas (uno por elemento o propiedad) salen del currículo de referencia con
+      // «Verificar metodología» → Antigravity; antes se metían 3 + 4 notas genéricas que no enseñaban nada.
+      const addedCount = 0;
+
+      const saved = st.save(plan);
+      clearTopicSnapCache(app.root);
+      return { plan: saved, addedCount };
+    },
+
+    /**
+     * Escanea la vault por IDs de tema, actualiza las rutas de carpetas del plan que hayan cambiado de lugar,
+     * guarda `.notevault/mentor/topic_id_index.json` y genera los `.canvas` explicativos pendientes.
+     */
+    mentor_plan_vault_reconcile(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      const res = reconcilePlanWithVault(app.root, plan, { generateCanvases: o.generateCanvases !== false });
+      const saved = res.changedPlan ? st.save(res.plan) : plan;
+      if (res.changedPlan || res.generatedCanvases > 0) {
+        clearTopicSnapCache(app.root);
+      }
+      return {
+        plan: saved,
+        changedPlan: res.changedPlan,
+        relocatedCount: res.relocatedCount,
+        generatedCanvases: res.generatedCanvases,
+        indexedCount: res.indexedCount,
+      };
+    },
+
+    /**
      * Renombra una sub-asignatura / grupo en un subplan (`mentor_plan_group_rename({ planId, subplanId, groupId, title })`).
      */
     mentor_plan_group_rename(opts: unknown) {
@@ -2844,6 +3147,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
     // «Preguntas, correcciones y ajustes»: clasificar lo escrito y responder preguntas sin tocar el plan (ver `mentorAsk.ts`)
     ...mentorAskApi(app, { withJob, guarded, cancelMode: (e) => (e instanceof CancelError ? e.mode : undefined), today: () => localDate() }),
     // Carpetas de la vault añadidas como áreas o sub-asignaturas (ver `mentorPlanFolders.ts`)
+    // Hora de estudio de cada área (calendario general ↔ página del área; ver `mentorAreaTimes.ts`)
+    ...mentorAreaTimesApi(app),
     ...mentorPlanFoldersApi(app, { allTopics: () => buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 }), today: () => localDate() }),
     /** Compatibilidad: el flujo anterior (un BORRADOR en el chat que se acepta aparte); el camino principal crea el plan propuesto. */
     mentor_plan_generate_draft: (opts: unknown) => api.mentor_plan_generate({ ...((opts && typeof opts === "object" ? opts : {}) as object), asDraft: true }),

@@ -47,6 +47,8 @@ import { DAY_LONG, openAgendaAt, type Loaded } from "./planShared";
 import { hasBasesRoute as planHasBasesRoute, RUN_TAB_GENERAL, RUN_TAB_RECORDS, runAreaTab, runTabKey } from "./mentorNav";
 import { PlanRecords } from "./PlanRecords";
 
+import { VaultSyncBanner } from "./VaultSyncBanner";
+
 const UPCOMING_DAYS = 5;
 const DELIVERABLES_SHOWN = 4;
 const NO_DUE: readonly PlanDeliverable[] = [];
@@ -313,6 +315,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
 
   return (
     <div className="space-y-6 pb-4" data-testid="plan-run">
+      <VaultSyncBanner planId={plan.id} />
       <InterruptedRunBanner planId={plan.id} />
       {missingFolders.length > 0 && (
         <div role="status" className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card px-4 py-3" data-testid="run-missing-folders">

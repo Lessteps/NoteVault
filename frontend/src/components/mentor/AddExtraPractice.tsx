@@ -18,6 +18,8 @@ export interface AddExtraPracticeProps {
   date: string;
   /** abre el panel en los ejercicios de esta área (id de subplan); sin él, de todas las áreas */
   area?: string;
+  /** si true (modo Ejecución), fija la fecha a la sesión actual (date), oculta selector de fecha y restringe a esta misma área */
+  lockSession?: boolean;
   /** compatibilidad hacia atrás: si la vista pasa temas ya no se usa como selector manual */
   topics?: ReadonlyArray<{ folder: string; title: string }>;
   minDate?: string;
@@ -87,18 +89,18 @@ function ExerciseRow({ ex, day, busy, onAdd, dayText }: { ex: MentorExerciseCand
   );
 }
 
-export function AddExtraPractice({ planId, date, area, minDate, maxDate, onChanged, label = "Más práctica", className }: AddExtraPracticeProps) {
+export function AddExtraPractice({ planId, date, area, lockSession, minDate, maxDate, onChanged, label = "Añadir más práctica al aprendizaje diario", className }: AddExtraPracticeProps) {
   const toast = useApp((s) => s.toast);
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState(date);
-  const [allAreas, setAllAreas] = useState(!area);
+  const [allAreas, setAllAreas] = useState(!area && !lockSession);
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const seq = useRef(0);
   useEffect(() => setDay(date), [date]);
 
-  const scope = allAreas ? undefined : area;
+  const scope = lockSession ? area : (allAreas ? undefined : area);
   const load = useCallback(async () => {
     const mine = ++seq.current;
     setError("");
@@ -191,19 +193,25 @@ export function AddExtraPractice({ planId, date, area, minDate, maxDate, onChang
         <ArrowUpRight size={15} aria-hidden /> {label}
       </GhostButton>
       {open && (
-        <Modal title="Más práctica planificada" onClose={close} width={760}>
-          <p className="text-[14px] text-dim">Estos son los katas y ejercicios ya planificados que aún no te tocan. Puedes adelantarlos al día que elijas.</p>
-          <div className="grid items-end gap-3 sm:grid-cols-[auto_1fr]">
-            <Field label="Día">
-              <input type="date" className={input} value={day} min={minDate} max={maxDate} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Día" />
-            </Field>
-            {area && (
-              <div className="flex flex-wrap items-center gap-2">
-                <GhostButton large="md" aria-pressed={!allAreas} onClick={() => setAllAreas(false)} className={cn(!allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Esta área</GhostButton>
-                <GhostButton large="md" aria-pressed={allAreas} onClick={() => setAllAreas(true)} className={cn(allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Todas las áreas</GhostButton>
-              </div>
-            )}
-          </div>
+        <Modal title={lockSession ? "Añadir más práctica al aprendizaje diario" : "Más práctica planificada"} onClose={close} width={760}>
+          <p className="text-[14px] text-dim">
+            {lockSession
+              ? "Selecciona katas y ejercicios de esta área para añadirlos a tu sesión de práctica diaria."
+              : "Estos son los katas y ejercicios ya planificados que aún no te tocan. Puedes adelantarlos al día que elijas."}
+          </p>
+          {!lockSession && (
+            <div className="grid items-end gap-3 sm:grid-cols-[auto_1fr]">
+              <Field label="Día">
+                <input type="date" className={input} value={day} min={minDate} max={maxDate} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Día" />
+              </Field>
+              {area && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <GhostButton large="md" aria-pressed={!allAreas} onClick={() => setAllAreas(false)} className={cn(!allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Esta área</GhostButton>
+                  <GhostButton large="md" aria-pressed={allAreas} onClick={() => setAllAreas(true)} className={cn(allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Todas las áreas</GhostButton>
+                </div>
+              )}
+            </div>
+          )}
           {error && <p role="alert" className="text-[14px] text-danger">{error}</p>}
           {!data && !error && <p className="text-[14px] text-dim" role="status">Buscando los ejercicios planificados…</p>}
           {data && groups.length === 0 && katas.length === 0 && <p className="text-[14px] text-dim" data-testid="next-practice-empty">No hay más práctica planificada por ahora.</p>}

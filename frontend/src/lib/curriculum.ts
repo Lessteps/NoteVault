@@ -22,6 +22,8 @@ export interface CurriculumEntry {
   items: string[];
   /** Palabras clave para reconocer temas existentes que ya lo cubren (minúsculas). */
   keywords: string[];
+  /** Subtema ATÓMICO (una propiedad, un elemento, un método): id de la entrada-grupo de la que sale. Se crea una nota por cada uno. */
+  parentId?: string;
 }
 
 export interface CurriculumArea {
@@ -34,6 +36,8 @@ export interface CurriculumArea {
   areaFolder: string;
   /** Prefijo numérico opcional para los temas (ej. `5.1` para HTML, `5.2` para CSS); si no se especifica se extrae de `areaFolder`. */
   prefix?: string;
+  /** Si true, cada elemento/propiedad de una entrada importante es su PROPIO subtema (una nota por propiedad); la entrada-grupo queda como repaso. */
+  atomic?: boolean;
   entries: CurriculumEntry[];
 }
 

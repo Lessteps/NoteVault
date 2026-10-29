@@ -81,8 +81,8 @@ const planWith = (subplans: unknown[], practice = false) => ({ subplans, ...(pra
 describe("ítems de Planeación", () => {
   it("Vista general, una página por área (en el orden fijo) y «Más» con Entregables, Registros, Preparar plan y Preguntas y ajustes", () => {
     const l = planeacionLinks(planWith([sub("s2", "Frontend", "frontend"), sub("s1", "Backend", "backend")]));
-    expect(l.map((x) => x.label)).toEqual(["Vista general", "Backend", "Frontend", "Entregables", "Registros", "Preparar plan", "Preguntas y ajustes"]);
-    expect(l.map((x) => x.id)).toEqual(["pl:general", "pl:area/s1", "pl:area/s2", "pl:entregables", "pl:registros", "pl:preparar", "pl:cambios"]);
+    expect(l.map((x) => x.label)).toEqual(["Vista general", "Backend", "Frontend", "Agregar una nueva área", "Entregables", "Registros", "Preparar plan", "Preguntas y ajustes"]);
+    expect(l.map((x) => x.id)).toEqual(["pl:general", "pl:area/s1", "pl:area/s2", "pl:add-area", "pl:entregables", "pl:registros", "pl:preparar", "pl:cambios"]);
     // sin sub-ítems anidados: ya no hay «Agenda › Día · Semana · Mes · Calendario» ni «Mi plan› Resumen…»
     expect(l.every((x) => !x.subs)).toBe(true);
     // los rótulos de sección y las áreas
@@ -95,7 +95,7 @@ describe("ítems de Planeación", () => {
 
   it("«Bases» va la última de las áreas solo si el plan tiene fundamentos; «Práctica» solo si tiene la pista", () => {
     const l = planeacionLinks(planWith([sub("s1", "Backend", "backend", true)], true));
-    expect(l.map((x) => x.label)).toEqual(["Vista general", "Backend", "Bases", "Entregables", "Registros", "Preparar plan", "Práctica", "Preguntas y ajustes"]);
+    expect(l.map((x) => x.label)).toEqual(["Vista general", "Backend", "Agregar una nueva área", "Bases", "Entregables", "Registros", "Preparar plan", "Práctica", "Preguntas y ajustes"]);
     expect(l.some((x) => x.id === "pl:bases")).toBe(true);
   });
 

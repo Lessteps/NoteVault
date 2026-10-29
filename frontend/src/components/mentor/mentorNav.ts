@@ -131,6 +131,7 @@ export const PLAN_SECTION_LINKS: ReadonlyArray<{ id: string; label: string }> = 
 
 export const PAGE_GENERAL = "general";
 export const PAGE_BASES = "bases";
+export const PAGE_ADD_AREA = "add-area";
 export const pageAreaId = (subplanId: string): string => `area/${subplanId}`;
 /** Las páginas «de Más» que siguen siendo pestañas/sub-vistas de siempre. */
 export const MORE_PAGES = ["entregables", "registros", "preparar", "cambios", "practica"] as const;
@@ -149,6 +150,7 @@ export function planeacionLinks(plan: Pick<MentorPlan, "programmingPractice" | "
   const out: NavLink[] = [
     { id: `${PLAN_NAV_PREFIX}${PAGE_GENERAL}`, label: "Vista general", section: "Planificación" },
     ...orderedAreas(plan).map((a): NavLink => ({ id: `${PLAN_NAV_PREFIX}${pageAreaId(a.subplanId)}`, label: a.area, areaId: a.areaId ?? a.subplanId, ...hint(runAreaTab(a.subplanId)) })),
+    { id: `${PLAN_NAV_PREFIX}${PAGE_ADD_AREA}`, label: "Agregar una nueva área" },
     ...(hasBasesRoute(plan) ? [{ id: `${PLAN_NAV_PREFIX}${PAGE_BASES}`, label: "Bases", ...hint("bases") } as NavLink] : []),
   ];
   const pend = pendingDeliverables ? { badge: pendingDeliverables, hint: `${pendingDeliverables} ${pendingDeliverables === 1 ? "pendiente" : "pendientes"} de decidir` } : {};

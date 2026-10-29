@@ -35,6 +35,7 @@ export function openSecondaryWindow(noteRel = ""): { ok: boolean } {
       preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
   });
   win.on("maximize", () => win.webContents.send("nv-window-state", { maximized: true }));

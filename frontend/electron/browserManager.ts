@@ -1,4 +1,4 @@
-import { WebContentsView, BrowserWindow, net, shell } from "electron";
+import { WebContentsView, BrowserWindow, net, shell, type WebContents } from "electron";
 import { blockedPageHtml, hostOf, normalizeUrl, UsageMeter, WebStore } from "../src/core/webStore.js";
 import { getAppState } from "../src/api/registry.js";
 import { cleanRequestHeaders, cleanUserAgent } from "../src/core/webUserAgent.js";
@@ -24,8 +24,53 @@ export interface BrowserState {
   attached: boolean;
 }
 
+function errorPageHtml(url: string, errorDescription: string, errorCode: number): string {
+  return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Error al cargar la página</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #131317;
+      color: #e6e6eb;
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .card {
+      max-width: 460px;
+      width: 100%;
+      background: #1b1b22;
+      border: 1px solid #2b2b36;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    h1 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+    p { margin: 0 0 12px; font-size: 13px; color: #9ca0b0; line-height: 1.5; word-break: break-all; }
+    code { font-family: monospace; font-size: 11.5px; color: #cbd0df; background: #131317; padding: 3px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>No se pudo abrir esta página</h1>
+    <p>Verifica la dirección escrita o tu conexión a internet e inténtalo de nuevo.</p>
+    <p><code>${url}</code></p>
+    <p><code>${errorDescription || "ERR_FAILED"} (${errorCode})</code></p>
+  </div>
+</body>
+</html>`;
+}
+
 export class BrowserManager {
   private view: WebContentsView | null = null;
+  private guestWc: WebContents | null = null;
+  private configuredWcs = new WeakSet<WebContents>();
+  private headersConfigured = false;
   private win: BrowserWindow | null = null;
   private attached = false;
   private currentUrl = "https://www.google.com";
@@ -37,6 +82,46 @@ export class BrowserManager {
 
   setWindow(win: BrowserWindow) {
     this.win = win;
+  }
+
+  private activeWebContents(): WebContents | null {
+    if (this.guestWc && !this.guestWc.isDestroyed()) {
+      return this.guestWc;
+    }
+    if (this.view && !this.view.webContents.isDestroyed()) {
+      return this.view.webContents;
+    }
+    return null;
+  }
+
+  /**
+   * Binds the `<webview>` guest WebContents created in the renderer so all
+   * navigation, content restrictions, history, favicons and usage metering run
+   * directly on the visible DOM-embedded surface.
+   */
+  attachGuest(wc: WebContents): void {
+    this.guestWc = wc;
+    this.attached = true;
+
+    // Ensure no legacy native WebContentsView overlay stays attached
+    if (this.win && !this.win.isDestroyed() && this.view) {
+      try {
+        this.view.setVisible(false);
+        this.win.contentView.removeChildView(this.view);
+      } catch {
+        // Ignore
+      }
+    }
+
+    this.configureWebContents(wc);
+
+    wc.once("destroyed", () => {
+      if (this.guestWc === wc) {
+        this.guestWc = null;
+      }
+    });
+
+    this.notifyState();
   }
 
   /**
@@ -67,28 +152,18 @@ export class BrowserManager {
    * and recalculates DIP bounds for the current layout.
    */
   syncZoom(level: number): void {
-    if (this.view && !this.view.webContents.isDestroyed()) {
-      this.view.webContents.setZoomLevel(level);
+    const wc = this.activeWebContents();
+    if (wc && !wc.isDestroyed()) {
+      wc.setZoomLevel(level);
     }
-    if (this.lastBounds && this.attached && this.view) {
+    if (!this.guestWc && this.lastBounds && this.attached && this.view) {
       this.view.setBounds(this.toDipBounds(this.lastBounds));
     }
   }
 
-  private ensureView(): WebContentsView {
-    if (this.view) return this.view;
-
-    this.view = new WebContentsView({
-      webPreferences: {
-        partition: "persist:nvweb",
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-        plugins: true,
-      },
-    });
-
-    const wc = this.view.webContents;
+  private configureWebContents(wc: WebContents): void {
+    if (this.configuredWcs.has(wc)) return;
+    this.configuredWcs.add(wc);
 
     // Follow the application window's zoom scale so web pages match interface sizing
     if (this.win && !this.win.isDestroyed()) {
@@ -108,9 +183,12 @@ export class BrowserManager {
     const ua = cleanUserAgent(wc.getUserAgent());
     wc.setUserAgent(ua);
     wc.session.setUserAgent(ua);
-    wc.session.webRequest.onBeforeSendHeaders((details, callback) => {
-      callback({ requestHeaders: cleanRequestHeaders(details.requestHeaders) as Record<string, string> });
-    });
+    if (!this.headersConfigured) {
+      this.headersConfigured = true;
+      wc.session.webRequest.onBeforeSendHeaders((details, callback) => {
+        callback({ requestHeaders: cleanRequestHeaders(details.requestHeaders) as Record<string, string> });
+      });
+    }
 
     wc.on("did-start-loading", () => {
       this.isLoading = true;
@@ -124,19 +202,33 @@ export class BrowserManager {
     });
 
     wc.on("did-navigate", (_e, url) => {
-      this.currentUrl = url;
-      this.currentTitle = wc.getTitle();
-      this.recordHistory(url, this.currentTitle);
+      if (!url.startsWith("data:text/html")) {
+        this.currentUrl = url;
+        this.currentTitle = wc.getTitle();
+        this.recordHistory(url, this.currentTitle);
+      }
       this.notifyState();
     });
 
     wc.on("did-navigate-in-page", (_e, url) => {
-      this.currentUrl = url;
+      if (!url.startsWith("data:text/html")) {
+        this.currentUrl = url;
+      }
       this.notifyState();
     });
 
     wc.on("page-title-updated", (_e, title) => {
       this.currentTitle = title;
+      this.notifyState();
+    });
+
+    wc.on("did-fail-load", (_e, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (!isMainFrame || errorCode === -3) return; // Ignore ERR_ABORTED (-3)
+      this.isLoading = false;
+      const failedUrl = validatedURL || this.currentUrl;
+      void wc
+        .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorPageHtml(failedUrl, errorDescription, errorCode))}`)
+        .catch(() => undefined);
       this.notifyState();
     });
 
@@ -148,7 +240,6 @@ export class BrowserManager {
     });
 
     wc.setWindowOpenHandler(({ url }) => {
-      // Content rules check
       const state = getAppState();
       if (state) {
         const store = new WebStore(state.root);
@@ -188,27 +279,50 @@ export class BrowserManager {
       const [allowed, reason] = store.restrictions().check(url, meter.today());
       if (!allowed) {
         e.preventDefault();
-        void wc.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(blockedPageHtml(url, reason))}`);
+        void wc.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(blockedPageHtml(url, reason))}`).catch(() => undefined);
       }
     };
 
     wc.on("will-navigate", (e, url) => checkNavigation(e, url));
     wc.on("will-redirect", (e, url) => checkNavigation(e, url));
 
-    // Meter tick every second
-    this.meterTimer = setInterval(() => {
-      if (!this.attached || !this.view) return;
-      const url = this.view.webContents.getURL();
-      if (url.startsWith("http://") || url.startsWith("https://")) {
-        const state = getAppState();
-        if (state) {
-          const store = new WebStore(state.root);
-          const meter = new UsageMeter(store);
-          meter.tick(hostOf(url), 1);
+    if (!this.meterTimer) {
+      this.meterTimer = setInterval(() => {
+        const active = this.activeWebContents();
+        if (!this.attached || !active || active.isDestroyed()) return;
+        const url = active.getURL();
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+          const state = getAppState();
+          if (state) {
+            const store = new WebStore(state.root);
+            const meter = new UsageMeter(store);
+            meter.tick(hostOf(url), 1);
+          }
         }
-      }
-    }, 1000);
+      }, 1000);
+    }
+  }
 
+  ensureView(): WebContentsView {
+    if (this.view) return this.view;
+
+    this.view = new WebContentsView({
+      webPreferences: {
+        partition: "persist:nvweb",
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        plugins: true,
+      },
+    });
+
+    try {
+      this.view.setBackgroundColor("#ffffff");
+    } catch {
+      // Ignore if unsupported
+    }
+
+    this.configureWebContents(this.view.webContents);
     return this.view;
   }
 
@@ -226,12 +340,20 @@ export class BrowserManager {
   }
 
   getState(): BrowserState {
-    const wc = this.view?.webContents;
+    const wc = this.activeWebContents();
+    const rawUrl = wc && !wc.isDestroyed() ? wc.getURL() : "";
+    const effectiveUrl = rawUrl && !rawUrl.startsWith("data:text/html") ? rawUrl : this.currentUrl;
+    const canGoBack = wc && !wc.isDestroyed()
+      ? (wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack())
+      : false;
+    const canGoForward = wc && !wc.isDestroyed()
+      ? (wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward())
+      : false;
     return {
-      url: wc?.getURL() || this.currentUrl,
-      title: wc?.getTitle() || this.currentTitle,
-      canGoBack: wc?.canGoBack() ?? false,
-      canGoForward: wc?.canGoForward() ?? false,
+      url: effectiveUrl,
+      title: (wc && !wc.isDestroyed() ? wc.getTitle() : "") || this.currentTitle,
+      canGoBack,
+      canGoForward,
       isLoading: this.isLoading,
       favicon: this.currentFavicon,
       attached: this.attached,
@@ -257,69 +379,76 @@ export class BrowserManager {
   attach(bounds: BrowserBounds, url?: string): BrowserState {
     if (!this.win || this.win.isDestroyed()) return this.getState();
     this.lastBounds = bounds;
-    const view = this.ensureView();
-    if (!this.attached) {
-      try {
-        this.win.contentView.addChildView(view);
-      } catch {
-        // Ignore if already child
-      }
-      this.attached = true;
-    }
-    view.setBounds(this.toDipBounds(bounds));
-    view.setVisible(true);
+    this.attached = true;
 
-    const currentWcUrl = view.webContents.getURL();
-    // If the webContents has never loaded a page (or is blank), navigate to initial URL
-    if (!currentWcUrl || currentWcUrl === "about:blank") {
-      void this.navigate(url || this.currentUrl || "https://www.google.com");
-    } else if (url && url !== currentWcUrl && url !== "https://www.google.com" && url !== this.currentUrl) {
-      // Explicit new target requested (e.g. user clicked bookmark or search)
-      void this.navigate(url);
+    const targetUrl = normalizeUrl(url || this.currentUrl || "https://www.google.com");
+
+    // When the renderer uses `<webview>`, `<webview src=...>` handles the initial
+    // load; only trigger an explicit navigate if a different URL is requested later.
+    if (this.guestWc && !this.guestWc.isDestroyed()) {
+      const currentWcUrl = this.guestWc.getURL();
+      if (url && currentWcUrl && currentWcUrl !== "about:blank" && targetUrl !== currentWcUrl && targetUrl !== this.currentUrl) {
+        void this.navigate(targetUrl);
+      }
+      return this.getState();
     }
+
+    this.currentUrl = targetUrl;
     return this.getState();
   }
 
   detach(): void {
-    if (!this.win || !this.view || !this.attached) return;
-    try {
-      this.view.setVisible(false);
-      this.view.setBounds({ x: -10000, y: -10000, width: 0, height: 0 });
-      this.win.contentView.removeChildView(this.view);
-    } catch {
-      // Ignore
+    if (!this.attached) return;
+    if (this.win && !this.win.isDestroyed() && this.view) {
+      try {
+        this.view.setVisible(false);
+        this.view.setBounds({ x: -10000, y: -10000, width: 0, height: 0 });
+        this.win.contentView.removeChildView(this.view);
+      } catch {
+        // Ignore
+      }
     }
     this.attached = false;
   }
 
   setBounds(bounds: BrowserBounds): void {
     this.lastBounds = bounds;
-    if (!this.view || !this.attached) return;
+    if (this.guestWc || !this.view || !this.attached) return;
     this.view.setBounds(this.toDipBounds(bounds));
   }
 
   async navigate(rawUrl: string): Promise<BrowserState> {
-    const view = this.ensureView();
     const url = normalizeUrl(rawUrl);
+    this.currentUrl = url;
+    const wc = this.activeWebContents();
+    if (!wc) {
+      return this.getState();
+    }
+
     const state = getAppState();
     if (state) {
       const store = new WebStore(state.root);
       const meter = new UsageMeter(store);
       const [allowed, reason] = store.restrictions().check(url, meter.today());
       if (!allowed) {
-        await view.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(blockedPageHtml(url, reason))}`);
+        await wc.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(blockedPageHtml(url, reason))}`).catch(() => undefined);
         return this.getState();
       }
     }
-    await view.webContents.loadURL(url);
+    await wc.loadURL(url).catch((err: any) => {
+      if (err?.errno === -3 || String(err?.message || "").includes("ERR_ABORTED")) return;
+      console.warn("[browserManager] loadURL warning:", err?.message || err);
+    });
     return this.getState();
   }
 
   action(act: "back" | "forward" | "reload" | "stop"): BrowserState {
-    const wc = this.view?.webContents;
-    if (wc) {
-      if (act === "back" && wc.canGoBack()) wc.goBack();
-      else if (act === "forward" && wc.canGoForward()) wc.goForward();
+    const wc = this.activeWebContents();
+    if (wc && !wc.isDestroyed()) {
+      const canBack = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack();
+      const canFwd = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
+      if (act === "back" && canBack) wc.goBack();
+      else if (act === "forward" && canFwd) wc.goForward();
       else if (act === "reload") wc.reload();
       else if (act === "stop") wc.stop();
     }
@@ -332,6 +461,7 @@ export class BrowserManager {
       this.meterTimer = null;
     }
     this.detach();
+    this.guestWc = null;
     if (this.view) {
       try {
         this.view.webContents.close();

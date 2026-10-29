@@ -79,7 +79,41 @@ function skillChangeTimes(root: string, subjects: Iterable<string>): Map<string,
   return out;
 }
 
-/** Para cada carpeta de tema (relativa a la vault), qué piezas existen pero son más viejas que su skill. Solo salen los temas con algo atrasado. */
+function isProgrammingTheoryOutdated(raw: string): boolean {
+  if (!raw) return true;
+  if (!raw.includes("## Requires")) return true;
+  if (!raw.includes("### What it is")) return true;
+  // Si no es un tema de catálogo curricular con curriculum_id, debe tener la estructura estándar de 4.1
+  if (!raw.includes("curriculum_id:")) {
+    if (!raw.includes("**In one sentence.**")) return true;
+    if (!raw.includes("### Mental model")) return true;
+    if (!raw.includes("- **In the practice:**") && !raw.includes("**In the practice:**")) return true;
+    if (!raw.includes("## Examples")) return true;
+    if (!raw.includes("**How you will apply it:**") && !raw.includes("**Why it works:**")) return true;
+    if (!raw.includes("## Common mistakes")) return true;
+  }
+  return false;
+}
+
+function isProgrammingCanvasOutdated(rawCanvas: string, theoryStale: boolean): boolean {
+  if (theoryStale) return true;
+  if (!rawCanvas) return true;
+  try {
+    const parsed = JSON.parse(rawCanvas);
+    if (!Array.isArray(parsed.nodes) || parsed.nodes.length === 0) return true;
+    const texts = parsed.nodes.filter((n: any) => n.type === "text").map((n: any) => String(n.text || ""));
+    const joined = texts.join("\n");
+    // Verificar que contenga los marcadores clave del nuevo mapa
+    if (!joined.includes("Explanation") && !parsed.nodes.some((n: any) => n.type === "group" && String(n.label).includes("Explanation"))) return true;
+    if (!joined.includes("**In one sentence.**") && !joined.includes("What it is")) return true;
+    if (!joined.includes("Mental model") && !joined.includes("In the practice")) return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/** Para cada carpeta de tema (relativa a la vault), qué piezas existen pero son más viejas que su skill o tienen formato desactualizado. */
 export function outdatedByFolder(root: string, folders: Iterable<string>): Map<string, OutdatedSkills> {
   const list = [...folders];
   const subjectOf = (folder: string): string => folder.split("/")[0] ?? "";
@@ -93,9 +127,37 @@ export function outdatedByFolder(root: string, folders: Iterable<string>): Map<s
     const stale: OutdatedSkills = {};
     for (const kind of KINDS) {
       const changed = times.get(`${subject}/${kind}`);
-      const made = mtime(path.join(root, folder, pieces[kind]));
+      const filePath = path.join(root, folder, pieces[kind]);
+      const made = mtime(filePath);
       if (changed !== undefined && made !== null && made < changed) stale[kind] = true;
     }
+
+    // Comprobación estructural en caliente para Programación
+    if (subject === "Programación") {
+      const thPath = path.join(root, folder, pieces.theory);
+      if (fs.existsSync(thPath)) {
+        try {
+          const rawTh = fs.readFileSync(thPath, "utf8");
+          if (isProgrammingTheoryOutdated(rawTh)) {
+            stale.theory = true;
+          }
+        } catch {
+          stale.theory = true;
+        }
+      }
+      const cvPath = path.join(root, folder, pieces.canvas);
+      if (fs.existsSync(cvPath)) {
+        try {
+          const rawCv = fs.readFileSync(cvPath, "utf8");
+          if (isProgrammingCanvasOutdated(rawCv, !!stale.theory)) {
+            stale.canvas = true;
+          }
+        } catch {
+          stale.canvas = true;
+        }
+      }
+    }
+
     if (stale.theory || stale.canvas || stale.practica) out.set(folder, stale);
   }
   return out;

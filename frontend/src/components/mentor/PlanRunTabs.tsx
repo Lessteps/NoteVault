@@ -10,6 +10,7 @@ import type { ReviewRow } from "../../lib/planReviews";
 import { cn } from "../ui";
 import { GhostButton } from "../common/forms";
 import { AreaSession, useTimeLog } from "./AreaSession";
+import { SubjectStatsCard } from "./SubjectStatsCard";
 import { minutesOn } from "../../lib/timeLog";
 import { AreaWork, startAreaBlock, type UpcomingWeekView, type WeekDayView } from "./AreaWork";
 import type { BoardPractice, BoardRow } from "./PlanBoard";
@@ -55,6 +56,7 @@ export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets,
   const areaKey = area.areaId ?? area.subplanId;
   const { entries: timeEntries } = useTimeLog(plan.id);
   const objective = plan.subplans.find((s) => s.id === area.subplanId)?.objective;
+  const sub = plan.subplans.find((s) => s.id === area.subplanId);
   const planned = card ? card.entry.theoryMinutes + card.entry.practiceMinutes : 0;
   const current = card?.rows.find((r) => !r.done)?.title;
   const toast = useApp.getState().toast;
@@ -110,21 +112,24 @@ export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets,
           </SectionCard>
         )}
       </div>
-      <AreaSession
-        planId={plan.id}
-        areaKey={areaKey}
-        areaName={area.area}
-        date={date}
-        plannedMinutes={planned}
-        colour={colour}
-        {...(current ? { currentTopic: current } : {})}
-        defaultWork={areaDefaultWork({ pendingTopics: (card?.rows ?? []).some((r) => !r.done), project: !!dailyProject })}
-        todayTopics={(card?.rows ?? []).filter((r) => !r.done).map((r) => ({ folder: r.folder, title: r.title, kind: "topic" as const }))}
-        suggestions={[
-          ...(dailyProject ? [{ folder: `project:daily:${areaKey}`, title: `Proyecto diario: ${dailyProject.title}`, kind: "project" as const }] : []),
-          ...(weeklyProjectTitle ? [{ folder: `project:weekly:${areaKey}`, title: `Proyecto semanal: ${weeklyProjectTitle}`, kind: "project" as const }] : []),
-        ]}
-      />
+      <div className="space-y-4">
+        <AreaSession
+          planId={plan.id}
+          areaKey={areaKey}
+          areaName={area.area}
+          date={date}
+          plannedMinutes={planned}
+          colour={colour}
+          {...(current ? { currentTopic: current } : {})}
+          defaultWork={areaDefaultWork({ pendingTopics: (card?.rows ?? []).some((r) => !r.done), project: !!dailyProject })}
+          todayTopics={(card?.rows ?? []).filter((r) => !r.done).map((r) => ({ folder: r.folder, title: r.title, kind: "topic" as const }))}
+          suggestions={[
+            ...(dailyProject ? [{ folder: `project:daily:${areaKey}`, title: `Proyecto diario: ${dailyProject.title}`, kind: "project" as const }] : []),
+            ...(weeklyProjectTitle ? [{ folder: `project:weekly:${areaKey}`, title: `Proyecto semanal: ${weeklyProjectTitle}`, kind: "project" as const }] : []),
+          ]}
+        />
+        {sub && <SubjectStatsCard plan={plan} sub={sub} />}
+      </div>
     </div>
   );
 }

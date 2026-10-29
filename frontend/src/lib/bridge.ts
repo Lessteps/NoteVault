@@ -455,6 +455,22 @@ export const api = {
     call<import("./types").MentorRouteChangeResult>("mentor_plan_route_set", opts),
   /** «Añadir al plan»: los temas de referencia validados entran al final de la ruta de su área (html/css/js → Frontend, java → Java); idempotente. */
   mentorPlanAddTopics: (opts: { planId: string; folders: string[]; subplanId?: string }) => call<import("./types").MentorAddTopicsResult>("mentor_plan_add_topics", opts),
+  mentorPlanAreaCreate: (opts: { planId: string; name: string; objective?: string; fromWeek?: number; toWeek?: number }) =>
+    call<{ plan: import("./types").MentorPlan; subplan: import("./types").MentorSubplan }>("mentor_plan_area_create", opts),
+  mentorPlanAreaUpdate: (opts: { planId: string; subplanId: string; fromWeek?: number; toWeek?: number; objective?: string; state?: "en_curso" | "pendiente" | "completada" }) =>
+    call<{ plan: import("./types").MentorPlan; subplan: import("./types").MentorSubplan }>("mentor_plan_area_update", opts),
+  mentorPlanFixMethodology: (opts: { planId: string; subplanId: string; groupId?: string }) =>
+    call<{ plan: import("./types").MentorPlan; addedCount: number }>("mentor_plan_fix_methodology", opts),
+  mentorPlanTopicUpdate: (opts: { planId: string; subplanId?: string; folder: string; targetWeek?: number; completed?: boolean; route?: "core" | "optional" | "skipped"; tags?: string[] }) =>
+    call<{ plan: import("./types").MentorPlan; topic: import("./types").MentorPlannedTopic }>("mentor_plan_topic_update", opts),
+  mentorTopicResolve: (opts: { folder: string; topicId?: string; title?: string; areaId?: string; ensureCanvas?: boolean }) =>
+    call<{ found: boolean; folder: string; topicId: string; relocated: boolean; theoryNote: string | null; practiceNote: string | null; canvasFile: string | null; canvasGenerated: boolean }>("mentor_topic_resolve", opts),
+  mentorPlanVaultCheck: (planId: string) =>
+    call<{ planId: string; needsSync: boolean; relocatedCount: number; missingCanvasCount: number; unindexedCount: number; relocated: Array<{ oldFolder: string; newFolder: string; title: string; topicId: string }>; missingCanvases: Array<{ folder: string; title: string; topicId: string }> }>("mentor_plan_vault_check", { planId }),
+  mentorPlanVaultReconcile: (planId: string, generateCanvases = true) =>
+    call<{ plan: import("./types").MentorPlan; changedPlan: boolean; relocatedCount: number; generatedCanvases: number; indexedCount: number }>("mentor_plan_vault_reconcile", { planId, generateCanvases }),
+  mentorPlanSubjectAddTopics: (opts: { planId: string; subplanId: string; groupId: string; topics: Array<{ folder?: string; title: string; estMinutes?: number; targetWeek?: number }> }) =>
+    call<{ plan: import("./types").MentorPlan; added: number }>("mentor_plan_subject_add_topics", opts),
   mentorPlanGroupCreate: (opts: { planId: string; subplanId: string; title: string }) => call<{ plan: import("./types").MentorPlan; group: import("./planAreas").AreaGroup }>("mentor_plan_group_create", opts),
   mentorPlanGroupRename: (opts: { planId: string; subplanId: string; groupId: string; title: string }) => call<{ plan: import("./types").MentorPlan; group: import("./planAreas").AreaGroup }>("mentor_plan_group_rename", opts),
   mentorPlanGroupDelete: (opts: { planId: string; subplanId: string; groupId: string; fallbackGroupId?: string }) => call<{ plan: import("./types").MentorPlan; moved: number }>("mentor_plan_group_delete", opts),
@@ -463,6 +479,8 @@ export const api = {
   mentorFolderRoleSet: (opts: { folder: string; role: import("./folderRoles").FolderRoleKind; objective?: string }) => call<import("./folderRoles").FolderRolesFile>("mentor_folder_role_set", opts),
   mentorFolderRoleClear: (opts: { folder: string }) => call<import("./folderRoles").FolderRolesFile>("mentor_folder_role_clear", opts),
   mentorFolderAutoAddSet: (opts: { enabled: boolean }) => call<import("./folderRoles").FolderRolesFile>("mentor_folder_auto_add_set", opts),
+  mentorAreaTimesGet: (opts: { planId: string }) => call<{ times: import("./areaTimes").AreaTimes }>("mentor_area_times_get", opts),
+  mentorAreaTimeSet: (opts: { planId: string; subplanId: string; start: string | null; durationMin?: number | null }) => call<{ times: import("./areaTimes").AreaTimes }>("mentor_area_time_set", opts),
   mentorPlanFolderCandidates: (opts: { planId: string }) => call<{ candidates: Array<{ folder: string; label: string; role?: import("./folderRoles").FolderRoleKind; objective?: string; topicCount: number; estMinutes: number }> }>("mentor_plan_folder_candidates", opts),
   mentorPlanFolderPreview: (opts: { planId: string; folder: string; mode: "area" | "subject"; subplanId?: string; name?: string; objective?: string }) => call<{ preview: { duplicates: import("./types").ReviewDuplicate[]; impact: import("./types").ReviewImpact; warnings: string[]; fits: boolean } }>("mentor_plan_folder_preview", opts),
   mentorPlanFolderAdd: (opts: { planId: string; folder: string; mode: "area" | "subject"; subplanId?: string; name?: string; objective?: string; source?: "manual" | "auto" }) => call<{ plan: import("./types").MentorPlan; review: import("./types").PlanReview }>("mentor_plan_folder_add", opts),

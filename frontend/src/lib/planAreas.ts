@@ -247,6 +247,155 @@ export interface BranchPlacement {
 const BASES_GROUP: AreaGroup = { id: "bases", title: "Bases", kind: "bases", order: 0 };
 export const CORE_GROUP_ID = "core";
 
+export const FRONTEND_SUBJECT_GROUPS: readonly AreaGroup[] = [
+  { id: "html", title: "HTML", kind: "knowledge", order: 110 },
+  { id: "css", title: "CSS", kind: "knowledge", order: 120 },
+];
+
+/** Determina si una carpeta de Frontend pertenece a la asignatura HTML o CSS. */
+export function frontendGroupForFolder(folder: string): AreaGroup | null {
+  const f = folder.replace(/\\/g, "/");
+  if (
+    f.includes("/5 Frontend/HTML/") ||
+    f.includes("/11 HTML/") ||
+    /\/5\.1\b.*semantic html/i.test(f) ||
+    /\bhtml\b/i.test(f.split("/").pop() ?? "")
+  ) {
+    return { id: "html", title: "HTML", kind: "knowledge", order: 110 };
+  }
+  if (
+    f.includes("/5 Frontend/CSS/") ||
+    f.includes("/12 CSS/") ||
+    /\/5\.2\s+CSS\b/i.test(f) ||
+    /\/5\.11\s+Styling\b/i.test(f) ||
+    /\bcss\b/i.test(f.split("/").pop() ?? "")
+  ) {
+    return { id: "css", title: "CSS", kind: "knowledge", order: 120 };
+  }
+  return null;
+}
+
+export interface SubjectMethodologyWarning {
+  areaId: string;
+  groupId: string;
+  groupTitle: string;
+  severity: "warning" | "error";
+  title: string;
+  description: string;
+  missingTags: string[];
+  recommendedTopics: Array<{
+    folder: string;
+    title: string;
+    group: string;
+    tags: string[];
+    estMinutes: number;
+  }>;
+}
+
+export function evaluateAreaMethodology(subplan: {
+  id: string;
+  areaId?: string;
+  area: string;
+  groups?: readonly AreaGroup[];
+  topics: ReadonlyArray<{ folder: string; title: string; group?: string; route?: string; tags?: string[] }>;
+}): SubjectMethodologyWarning[] {
+  const warnings: SubjectMethodologyWarning[] = [];
+  const isFrontend = subplan.areaId === "frontend" || /frontend/i.test(subplan.area);
+  if (!isFrontend) return warnings;
+
+  const liveTopics = subplan.topics.filter((t) => t.route !== "skipped");
+  const htmlTopics = liveTopics.filter(
+    (t) => t.group === "html" || frontendGroupForFolder(t.folder)?.id === "html"
+  );
+  const hasContainerHtml = htmlTopics.some((t) =>
+    /contenedor|container|semantic|landmark|section/i.test(`${t.title} ${t.folder} ${(t.tags ?? []).join(" ")}`)
+  );
+  if (htmlTopics.length < 3 || !hasContainerHtml) {
+    warnings.push({
+      areaId: subplan.id,
+      groupId: "html",
+      groupTitle: "HTML",
+      severity: "warning",
+      title: "Problema metodológico en la asignatura HTML: falta práctica de contenedores y estructura semántica",
+      description: "Cuando una asignatura radica en la memorización y práctica particular de elementos (contenedores semánticos, landmarks, formularios y tablas), un único tema general resulta insuficiente.",
+      missingTags: ["#memorizacion-elementos", "#practica-contenedores", "#html-semantico"],
+      recommendedTopics: [
+        {
+          folder: "Programación/5 Frontend/HTML/5.18.1 HTML practicar con contenedores y estructura semántica",
+          title: "HTML: practicar con contenedores y estructura semántica",
+          group: "html",
+          tags: ["memorizacion-elementos", "practica-contenedores", "html-semantico"],
+          estMinutes: 45,
+        },
+        {
+          folder: "Programación/5 Frontend/HTML/5.18.2 HTML practicar con formularios, inputs y tablas",
+          title: "HTML: practicar con formularios, inputs y tablas",
+          group: "html",
+          tags: ["memorizacion-elementos", "practica-formularios", "html-inputs"],
+          estMinutes: 45,
+        },
+        {
+          folder: "Programación/5 Frontend/HTML/5.18.3 HTML practicar con multimedia, enlaces y accesibilidad",
+          title: "HTML: practicar con multimedia, enlaces y accesibilidad",
+          group: "html",
+          tags: ["memorizacion-elementos", "practica-accesibilidad", "html-aria"],
+          estMinutes: 45,
+        },
+      ],
+    });
+  }
+
+  const cssTopics = liveTopics.filter(
+    (t) => t.group === "css" || frontendGroupForFolder(t.folder)?.id === "css"
+  );
+  const hasContainerCss = cssTopics.some((t) =>
+    /contenedor|container|flexbox|grid|box-model|propiedades/i.test(`${t.title} ${t.folder} ${(t.tags ?? []).join(" ")}`)
+  );
+  if (cssTopics.length < 4 || !hasContainerCss) {
+    warnings.push({
+      areaId: subplan.id,
+      groupId: "css",
+      groupTitle: "CSS",
+      severity: "warning",
+      title: "Problema metodológico en la asignatura CSS: práctica insuficiente de propiedades de contenedores",
+      description: "La práctica actual de CSS es insuficiente para lo que necesita dominar un frontend real. Requiere práctica particular de propiedades de contenedores (Box Model, Flexbox, Grid, posicionamiento y responsive).",
+      missingTags: ["#practica-propiedades-contenedores", "#flexbox", "#css-grid", "#box-model"],
+      recommendedTopics: [
+        {
+          folder: "Programación/5 Frontend/CSS/5.19.1 CSS practicar con propiedades de contenedores y Box Model",
+          title: "CSS: practicar con propiedades de contenedores y Box Model",
+          group: "css",
+          tags: ["practica-propiedades-contenedores", "box-model", "display-flow"],
+          estMinutes: 45,
+        },
+        {
+          folder: "Programación/5 Frontend/CSS/5.19.2 CSS practicar con contenedores Flexbox y alineación",
+          title: "CSS: practicar con contenedores Flexbox y alineación",
+          group: "css",
+          tags: ["practica-propiedades-contenedores", "flexbox", "alineacion"],
+          estMinutes: 45,
+        },
+        {
+          folder: "Programación/5 Frontend/CSS/5.19.3 CSS practicar con contenedores CSS Grid y áreas",
+          title: "CSS: practicar con contenedores CSS Grid y áreas",
+          group: "css",
+          tags: ["practica-propiedades-contenedores", "css-grid", "layout"],
+          estMinutes: 45,
+        },
+        {
+          folder: "Programación/5 Frontend/CSS/5.19.4 CSS practicar con posicionamiento, responsive y variables",
+          title: "CSS: practicar con posicionamiento, responsive y variables",
+          group: "css",
+          tags: ["practica-propiedades-contenedores", "positioning", "responsive"],
+          estMinutes: 45,
+        },
+      ],
+    });
+  }
+
+  return warnings;
+}
+
 export const areaNameOf = (id: string, fallback = ""): string => AREA_BY_ID.get(id)?.name ?? fallback;
 
 function knowledgeGroup(areaId: string, order = 100): AreaGroup {
@@ -350,7 +499,10 @@ export function bucketByArea<T extends TopicLike>(topics: readonly T[], opts: { 
       for (const t of list) {
         const p = placed.get(branchOfFolder(t.folder));
         if (p === null) continue; // programming_practice: no es un área del plan
-        if (p) put(p.areaId, p.areaName, p.group, t);
+        if (p) {
+          const fg = p.areaId === "frontend" ? frontendGroupForFolder(t.folder) : null;
+          put(p.areaId, p.areaName, fg ?? p.group, t);
+        }
         else put("x-" + slug(space), space, { id: CORE_GROUP_ID, title: "Temas", kind: "knowledge", order: 100 }, t);
       }
     } else {

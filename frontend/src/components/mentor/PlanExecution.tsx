@@ -7,6 +7,8 @@
 //  · el progreso de la ejecución en segundo plano (pausar, reanudar, cancelar y el registro de los archivos creados).
 // Nada se ejecuta solo: lo que crea o modifica notas ocurre únicamente cuando la persona confirma en el diálogo.
 
+import { AreasCheckButton } from "./AreasCheck";
+import { MethodologyCheckButton } from "./MethodologyCheck";
 import { ClipboardCopy, FolderPlus, ListChecks, Pause, Play, Sparkles, Square } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
@@ -641,6 +643,12 @@ export function ExecutionPanel({ plan, cov, onPlan, announce, signal }: { plan: 
         <PrimaryButton large onClick={() => void analyze()} disabled={busy} data-testid="exec-analyze">
           <Sparkles size={16} aria-hidden className="flex-none" /> Analizar el plan
         </PrimaryButton>
+        <AreasCheckButton plan={plan} onPlan={onPlan} announce={announce} />
+        <MethodologyCheckButton
+          scope={{ kind: "all", label: "Todas las áreas" }}
+          topics={plan.subplans.flatMap((s) => s.topics.map((t) => ({ folder: t.folder, title: t.title, group: t.group })))}
+          testid="exec-methodology-check"
+        />
         <GhostButton large onClick={() => setDialog(true)} disabled={!report || !report.tasks.length || running || !aiOn} data-testid="exec-open-dialog" title={!aiOn ? "La IA no está configurada" : undefined}>
           <FolderPlus size={16} aria-hidden className="flex-none" /> Ejecutar plan…
         </GhostButton>

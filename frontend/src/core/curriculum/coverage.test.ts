@@ -40,7 +40,8 @@ const TODAY: ExistingTopic[] = [
 ];
 
 describe("computeCoverage", () => {
-  const areas = curriculumAreas();
+  // los tests de abajo miden los GRUPOS del catálogo; los subtemas atómicos tienen su propio bloque al final
+  const areas = curriculumAreas().map((a) => ({ ...a, entries: a.entries.filter((e) => !e.parentId) }));
 
   it("la vault de hoy sale crítica en HTML, CSS y Java, y baja o crítica en JS reference", () => {
     const cov = computeCoverage(areas, TODAY);

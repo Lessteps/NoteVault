@@ -58,6 +58,11 @@ export function WebModule() {
   const open = async (text: string) => {
     if (!text.trim()) return;
     setCurrentBrowseUrl(text);
+    if (!page) {
+      addPage(text);
+    } else {
+      patchPage(page.id, { url: text });
+    }
     setTab("browser");
     try {
       await api.browserNavigate(text);
@@ -117,7 +122,7 @@ export function WebModule() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => addPage("https://")}
+                  onClick={() => addPage("https://www.google.com")}
                   className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-accent-strong"
                 >
                   Abrir la primera página

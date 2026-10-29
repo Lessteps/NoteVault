@@ -114,7 +114,7 @@ beforeEach(async () => {
   put("Programación/_skills/resumen_teorico_skill.md", "# resumen_teorico_skill\nTHEORY\n");
   put("Programación/_skills/practica_skill.md", "# practica\nPRACTICE\n");
   put("Programación/00 Temario.md", "---\ntitle: Syllabus\n---\n\n# Syllabus\n\n<!-- nv:generated -->\n\n## 4 Backend\n- [[4.1 HTTP]]\n");
-  for (const t of ["Programación/4 Backend/4.1 HTTP", "Programación/4 Backend/4.2 REST", "Programación/5 Frontend/5.1 DOM", "Programación/5 Frontend/5.2 Events"]) topic(t);
+  for (const t of ["Programación/4 Backend/4.1 HTTP", "Programación/4 Backend/4.2 REST", "Programación/5 Frontend/5.1 DOM", "Programación/5 Frontend/5.2 Events", "Programación/10 Programming Logic/10.1 Kata"]) topic(t);
   clearStudySnapshotCache();
   clearVaultScanCache();
   app = new AppState(dir);
@@ -302,7 +302,7 @@ describe("mentor_plan_add_topics (API)", () => {
     mkTopics();
     const plan = savePlan();
     expect(() => api().mentor_plan_add_topics({ planId: plan.id, folders: ["Programación/12 CSS/12.99 Nada"] })).toThrow(/No se añadió nada: no es un tema de la vault/);
-    expect(() => api().mentor_plan_add_topics({ planId: plan.id, folders: ["Programación/4 Backend/4.1 HTTP"] })).toThrow(/no es de un área de referencia/);
+    expect(() => api().mentor_plan_add_topics({ planId: plan.id, folders: ["Programación/10 Programming Logic/10.1 Kata"] })).toThrow(/no es de un área de referencia/);
     expect(() => api().mentor_plan_add_topics({ planId: plan.id, folders: [] })).toThrow(/al menos un tema/);
     expect(() => api().mentor_plan_add_topics({ planId: "../x", folders: [CSS1] })).toThrow(/Plan inválido/);
     expect(() => api().mentor_plan_add_topics({ planId: "2000-01-01_2000-02-01", folders: [CSS1] })).toThrow(/ya no existe/);

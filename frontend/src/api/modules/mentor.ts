@@ -162,7 +162,7 @@ import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
 import { curriculumAreas } from "../../core/curriculum/catalog.js";
-import { addTopicsToPlan, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, findAreaSubplan, type AddTopicItem } from "../../core/mentor/planAddTopics.js";
+import { addTopicsToPlan, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, findAreaSubplan, knowledgeTargetOfFolder, type AddTopicItem } from "../../core/mentor/planAddTopics.js";
 
 const DEFAULT_BRIEF_CHARS = 6000;
 
@@ -2269,7 +2269,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
           continue;
         }
         const areaId = curriculumAreaOfFolder(folder, areas);
-        const target = areaId ? CURRICULUM_PLAN_TARGET[areaId] : undefined;
+        const target = (areaId ? CURRICULUM_PLAN_TARGET[areaId] : undefined) ?? knowledgeTargetOfFolder(folder);
         if (!target) rejected.push({ folder, reason: "no es de un área de referencia: elige el área del plan donde añadirlo" });
         else items.push({ folder, title: snap.title, estMinutes: minutes, target });
       }
@@ -2336,13 +2336,24 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const inPlan = new Set(plan.subplans.flatMap((s) => s.topics.map((t) => t.folder)));
       const file = path.join(app.root, ".notevault", "mentor", "plan-sync", `${id}.json`);
       const offered = new Set<string>(((store.loadJson(file, null) as { offered?: unknown } | null)?.offered as string[] | undefined) ?? []);
+      const planBorn = Date.parse(plan.createdAt) || 0;
+      const newerThanPlan = (folder: string): boolean => {
+        try {
+          return fs.statSync(path.join(app.root, folder, `${folder.split("/").pop()}.md`)).mtimeMs >= planBorn;
+        } catch {
+          return false;
+        }
+      };
       const candidates = topicSnaps(app)
         .map((t) => t.folder)
         .filter((f) => {
           if (inPlan.has(f)) return false;
           const aid = curriculumAreaOfFolder(f, areas);
-          const target = aid ? CURRICULUM_PLAN_TARGET[aid] : undefined;
-          return !!target && !!findAreaSubplan(plan, target);
+          const reference = aid ? CURRICULUM_PLAN_TARGET[aid] : undefined;
+          if (reference) return !!findAreaSubplan(plan, reference);
+          // un tema de conocimiento (`6 Databases/6.4.1 SELECT`) nuevo desde que existe el plan: solo si su área ya está en él (lo que el estudiante quitó antes del plan no vuelve)
+          const knowledge = knowledgeTargetOfFolder(f);
+          return !!knowledge && !!findAreaSubplan(plan, knowledge) && newerThanPlan(f);
         });
       const fresh = candidates.filter((f) => !offered.has(f)).slice(0, 400);
       if (!fresh.length) return { loading: false as const, added: [] as string[], message: "" };

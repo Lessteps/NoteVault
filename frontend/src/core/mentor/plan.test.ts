@@ -189,8 +189,12 @@ describe("planItemsFor: del plan mensual al plan diario", () => {
     expect(w2.map((i) => i.folder)).toEqual(["P/T3", "P/T1", "P/T2", "P/T4", "P/T5", "P/T6"]);
     expect(w2[0]).toMatchObject({ scheduledToday: true });
     expect(w2[0]!.todayMinutes).toBeGreaterThan(0);
-    expect(w2.slice(0, 3).every((i) => i.overdue)).toBe(true); // la semana 1 ya pasó
-    expect(w2[3]!.overdue).toBe(false);
+    // sin haber empezado la ruta nada está atrasado, por mucho que la semana 1 ya pasó
+    expect(w2.some((i) => i.overdue)).toBe(false);
+    // con algo ya hecho, lo de la semana 1 sin hacer sí es atraso
+    const started = planItemsFor("2026-10-09", [plan], (f) => f === "P/T6");
+    expect(started.slice(0, 3).every((i) => i.overdue)).toBe(true);
+    expect(started[3]!.overdue).toBe(false);
     expect(w2.every((i) => i.label === "Programación: Backend")).toBe(true);
     // el primer día del mes solo toca la semana 1
     expect(planItemsFor("2026-10-02", [plan]).map((i) => i.folder)).toEqual(["P/T1", "P/T2", "P/T3"]);

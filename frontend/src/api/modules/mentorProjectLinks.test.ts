@@ -217,6 +217,21 @@ describe("mentor_plan_sync_reference: lo nuevo de la vault entra solo al plan", 
     expect(r3.added.map((f: string) => f.split("/").pop())).toEqual(["5.18.5 Metadata"]);
   });
 
+  it("un tema nuevo de conocimiento (6.4.1 SELECT de Databases) entra solo a su área, si el plan la tiene", async () => {
+    const plan = savePlan();
+    const store = new PlanStore(dir);
+    const fe = plan.subplans.find((s) => s.areaId === "frontend")!;
+    store.save({ ...plan, createdAt: "2000-01-01T00:00:00.000Z", subplans: [...plan.subplans, { ...fe, id: "s9-databases", area: "Databases", areaId: "databases", topics: [], weeks: [], groups: undefined as never }] });
+    setWarmApp(app);
+    make("Programación/6 Databases/6.4.1 SELECT");
+    make("Programación/3 Desktop Apps (Electron)/3.9 Algo"); // su área no está en el plan: no entra
+    await warmStudyIndex();
+    const m = mentorApi(app, vi.fn());
+    const r: any = m.mentor_plan_sync_reference({ planId: plan.id });
+    expect(r.added.map((f: string) => f.split("/").pop())).toEqual(["6.4.1 SELECT"]);
+    expect(store.load(plan.id)!.subplans.find((s) => s.areaId === "databases")!.topics.map((t) => t.folder.split("/").pop())).toEqual(["6.4.1 SELECT"]);
+  });
+
   it("si el plan no tiene el área (Frontend) no mete nada; en planes archivados tampoco", async () => {
     const plan = savePlan();
     const store = new PlanStore(dir);

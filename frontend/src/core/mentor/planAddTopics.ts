@@ -10,7 +10,8 @@
  */
 
 import { areaDef, CORE_GROUP_ID, type AreaGroup } from "../../lib/planAreas.js";
-import { weekRangesOf } from "../../lib/planTime.js";
+import { classifyBranch, weekRangesOf } from "../../lib/planTime.js";
+import { branchOfFolder } from "../../lib/planTopicCatalog.js";
 import type { PlannedTopic, Plan, Subplan, WeekSlice } from "./plan.js";
 
 export interface PlanAreaTarget {
@@ -30,6 +31,19 @@ const JAVA: PlanAreaTarget = { areaId: "java", name: "Java", objective: "Dominar
 
 /** Área del currículo de referencia → área del plan donde entra por defecto. */
 export const CURRICULUM_PLAN_TARGET: Readonly<Record<string, PlanAreaTarget>> = { html: FRONTEND, css: FRONTEND, "js-reference": FRONTEND, java: JAVA };
+
+/** Áreas de CONOCIMIENTO (carpetas numeradas como `6 Databases`) cuyos temas nuevos entran solos al plan: la clase de su rama → el área del plan. */
+const KNOWLEDGE_CLASSES: ReadonlySet<string> = new Set(["backend", "frontend", "databases", "automation", "tooling"]);
+
+/** El área del plan a la que va un tema de conocimiento (`Programación/6 Databases/6.4.1 SELECT`) por su rama, o undefined si no es de una. */
+export function knowledgeTargetOfFolder(folder: string): PlanAreaTarget | undefined {
+  const f = folder.replace(/\\/g, "/");
+  if (f.split("/").filter(Boolean).length < 3) return undefined;
+  const cls = classifyBranch(branchOfFolder(f));
+  if (!KNOWLEDGE_CLASSES.has(cls)) return undefined;
+  const d = areaDef(cls);
+  return d ? { areaId: d.id, name: d.name, objective: d.objective, knowledgeTitle: d.knowledgeTitle } : undefined;
+}
 
 /** Cuántos temas nuevos se reparten por semana en el `targetWeek` informativo (el reparto real es por avance). */
 const PER_WEEK = 4;

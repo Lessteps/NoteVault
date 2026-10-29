@@ -960,6 +960,8 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
     } catch {
       /* sin agenda: solo la semana */
     }
+    // sin haber empezado la ruta nada está atrasado (misma regla que `areaSets`): el número de semana es fijo, el avance no
+    const started = plan.subplans.some((x) => x.topics.some((t) => !!t.completedAt || isDone?.(t.folder)));
     for (const s of plan.subplans) {
       const label = subplanLabel(s);
       let pending = 0;
@@ -981,7 +983,7 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
           ...(t.skills?.length ? { skills: t.skills } : {}),
           estMinutes: t.estMinutes,
           targetWeek: t.targetWeek,
-          overdue: t.targetWeek < cur,
+          overdue: started && t.targetWeek < cur,
           ...(todayOf.has(t.folder) ? { scheduledToday: true, todayMinutes: todayOf.get(t.folder)! } : {}),
           ...(roleOf.has(t.folder) ? { role: roleOf.get(t.folder)! } : {}),
           ...(focusToday && todayOf.has(t.folder) ? { focus: focusToday } : {}),

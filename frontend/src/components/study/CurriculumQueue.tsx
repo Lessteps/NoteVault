@@ -17,7 +17,8 @@ import { useApp } from "../../store/app";
 import { useCurriculum, type CurriculumHandoffState } from "../../store/curriculum";
 import { GhostButton, PrimaryButton } from "../common/forms";
 import { ProgressBar } from "../mentor/parts";
-import { AddToPlan, refreshEverything } from "./CurriculumHandoffPanel";
+import { AddToPlan, refreshEverything, selectablePlans } from "./CurriculumHandoffPanel";
+import { useMentor } from "../../store/mentor";
 
 export function CurriculumQueue({ areaId, areaTitle, missing, essentials, withExercises }: { areaId: string; areaTitle: string; missing: number; essentials: number; withExercises: boolean }) {
   const toast = useApp((s) => s.toast);
@@ -110,6 +111,33 @@ export function CurriculumQueue({ areaId, areaTitle, missing, essentials, withEx
   const failed = queue.filter((h) => h.status === "failed");
   const folders = validatedTopics.flatMap((h) => h.entries.map((e) => e.folder));
 
+  // Lo validado (o generado en automático) entra SOLO al plan activo, al final de la ruta de su área: nadie tiene que acordarse de «Añadir al plan». Es idempotente y se
+  // puede deshacer desde el historial del plan. Si no hay un plan activo, queda el botón de abajo.
+  const addedKey = useRef("");
+  const autoFolders = job?.done ? job.created : folders;
+  const autoKey = autoFolders.join("|");
+  useEffect(() => {
+    if (!autoKey || addedKey.current === autoKey) return;
+    addedKey.current = autoKey;
+    let live = true;
+    void (async () => {
+      try {
+        const rows = selectablePlans(await api.mentorPlanList());
+        const plan = rows.find((p) => p.status === "activo");
+        if (!plan || !live) return;
+        const res = await useCurriculum.getState().addToPlan(plan.id, autoKey.split("|"));
+        if (!live) return;
+        toast("info", `${res.message} (plan «${plan.name}»)`);
+        useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+      } catch {
+        /* queda el botón «Añadir al plan» */
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [autoKey, toast]);
+
   const make = async (importance?: string): Promise<void> => {
     setBusy("make");
     try {
@@ -192,7 +220,7 @@ export function CurriculumQueue({ areaId, areaTitle, missing, essentials, withEx
         )}
         {job.done && job.created.length > 0 && (
           <div className="space-y-1" data-testid="auto-add">
-            <p className="text-[13.5px] font-semibold text-text">{job.created.length} temas creados, listos para tu plan</p>
+            <p className="text-[13.5px] font-semibold text-text">{job.created.length} temas creados (se añaden solos al plan activo)</p>
             <AddToPlan folders={job.created} />
           </div>
         )}
@@ -283,7 +311,7 @@ export function CurriculumQueue({ areaId, areaTitle, missing, essentials, withEx
 
       {folders.length > 0 && (
         <div className="space-y-1" data-testid="queue-step-plan">
-          <p className="text-[13.5px] font-semibold text-text"><span className="mr-2 font-bold text-accent-text">3</span>{folders.length} temas validados, listos para tu plan</p>
+          <p className="text-[13.5px] font-semibold text-text"><span className="mr-2 font-bold text-accent-text">3</span>{folders.length} temas validados (se añaden solos al plan activo)</p>
           <AddToPlan folders={folders} />
         </div>
       )}

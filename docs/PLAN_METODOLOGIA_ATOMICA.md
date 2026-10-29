@@ -28,6 +28,11 @@
 - **Verificar áreas faltantes** (junto a «Analizar el plan»): áreas estándar y carpetas de la vault que no están en el plan, con «Añadir» (operación del plan con historial y «Deshacer»).
 - **Horario por área**: `lib/areaTimes.ts` + API `mentor_area_time_set`; el calendario general (`MentorCalendarSource`) usa esa hora. Se edita en Calendario (Vista general, plegado) y en el Calendario de cada área: es el mismo dato.
 
+## Organización automática del plan
+- `lib/planOrganize.ts` + op `organize` (`planChange.ts`): el orden de los temas de referencia sale de los NÚMEROS de carpeta (`5.18.4` antes que `5.18.4.1`), los genéricos antiguos pasan a opcionales y las semanas se recalculan con la capacidad real.
+- Se aplica SOLO: al añadir temas al plan (`mentor_plan_add_topics`) y al abrir un plan que lo necesite (`useAutoOrganize`); a mano con «Organizar el plan ahora» en «Verificar metodología».
+- Una IA puede proponer el orden (bloque `json` con `order` al final de su respuesta); la app lo valida contra el plan y lo aplica (`parseOrderReply`). La IA da la lógica; la app la muestra.
+
 ## Pendiente / no verificado
 - Probar a mano en la app (Electron) todos los flujos nuevos.
 - El «Corregir metodología» ya no inserta notas genéricas: solo prepara la asignatura.

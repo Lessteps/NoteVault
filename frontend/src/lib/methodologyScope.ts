@@ -68,7 +68,10 @@ export function reviewPrompt(scope: MethodologyScope, topics: readonly ScopeTopi
     "1. **Topics to split** — for each: the current topic, and the ordered sub-topics it should become (one per element / property / method).",
     "2. **Missing topics** — grouped by subject, in learning order, each with a one-line reason.",
     "3. **Missing areas or subjects** — anything a working junior needs in this scope that has no topic at all.",
-    "4. **Order problems** — any topic placed before one it depends on.",
+    "4. **Order problems** — any topic placed before one it depends on, numbering that skips or repeats, and generic topics that the one-piece-per-topic topics make redundant.",
+    "5. **Machine-readable order (REQUIRED, last thing in your answer)** — one fenced ```json block, exactly this shape, with the topic folders copied LITERALLY from the list above in the learning order you recommend (general topic first, then its pieces):",
+    '```json\n{ "order": ["<folder>", "<folder>"], "missing": ["<title of a missing topic>"] }\n```',
+    "The app reads that block and applies the order itself; you only provide the logic and the files, you do not decide how it is shown.",
     "Be concrete: name every element, property or method. Do not pad.",
   ].join("\n");
 }
@@ -92,4 +95,21 @@ export function areasReviewPrompt(planAreas: ReadonlyArray<{ name: string; topic
     "2. **Vault folders to add to the plan** — which of the listed folders belong in the plan, and as a new area or as a subject of an existing one.",
     "3. **Areas that should be split** — any area mixing unrelated subjects.",
   ].join("\n");
+}
+
+/** El orden que una IA devolvió en el bloque ```json de su respuesta (`{ "order": [carpetas] }`), o null si no hay uno usable. Solo texto: la app valida contra el plan. */
+export function parseOrderReply(text: string): string[] | null {
+  const blocks = [...String(text ?? "").matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)].map((m) => m[1]!);
+  for (const b of blocks.reverse()) {
+    try {
+      const obj = JSON.parse(b) as { order?: unknown };
+      if (Array.isArray(obj.order)) {
+        const order = obj.order.filter((x): x is string => typeof x === "string" && x.length > 0 && x.length < 400);
+        if (order.length) return order.slice(0, 2000);
+      }
+    } catch {
+      /* no era JSON */
+    }
+  }
+  return null;
 }

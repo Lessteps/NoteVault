@@ -648,6 +648,7 @@ export function ExecutionPanel({ plan, cov, onPlan, announce, signal }: { plan: 
           scope={{ kind: "all", label: "Todas las áreas" }}
           topics={plan.subplans.flatMap((s) => s.topics.map((t) => ({ folder: t.folder, title: t.title, group: t.group })))}
           testid="exec-methodology-check"
+          planId={plan.id}
         />
         <GhostButton large onClick={() => setDialog(true)} disabled={!report || !report.tasks.length || running || !aiOn} data-testid="exec-open-dialog" title={!aiOn ? "La IA no está configurada" : undefined}>
           <FolderPlus size={16} aria-hidden className="flex-none" /> Ejecutar plan…

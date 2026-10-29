@@ -35,6 +35,7 @@ import { openPractice } from "./PracticeCard";
 import { ProgressBar } from "./parts";
 import { agendaDateKey, agendaViewKey, pageTabKey, STATUS_COLOUR, STATUS_LABEL, type Loaded } from "./planShared";
 import { MethodologyWarningBanner } from "./MethodologyWarningBanner";
+import { useAutoOrganize } from "./useAutoOrganize";
 import { VaultSyncBanner } from "./VaultSyncBanner";
 import { api } from "../../lib/bridge";
 
@@ -83,6 +84,7 @@ export function PlanScopePage(props: PlanScopePageProps) {
   const { data, plan, scope, planName, state, onChanged, announce, onOpenPage, anchorState, renderDetails, renderByArea, renderNotices, detailsBadge, topNotice, defaultTab } = props;
   const uid = useId();
   const m = useAgendaModel(data, plan);
+  useAutoOrganize(plan, onChanged);
   const info = scopeInfo(plan, scope, planName);
   const key = scopeKey(scope);
   const summary0 = data.derived?.summary;

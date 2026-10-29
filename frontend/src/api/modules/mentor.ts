@@ -2282,8 +2282,21 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const kinds = [...new Set(res.added.map((a) => labelOf(a.folder)).filter(Boolean))];
       const n = res.added.length;
       const where = [...bySub.entries()].map(([sid]) => subTitle(sid)).join(" y ");
-      const summary = `Se añadieron ${n} ${n === 1 ? "tema" : "temas"} de referencia${kinds.length ? ` (${kinds.join(", ")})` : ""} al área ${where}, al final de su ruta.${res.created.length ? ` Se creó el área ${res.created.map((c) => c.area).join(" y ")}.` : ""}`;
-      const saved = st.save(res.plan);
+      let summary = `Se añadieron ${n} ${n === 1 ? "tema" : "temas"} de referencia${kinds.length ? ` (${kinds.join(", ")})` : ""} al área ${where}, al final de su ruta.${res.created.length ? ` Se creó el área ${res.created.map((c) => c.area).join(" y ")}.` : ""}`;
+      // ORGANIZAR solo: lo recién añadido entra con su orden por números (tema general y luego sus piezas) y repartido en semanas con la capacidad real, no apilado al final
+      let finalPlan = res.plan;
+      let organized = "";
+      try {
+        const o = applyOps(res.plan, [{ op: "organize" }], { today: localDate(), all: [], startFocus: practiceStartFocus(app), mastery: masteryLookup(app) });
+        if (o.applied) {
+          finalPlan = o.plan;
+          organized = " Se organizó por números y se repartió en semanas.";
+        }
+      } catch {
+        /* se queda como entró: «Organizar» se puede lanzar a mano */
+      }
+      summary += organized;
+      const saved = st.save(finalPlan);
       const hist = new ChangeStore(app.root);
       const entry = hist.append(id, {
         at: new Date().toISOString(),
@@ -3008,8 +3021,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const kind = o.intent === "fix" ? ("fix" as const) : ("adjust" as const);
       const direct: ChangeOp[] | null = Array.isArray(o.ops)
         ? (o.ops as any[])
-            .filter((x) => x && ["trim_to_fit", "extend_to", "restart", "raise_minutes", "lighter", "set_area_mode", "add_area"].includes(String(x.op)))
-            .map((x) => (x.op === "add_area" ? { op: "add_area" as const, areaId: String(x.areaId ?? "").slice(0, 40) } : x.op === "extend_to" ? { op: "extend_to" as const, date: String(x.date ?? "") } : x.op === "restart" ? { op: "restart" as const, date: String(x.date ?? "") } : x.op === "raise_minutes" ? { op: "raise_minutes" as const, minutes: Number(x.minutes) } : x.op === "set_area_mode" ? { op: "set_area_mode" as const, mode: x.mode === "phased" ? ("phased" as const) : ("together" as const) } : { op: x.op as "trim_to_fit" | "lighter" }))
+            .filter((x) => x && ["trim_to_fit", "extend_to", "restart", "raise_minutes", "lighter", "set_area_mode", "add_area", "organize"].includes(String(x.op)))
+            .map((x) => (x.op === "add_area" ? { op: "add_area" as const, areaId: String(x.areaId ?? "").slice(0, 40) } : x.op === "extend_to" ? { op: "extend_to" as const, date: String(x.date ?? "") } : x.op === "restart" ? { op: "restart" as const, date: String(x.date ?? "") } : x.op === "raise_minutes" ? { op: "raise_minutes" as const, minutes: Number(x.minutes) } : x.op === "set_area_mode" ? { op: "set_area_mode" as const, mode: x.mode === "phased" ? ("phased" as const) : ("together" as const) } : x.op === "organize" ? { op: "organize" as const, ...(typeof x.subplan === "string" ? { subplan: x.subplan.slice(0, 80) } : {}), ...(Array.isArray(x.order) ? { order: x.order.map((f: unknown) => String(f).slice(0, 400)).slice(0, 2000) } : {}) } : { op: x.op as "trim_to_fit" | "lighter" }))
         : null;
       if (!comment && !direct?.length) throw new ApiError("Escribe qué quieres cambiar en el plan.");
       if (studyIndexCold(app)) return { loading: true as const };

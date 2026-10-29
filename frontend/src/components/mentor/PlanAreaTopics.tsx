@@ -322,6 +322,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
           scope={realGroup && group ? { kind: "group", label: group.title, areaName: active.area, groupId: group.id, groupTitle: group.title } : { kind: "area", label: active.area, areaName: active.area }}
           topics={scopeTopics}
           testid={`${testid}-methodology`}
+          planId={plan.id}
         />
       )}
     </div>

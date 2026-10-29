@@ -11,6 +11,7 @@
  */
 
 import { METHODOLOGY_RULE } from "./methodologyRule.js";
+import { organizeTopics } from "../../lib/planOrganize.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ChatMessage } from "../aiClient.js";
@@ -94,6 +95,8 @@ export type ChangeOp =
   /** «Reducir a lo esencial»: salta los temas menos necesarios de un área (o de un grupo) hasta dejar `max` temas en la ruta */
   | { op: "reduce_essentials"; subplan: string; group?: string; max: number }
   | { op: "set_branches"; branches: Record<string, string[]>; preset: string; excluded: string[] }
+  /** ORGANIZAR: el orden de los temas de cada área (o de `subplan`) sale de sus números/ids (tema general y luego sus piezas); `order` es el que propone una IA (se valida) y los genéricos antiguos pasan a opcionales; las semanas se recalculan */
+  | { op: "organize"; subplan?: string; order?: string[] }
   | { op: "lighter" }
   | { op: "trim_to_fit" }
   | { op: "extend_to"; date: string }
@@ -578,6 +581,27 @@ export function applyOps(plan: Plan, ops: readonly ChangeOp[], ctx: ChangeCtx): 
         }));
         if (!n) break;
         routeChanged += n;
+        structural();
+        applied++;
+        break;
+      }
+      case "organize": {
+        const only = op.subplan ? subOf(op.subplan) : undefined;
+        // lo que una IA proponga solo cuenta si son carpetas que están de verdad en el plan
+        const known = new Set(seeds.flatMap((s) => s.topics.map((t) => t.folder)));
+        const order = (op.order ?? []).filter((f, i, a) => known.has(f) && a.indexOf(f) === i);
+        let moved = 0;
+        let demoted = 0;
+        seeds = seeds.map((s) => {
+          if (only && s !== only) return s;
+          const r = organizeTopics(s.topics, s.groups, order.length ? { order } : {});
+          moved += r.moved.length;
+          demoted += r.demoted.length;
+          return r.moved.length || r.demoted.length ? { ...s, topics: r.topics } : s;
+        });
+        if (!moved && !demoted) break;
+        routeChanged += demoted;
+        rephase = true;
         structural();
         applied++;
         break;

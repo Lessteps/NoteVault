@@ -3,11 +3,12 @@
 // subtemas. Sin IA local: (1) «Crear con Antigravity» escribe la tarea para el agente externo; (2) «Copiar prompt de revisión» deja el texto listo
 // para pegar en cualquier IA. La app no crea temas por sí misma.
 
-import { ClipboardCheck, ClipboardCopy, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { ClipboardCheck, ClipboardCopy, ChevronRight, ListOrdered, Loader2, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { copyText } from "../../lib/clipboard";
-import { curriculumIdsOfScope, reviewPrompt, type MethodologyScope, type ScopeTopic } from "../../lib/methodologyScope";
+import { curriculumIdsOfScope, parseOrderReply, reviewPrompt, type MethodologyScope, type ScopeTopic } from "../../lib/methodologyScope";
+import { useMentor } from "../../store/mentor";
 import { useApp } from "../../store/app";
 import { useCoverage } from "../../store/curriculum";
 import { Chip, GhostButton, Modal } from "../common/forms";
@@ -15,13 +16,36 @@ import { cn } from "../ui";
 import { CoverageRing, LEVEL_COLOUR, LEVEL_LABEL } from "../study/CurriculumBadges";
 import { CurriculumGaps } from "../study/CurriculumGaps";
 
-export function MethodologyCheckButton({ scope, topics, label = "Verificar metodología", className, testid = "methodology-check" }: { scope: MethodologyScope; topics: readonly ScopeTopic[]; label?: string; className?: string; testid?: string }) {
+export function MethodologyCheckButton({ scope, topics, label = "Verificar metodología", className, testid = "methodology-check", planId }: { scope: MethodologyScope; topics: readonly ScopeTopic[]; label?: string; className?: string; testid?: string; /** el plan donde se aplica la organización; sin él solo se revisa */ planId?: string }) {
   const toast = useApp((s) => s.toast);
   const { areas, loaded, error } = useCoverage();
   const [open, setOpen] = useState(false);
   const [gapsId, setGapsId] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [aiText, setAiText] = useState("");
+  const [pasted, setPasted] = useState("");
+  const [organizing, setOrganizing] = useState(false);
+
+  /** ORGANIZAR: la app reordena por números/ids y reparte en semanas; si una IA dio un orden (`order`), lo valida contra el plan y lo aplica. Sin IA también funciona. */
+  const organize = async (order?: string[]): Promise<void> => {
+    if (!planId) return;
+    setOrganizing(true);
+    try {
+      const body = { id: planId, ops: [{ op: "organize", ...(order?.length ? { order } : {}) }], label: order ? "Organizar el plan con el orden de la IA" : "Organizar el plan por números e ids" };
+      let r = await api.mentorPlanChange(body);
+      for (let i = 0; r.loading && i < 40; i++) {
+        await new Promise((ok) => setTimeout(ok, 1500));
+        r = await api.mentorPlanChange(body);
+      }
+      if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
+      toast("info", r.applied ? `Plan organizado: ${r.entry.summary || "orden y semanas actualizados"}. Puedes deshacerlo en «Preguntas y ajustes».` : "El plan ya estaba bien organizado: no hay nada que cambiar.");
+      if (r.applied) useMentor.setState((st) => ({ planVersion: st.planVersion + 1 }));
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setOrganizing(false);
+    }
+  };
 
   const ids = useMemo(() => curriculumIdsOfScope(scope, areas.map((a) => a.areaId)), [scope, areas]);
   const mine = areas.filter((a) => ids.includes(a.areaId));
@@ -39,7 +63,12 @@ export function MethodologyCheckButton({ scope, topics, label = "Verificar metod
     try {
       const r = await api.mentorMethodologyReview({ prompt: reviewPrompt(scope, topics, folders) });
       if (!r.aiConfigured) toast("info", "La IA de la app no está configurada: usa «Ver y crear lo que falta» (Antigravity) o copia el prompt.");
-      else setAiText(r.text || "La IA no devolvió nada.");
+      else {
+        setAiText(r.text || "La IA no devolvió nada.");
+        // la IA da la lógica (el orden); la app la aplica y la muestra
+        const order = parseOrderReply(r.text);
+        if (order && planId) await organize(order);
+      }
     } catch (e) {
       toast("error", (e as Error).message);
     } finally {
@@ -100,6 +129,20 @@ export function MethodologyCheckButton({ scope, topics, label = "Verificar metod
                   {reviewing ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Sparkles size={15} aria-hidden />} Revisar con la IA de la app
                 </GhostButton>
               </div>
+              {planId && (
+                <section className="space-y-2 rounded-xl border border-line p-3" data-testid="methodology-organize" aria-label="Organizar el plan">
+                  <h4 className="text-[14px] font-semibold text-text">Organización del plan</h4>
+                  <p className="text-[13px] text-dim">La app ordena los temas por sus números e ids (el tema general y luego cada pieza), jubila los genéricos antiguos y reparte las semanas con tu capacidad real. No usa IA, y se puede deshacer.</p>
+                  <GhostButton large="md" onClick={() => void organize()} disabled={organizing} data-testid="methodology-organize-btn">
+                    {organizing ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <ListOrdered size={15} aria-hidden />} Organizar el plan ahora
+                  </GhostButton>
+                  <label className="block text-[12.5px] text-faint">
+                    ¿Usaste otra IA (Antigravity, un chat)? Pega aquí su respuesta: si trae el bloque <code>json</code> con el orden, la app lo valida y lo aplica.
+                    <textarea value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-line bg-card p-2 text-[13px] text-text" data-testid="methodology-paste" />
+                  </label>
+                  <GhostButton disabled={organizing || !parseOrderReply(pasted)} onClick={() => void organize(parseOrderReply(pasted) ?? undefined)} data-testid="methodology-apply-pasted">Aplicar el orden de esa respuesta</GhostButton>
+                </section>
+              )}
               {aiText && (
                 <section aria-label="Respuesta de la IA" className="space-y-1.5" data-testid="methodology-ai-answer">
                   <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-panel p-3 text-[13px] text-text">{aiText}</pre>

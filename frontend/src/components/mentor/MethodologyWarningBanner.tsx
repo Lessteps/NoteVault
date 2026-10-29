@@ -77,6 +77,7 @@ export function MethodologyWarningBanner({
                     topics={sub.topics.filter((t) => t.group === w.groupId).map((t) => ({ folder: t.folder, title: t.title, group: t.group }))}
                     label={`Ver qué falta de ${w.groupTitle} y crearlo`}
                     testid={`btn-check-methodology-${w.groupId}`}
+                    planId={plan.id}
                   />
                   <PrimaryButton
                     large

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { curriculumIdsOfScope, curriculumIdsOfText, reviewPrompt } from "./methodologyScope";
+import { curriculumIdsOfScope, curriculumIdsOfText, parseOrderReply, reviewPrompt } from "./methodologyScope";
 
 const ALL = ["html", "css", "atomic-design", "js-reference", "java"];
 
@@ -22,5 +22,15 @@ describe("methodologyScope", () => {
     expect(p).toContain("ONE topic per element");
     expect(p).toContain("- CSS [css] (P/5/5.2 CSS)");
     expect(p).toContain("Topics to split");
+  });
+});
+
+describe("orden que devuelve la IA", () => {
+  it("el prompt exige el bloque json y lo lee la app", () => {
+    expect(reviewPrompt({ kind: "group", label: "HTML" }, [{ folder: "P/H/5.18.4 S", title: "S" }])).toContain("Machine-readable order");
+    expect(parseOrderReply('Texto…\n```json\n{ "order": ["a/b", "c/d"], "missing": ["x"] }\n```\n')).toEqual(["a/b", "c/d"]);
+    expect(parseOrderReply("sin bloque")).toBeNull();
+    expect(parseOrderReply('```json\n{ "order": [] }\n```')).toBeNull();
+    expect(parseOrderReply("```json\nno es json\n```")).toBeNull();
   });
 });

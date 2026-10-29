@@ -305,7 +305,6 @@ export function BrowserPanel({
             partition="persist:nvweb"
             allowpopups
             className="h-full w-full flex-1 border-none"
-            style={{ display: "flex", flex: 1, width: "100%", height: "100%" }}
           />
         ) : (
           <iframe

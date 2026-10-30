@@ -51,3 +51,17 @@ export function executionLists<R extends { folder: string; done: boolean }>(rout
     pendientes: routeRows.filter((r) => sets.pending.has(r.folder) && !r.done),
   };
 }
+
+/** Mínimo de temas que Ejecución enseña SIEMPRE por asignatura: los de hoy y, si faltan, los siguientes de su ruta (el calendario no cambia). */
+export const MIN_SUBJECT_TOPICS = 4;
+
+/**
+ * Los temas que completan una asignatura hasta `min` filas cuando hoy le tocan menos: los siguientes pendientes de su ruta, en el orden de la ruta,
+ * sin repetir los que ya se enseñan. No toca el reparto: son los candidatos a adelantar, para que ninguna asignatura salga vacía.
+ */
+export function fillSubjectRows<R extends { folder: string; done: boolean }>(routeRows: readonly R[], groupFolders: ReadonlySet<string>, shown: readonly { folder: string }[], min: number = MIN_SUBJECT_TOPICS): R[] {
+  const need = Math.max(0, min - shown.length);
+  if (!need) return [];
+  const taken = new Set(shown.map((r) => r.folder));
+  return routeRows.filter((r) => groupFolders.has(r.folder) && !r.done && !taken.has(r.folder)).slice(0, need);
+}

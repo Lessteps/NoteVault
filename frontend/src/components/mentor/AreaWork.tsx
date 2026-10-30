@@ -13,7 +13,7 @@ import type { MentorPlan } from "../../lib/types";
 import { api } from "../../lib/bridge";
 import { bucketReviews, dueText, type ReviewRow } from "../../lib/planReviews";
 import { dateLabel } from "../../lib/planSchedule";
-import { executionLists, type AreaSets } from "../../lib/planAreaLists";
+import { executionLists, fillSubjectRows, MIN_SUBJECT_TOPICS, type AreaSets } from "../../lib/planAreaLists";
 import { useMentor } from "../../store/mentor";
 import { usePomodoro } from "../../store/pomodoro";
 import { mentorAssignment } from "../../lib/pomodoro";
@@ -385,6 +385,9 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
                     const t = sub.topics.find((x) => x.folder === r.folder);
                     return (t?.group ?? "core") === grp.id;
                   });
+                  // ninguna asignatura sale con menos de MIN_SUBJECT_TOPICS temas: a los de hoy se suman los siguientes de su ruta (candidatos a adelantar; el calendario no cambia)
+                  const inGroup = new Set(sub.topics.filter((t) => (t.group ?? "core") === grp.id).map((t) => t.folder));
+                  const nextRows = fillSubjectRows(rows, inGroup, grpRows);
                   // TODAS las asignaturas con temas se ven en Ejecución, también las que hoy no tienen nada (HTML, CSS…): así se pueden seguir y adelantar
                   if (!grpRows.length && grp.total === 0) return null;
                   return (
@@ -402,7 +405,16 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
                           ))}
                         </ul>
                       ) : (
-                        <p className="px-1 text-[13.5px] text-dim" data-testid="subject-nothing-today">Hoy no toca nada de esta asignatura ({grp.total - grp.done} {grp.total - grp.done === 1 ? "tema pendiente" : "temas pendientes"}).</p>
+                        <p className="px-1 text-[13.5px] text-dim" data-testid="subject-nothing-today">
+                          Hoy no toca nada de esta asignatura ({grp.total - grp.done} {grp.total - grp.done === 1 ? "tema pendiente" : "temas pendientes"}){nextRows.length ? ": estos son los siguientes de su ruta." : "."}
+                        </p>
+                      )}
+                      {nextRows.length > 0 && (
+                        <ul className="space-y-1" aria-label={`Siguientes de ${grp.title}`} data-testid="subject-next-list" data-min={MIN_SUBJECT_TOPICS}>
+                          {nextRows.map((r) => (
+                            <TopicRow key={`next:${r.folder}`} r={{ ...r, tag: { text: "Siguiente", colour: "var(--nv-faint)" } }} colour={colour} areaKey={areaKey} planId={planId} />
+                          ))}
+                        </ul>
                       )}
                       {plan && subplanId && (
                         <div className="pt-1" data-testid="subject-add-topic" data-subject={grp.id}>

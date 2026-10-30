@@ -204,6 +204,27 @@ describe("temas extra: marca «Extra», × y mismo resultado en Agenda y Ejecuci
   });
 });
 
+describe("Ejecución: ninguna asignatura sin temas", () => {
+  it("cada asignatura enseña al menos 4 temas: los de hoy y, si faltan, los siguientes de su ruta", async () => {
+    const p = basePlan();
+    const be = p.subplans[0]!;
+    // el área tiene dos asignaturas: «Uno» (con lo de hoy) y «Dos» (con temas más adelante, nada hoy)
+    be.groups = [{ id: "uno", title: "Uno", kind: "knowledge", order: 100 }, { id: "dos", title: "Dos", kind: "knowledge", order: 110 }] as never;
+    be.topics = be.topics.map((t, i) => ({ ...t, group: i < 20 ? "uno" : "dos", targetWeek: i < 20 ? 2 : 9 }));
+    await open("ejecucion", p);
+    await click(runTab("area:s-be"));
+    const groups = all("today-subject-group");
+    expect(groups.map((g) => g.dataset.subject)).toEqual(["uno", "dos"]);
+    for (const g of groups) {
+      const shown = g.querySelectorAll("[data-testid=board-topic]").length;
+      expect(shown).toBeGreaterThanOrEqual(4);
+    }
+    const dos = groups.find((g) => g.dataset.subject === "dos")!;
+    expect(dos.querySelector("[data-testid=subject-next-list]")).toBeTruthy();
+    expect(dos.textContent).toContain("Siguiente");
+  });
+});
+
 describe("Ejecución: añadir tema y práctica", () => {
   it("«Temas de hoy» ofrece «Añadir más temas» (hoy, esta área) y «Práctica diaria» ofrece «Añadir más práctica» con lista, hecho y quitar", async () => {
     await open("ejecucion");

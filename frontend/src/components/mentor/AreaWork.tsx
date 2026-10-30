@@ -23,6 +23,8 @@ import { AddExtraTopic } from "./AddExtraTopic";
 import { AreaPracticeBlock } from "./AreaPracticeBlock";
 import { bumpPlanVersion } from "./extraKit";
 import { ExtraPracticeSection } from "./ExtraPracticeSection";
+import { paceNeedText, requiredPace } from "../../lib/planRequiredPace";
+import type { ReactNode } from "react";
 import { openTopic } from "./openTopic";
 import { ProgressBar } from "./parts";
 import { TopicRow, type BoardPractice, type BoardRow } from "./PlanBoard";
@@ -236,6 +238,21 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
     "all"
   );
 
+  // El plan tiene fecha de inicio y de fin fijas: lo que se dice por asignatura es el ritmo que hace falta para llegar a la de fin (nunca se recorta ni se mueve la fecha)
+  const paceLine = (id: string, title: string, total: number, done: number): ReactNode => {
+    if (!plan || !sub || total - done <= 0) return null;
+    const mine = sub.topics.filter((t) => (t.group ?? "core") === id && t.route !== "skipped" && t.route !== "optional");
+    const r = requiredPace({
+      today, start: plan.start, end: plan.end, studyDays: plan.preconditions?.studyDays ?? [], ...(plan.preconditions?.minutesPerDay ? { minutesPerDay: plan.preconditions.minutesPerDay } : {}),
+      groups: [{ id, title, total, pending: total - done, totalMinutes: mine.reduce((n, t) => n + (t.estMinutes ?? 0), 0) }],
+    });
+    const endLabel = new Date(`${plan.end}T00:00:00`).toLocaleDateString("es", { day: "numeric", month: "short" });
+    return (
+      <span className="basis-full text-[12px] text-dim" data-testid={`subject-pace-${id}`} title="Ritmo necesario para terminar esta asignatura en la fecha de fin del plan (días de estudio)">
+        Ritmo necesario: {paceNeedText(r.groups[0]!, endLabel)}
+      </span>
+    );
+  };
   const subjectGroups = useMemo(() => {
     // los fundamentos («Bases») no son una asignatura del área: tienen su propia pestaña
     const own = (sub?.groups ?? []).filter((g) => g.kind !== "bases");
@@ -397,6 +414,7 @@ export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, 
                         <span className="text-[12px] font-medium text-dim" data-testid={`subject-progress-inline-${grp.id}`}>
                           {grp.done}/{grp.total} ({grp.pct}%)
                         </span>
+                        {paceLine(grp.id, grp.title, grp.total, grp.done)}
                       </div>
                       {grpRows.length ? (
                         <ul className="space-y-1" aria-label={grp.title} data-testid="work-list">

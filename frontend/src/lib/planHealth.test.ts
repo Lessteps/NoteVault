@@ -43,7 +43,7 @@ describe("salud del plan: cada regla es un error que ya nos pasó", () => {
 
   it("avisa cuando los temas no caben en el tiempo que queda (el plan crecía sin que nadie lo dijera)", () => {
     const plan = { subplans: [sub([])] };
-    expect(planHealth({ plan, vaultTopics: [], capacity: { neededMin: 1800 * 60, availableMin: 900 * 60 } })).toMatchObject([{ code: "over-capacity", message: expect.stringContaining("900 h de más") }]);
+    expect(planHealth({ plan, vaultTopics: [], capacity: { neededMin: 1800 * 60, availableMin: 900 * 60 } })).toMatchObject([{ code: "over-capacity", message: expect.stringContaining("Las fechas del plan no se mueven") }]);
     expect(planHealth({ plan, vaultTopics: [], capacity: { neededMin: 800 * 60, availableMin: 900 * 60 } })).toEqual([]);
   });
 

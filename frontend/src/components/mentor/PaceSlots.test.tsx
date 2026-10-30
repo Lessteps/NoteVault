@@ -222,6 +222,11 @@ describe("Ejecución: ninguna asignatura sin temas", () => {
     const dos = groups.find((g) => g.dataset.subject === "dos")!;
     expect(dos.querySelector("[data-testid=subject-next-list]")).toBeTruthy();
     expect(dos.textContent).toContain("Siguiente");
+    // cada asignatura dice el ritmo que hace falta para llegar a la fecha de fin del plan (que no se mueve)
+    for (const g of groups) {
+      const line = g.querySelector(`[data-testid=subject-pace-${g.dataset.subject}]`)!;
+      expect(line.textContent).toMatch(/Ritmo necesario: ≈ [\d,]+ (tema|temas)\/día · .*\/día para llegar al /);
+    }
   });
 });
 

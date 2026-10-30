@@ -54,7 +54,7 @@ export function planHealth(input: HealthInput): HealthIssue[] {
   const cap0 = input.capacity;
   if (cap0 && cap0.availableMin > 0 && cap0.neededMin > cap0.availableMin) {
     const h = (m: number): number => Math.round(m / 60);
-    out.push({ code: "over-capacity", area: "", message: `El plan no cabe en su fecha de fin: faltan ${h(cap0.neededMin)} h de temas y el calendario ofrece ${h(cap0.availableMin)} h (${h(cap0.neededMin - cap0.availableMin)} h de más). Hay que ampliar la fecha, subir los minutos diarios o recortar temas.` });
+    out.push({ code: "over-capacity", area: "", message: `Con tu ritmo actual no caben todos los temas antes de la fecha de fin (faltan ${h(cap0.neededMin)} h de temas y el calendario ofrece ${h(cap0.availableMin)} h). Las fechas del plan no se mueven: en cada asignatura de Ejecución verás el ritmo que hace falta para llegar.` });
   }
 
   const missing = new Map<string, string[]>();

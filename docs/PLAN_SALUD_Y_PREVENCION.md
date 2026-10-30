@@ -1,0 +1,20 @@
+# Salud del plan — los errores que ya nos pasaron y la guarda de cada uno
+
+Cada fallo de abajo ocurrió de verdad. Para cada uno hay una **guarda** (código que lo detecta o lo impide) y una **prueba** que se rompe si vuelve.
+
+| # | Qué pasó | Causa | Guarda | Prueba |
+|---|---|---|---|---|
+| 1 | La app veía 387 de 805 temas; las piezas de CSS/HTML «no existían» | El escaneo de la vault tenía un tope fijo de 4 000 notas y se cortaba en silencio (la vault real tiene ~9 800) | `MAX_SCAN_NOTES` = 60 000 y `VaultManager.scanTruncated` + `console.warn`; la salud del plan lo avisa (`scan-truncated`) | `core/vaultScanCap.test.ts` |
+| 2 | Temas de la vault que no estaban en el plan | La sincronización solo cubría áreas de referencia, y el escaneo cortado (1) | `mentor_plan_sync_reference` añade solo lo nuevo de HTML/CSS/JS Ref/Java **y** de Backend/Databases/Automation/Tooling; la salud avisa de `missing-topics` | `mentorProjectLinks.test.ts`, `planHealth.test.ts` |
+| 3 | «Añadir más temas» de una asignatura mostraba pocos o temas de otras | Pedía solo las próximas 4 semanas de TODA el área y filtraba por título en el navegador | El servidor filtra por `group` (id) y con asignatura da todos sus pendientes en orden | `mentorPace.test.ts`, `PaceControls.test.tsx` |
+| 4 | Databases se veía igual con 150 temas | Todo en un único grupo «Conocimientos…» y sin orden por número | Las asignaturas salen de las secciones de `00 Units — <área>.md` (`core/mentor/planRegroup.ts`), la app las mantiene (`auto: "units"`) y los temas van por número | `planRegroup.test.ts` |
+| 5 | «Foundations» y «Fundamentals» en la misma área | Dos secciones del índice con nombres casi iguales | La salud avisa de `similar-sections`; el plan de Antigravity pide nombres que digan qué contienen | `planHealth.test.ts` |
+| 6 | «Bases» aparecía como asignatura de Backend | Una vista listaba todos los grupos, incluido el de fundamentos | Las vistas de asignaturas excluyen `kind: "bases"` (tiene su propia pestaña) | `PlanAgenda.test.tsx` |
+| 7 | Todo «atrasado» sin haber empezado | `overdue` salía de un número de semana fijo | Solo hay atraso si la ruta ya empezó | `plan.test.ts` |
+| 8 | 217 notas «hechas» que no seguían la skill | El validador de Antigravity no comprobaba el formato de la teoría | `tools/programming_kb/check_format.mjs` (mismos marcadores que el detector de la app); «terminado» = 0 fallos | `skillFreshness` + el propio script |
+
+## Cómo se ve en la app
+Al abrir un plan, `useAutoSync` llama a `mentor_plan_sync_reference`: añade lo nuevo, reparte en asignaturas, ordena y, si algo sigue mal (`health`), lo dice con un aviso **una vez por plan**. `mentor_plan_health` hace la misma revisión bajo demanda y solo lee.
+
+## Regla para añadir una función nueva
+Si arreglas un fallo de este tipo, añade **una fila** aquí con su guarda y su prueba. Un arreglo sin prueba que se rompa si vuelve el fallo no cuenta como arreglo.

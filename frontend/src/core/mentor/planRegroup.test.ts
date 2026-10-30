@@ -35,4 +35,16 @@ describe("asignaturas desde el índice de la vault", () => {
     const r = organizeTopics(out.topics, out.groups);
     expect(r.topics.map((t) => t.folder.split("/").pop())).toEqual(["6.0 Zero", "6.0.1 Data", "6.4 CRUD", "6.4.1 SELECT", "6.15 PostgreSQL"]);
   });
+
+  it("si el índice renombra una sección, los temas la siguen y el grupo viejo desaparece; lo que la persona agrupó a mano no se toca", () => {
+    const first = regroupByUnits(planOf(["6.0 Zero", "6.4 CRUD", "6.15 PostgreSQL"]), () => INDEX);
+    const renamed = INDEX.replace("## Foundations", "## Databases from zero");
+    const out = regroupByUnits(first, () => renamed).subplans[0]!;
+    expect(out.groups!.map((g) => g.title)).toEqual(["Databases from zero", "Queries", "Engines"]);
+    expect(out.topics.map((t) => t.group)).toEqual(["databases-from-zero", "queries", "engines"]);
+    // un grupo propio de la persona (sin marca) conserva sus temas
+    const mine = { ...out, groups: [...out.groups!, { id: "mio", title: "Mi grupo", kind: "knowledge" as const, order: 105 }], topics: out.topics.map((t, i) => (i === 1 ? { ...t, group: "mio" } : t)) };
+    const again = regroupByUnits({ subplans: [mine] } as never, () => renamed).subplans[0]!;
+    expect(again.topics[1]!.group).toBe("mio");
+  });
 });

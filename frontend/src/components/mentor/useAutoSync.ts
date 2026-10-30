@@ -10,6 +10,7 @@ import { useMentor } from "../../store/mentor";
 
 export function useAutoSync(plan: MentorPlan | null | undefined, onChanged: (p: MentorPlan) => void): void {
   const tried = useRef(new Set<string>());
+  const warned = useRef(new Set<string>());
   const version = useMentor((s) => s.planVersion);
   useEffect(() => {
     if (!plan || plan.archived || plan.proposed) return;
@@ -25,6 +26,11 @@ export function useAutoSync(plan: MentorPlan | null | undefined, onChanged: (p: 
           r = await api.mentorPlanSyncReference({ planId: plan.id });
         }
         if (!live || r.loading) return;
+        // lo que sigue mal respecto a la vault (temas que faltan, asignaturas sin repartir, secciones confusas…): se dice una vez por plan, no se calla
+        if (r.health?.length && !warned.current.has(plan.id)) {
+          warned.current.add(plan.id);
+          useApp.getState().toast("info", `Revisión del plan: ${r.health.map((h) => h.message).join(" ")}`);
+        }
         if (!r.added.length) {
           // nada nuevo, pero la app ordenó lo que ya había (asignaturas del índice y orden por números)
           if (r.tidied && r.plan) {

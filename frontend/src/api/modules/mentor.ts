@@ -162,7 +162,8 @@ import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
 import { curriculumAreas } from "../../core/curriculum/catalog.js";
-import { regroupByUnits } from "../../core/mentor/planRegroup.js";
+import { areaFolderOf, regroupByUnits } from "../../core/mentor/planRegroup.js";
+import { planHealth, type HealthIssue } from "../../lib/planHealth.js";
 import { addTopicsToPlan, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, findAreaSubplan, knowledgeTargetOfFolder, type AddTopicItem } from "../../core/mentor/planAddTopics.js";
 
 const DEFAULT_BRIEF_CHARS = 6000;
@@ -570,6 +571,20 @@ export function mentorApi(app: AppState, send?: SendFn) {
     }
   };
   /** Pone en orden un plan SIN IA: reparte los temas sueltos en las asignaturas del índice de su área y los ordena por número (y reparte las semanas). Devuelve el mismo objeto si no hizo falta nada. */
+  /** Salud del plan (ver `lib/planHealth.ts`): lee la vault y el plan y devuelve lo que está mal, sin tocar nada. */
+  const healthOf = (plan: Plan, offered: ReadonlySet<string>): HealthIssue[] => {
+    const areas = curriculumAreas();
+    const vaultTopics = topicSnaps(app).map((t) => {
+      const aid = curriculumAreaOfFolder(t.folder, areas);
+      const target = (aid ? CURRICULUM_PLAN_TARGET[aid] : undefined) ?? knowledgeTargetOfFolder(t.folder);
+      return { folder: t.folder, areaId: target?.areaId ?? null };
+    });
+    const folderOf = (areaId: string): string | undefined => {
+      const sub = plan.subplans.find((x) => x.areaId === areaId);
+      return sub ? areaFolderOf(areaId, sub.topics.map((t) => t.folder)) : undefined;
+    };
+    return planHealth({ plan, vaultTopics, offered, unitsIndexOf: (areaId) => { const f = folderOf(areaId); return f ? readUnitsIndex(f) : null; }, scanTruncated: app.vault.scanTruncated });
+  };
   const tidyPlan = (plan: Plan): { plan: Plan; changed: boolean; organized: boolean } => {
     let cur = regroupByUnits(plan, readUnitsIndex);
     let organized = false;
@@ -819,7 +834,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
   const upcomingTopics = (plan: Plan, area: string, o: Record<string, any>) => {
     const date = o.date === undefined || o.date === null || o.date === "" ? localDate() : String(o.date);
     if (!isIsoDate(date)) throw new ApiError("Fecha inválida (AAAA-MM-DD).");
-    const horizon = Math.max(1, Math.min(26, Math.round(Number(o.horizon)) || 4));
+    // con una asignatura elegida se ven TODOS sus temas pendientes en orden (no solo los de las próximas semanas del área entera)
+    const only = typeof o.group === "string" ? o.group.trim() : "";
+    const horizon = only ? 26 : Math.max(1, Math.min(26, Math.round(Number(o.horizon)) || 4));
     const { sch, placed, weeks } = placementOf(plan);
     const isBases = basesClassifier(plan);
     const added = new Map<string, string[]>();
@@ -831,7 +848,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
     for (const s of plan.subplans) {
       if (area && s.id !== area) continue;
       plannedByArea[s.id] = (sch?.byDate.get(date)?.topics ?? []).filter((t) => t.subplanId === s.id).length;
-      let live = s.topics.filter((t) => isLive(t) && (area === "bases" || !isBases({ subplanId: s.id, ...(t.group ? { group: t.group } : {}) })));
+      let live = s.topics.filter((t) => isLive(t) && (area === "bases" || !isBases({ subplanId: s.id, ...(t.group ? { group: t.group } : {}) })) && (!only || (t.group ?? "core") === only));
       const origIndex = new Map(live.map((t, idx) => [t.folder, idx]));
       live = live.slice().sort((a, b) => {
         const pa = placed.get(a.folder);
@@ -2340,6 +2357,19 @@ export function mentorApi(app: AppState, send?: SendFn) {
      * vault, no están en el plan y cuya área SÍ está en el plan, entran solos (con su asignatura y organizados por números, como «Añadir al plan»). Lo que la persona
      * quitó a mano no vuelve: cada tema solo se ofrece UNA vez (`.notevault/mentor/plan-sync/<plan>.json` recuerda lo ya ofrecido). Idempotente; nada en planes archivados.
      */
+    /** SALUD del plan: lo que está mal respecto a la vault (temas que faltan, asignaturas sin repartir, secciones confusas, orden). Solo lee. */
+    mentor_plan_health(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.planId ?? o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const plan = new PlanStore(app.root).load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (studyIndexCold(app)) return { loading: true as const };
+      const file = path.join(app.root, ".notevault", "mentor", "plan-sync", `${id}.json`);
+      const offered = new Set<string>(((store.loadJson(file, null) as { offered?: unknown } | null)?.offered as string[] | undefined) ?? []);
+      return { loading: false as const, issues: healthOf(plan, offered) };
+    },
+
     mentor_plan_sync_reference(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
       const id = String(o.planId ?? o.id ?? "");
@@ -2375,9 +2405,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
       if (!fresh.length) {
         // nada nuevo que añadir, pero lo que ya está puede estar sin asignatura o sin orden (temas que entraron antes de esta regla): se ordena solo
         const t = tidyPlan(plan);
-        if (!t.changed) return { loading: false as const, added: [] as string[], message: "" };
+        if (!t.changed) return { loading: false as const, added: [] as string[], message: "", health: healthOf(plan, offered) };
         const saved = new PlanStore(app.root).save(t.plan);
-        return { loading: false as const, added: [] as string[], message: "", tidied: true as const, plan: saved };
+        return { loading: false as const, added: [] as string[], message: "", tidied: true as const, plan: saved, health: healthOf(saved, offered) };
       }
       const res = api.mentor_plan_add_topics({ planId: id, folders: fresh }) as { added?: string[]; message?: string };
       for (const f of candidates) offered.add(f);

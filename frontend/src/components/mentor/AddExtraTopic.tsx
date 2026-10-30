@@ -27,7 +27,7 @@ export interface AddExtraTopicProps {
   maxDate?: string;
   onChanged: (plan: MentorPlan) => void;
   /** si se da, solo se ven y adelantan los temas de ESA asignatura (título del grupo: «Lenguaje: JavaScript»); `info` es la línea de estado que se enseña arriba */
-  subject?: { title: string; info?: string };
+  subject?: { id?: string; title: string; info?: string };
   /** texto del botón */
   label?: string;
   className?: string;
@@ -90,7 +90,7 @@ export function AddExtraTopic({ planId, date, area, lockArea, lockSession, minDa
     setError("");
     try {
       for (let i = 0; i < 40; i++) {
-        const r = await api.mentorPlanTopicCandidates({ id: planId, upcoming: true, date: day, ...(scope ? { area: scope } : {}) });
+        const r = await api.mentorPlanTopicCandidates({ id: planId, upcoming: true, date: day, ...(scope ? { area: scope } : {}), ...(subject?.id ? { group: subject.id } : {}) });
         if (seq.current !== mine) return;
         if (!r.loading) return void setData({ ahead: r.ahead, weeks: r.weeks ?? {}, plannedByArea: r.plannedByArea ?? {} });
         await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
@@ -100,7 +100,7 @@ export function AddExtraTopic({ planId, date, area, lockArea, lockSession, minDa
     } catch (e) {
       if (seq.current === mine) setError((e as Error).message);
     }
-  }, [planId, scope, day]);
+  }, [planId, scope, day, subject?.id]);
   useEffect(() => {
     if (open) void load();
   }, [open, load]);
@@ -127,7 +127,7 @@ export function AddExtraTopic({ planId, date, area, lockArea, lockSession, minDa
   const groups = useMemo(() => {
     const byWeek = new Map<number, Map<string, { name: string; rows: MentorTopicCandidate[] }>>();
     for (const c of data?.ahead ?? []) {
-      if (subject && c.group !== subject.title) continue;
+      if (subject && !subject.id && c.group !== subject.title) continue;
       const w = c.week ?? c.targetWeek ?? 0;
       const areas = byWeek.get(w) ?? new Map<string, { name: string; rows: MentorTopicCandidate[] }>();
       const key = c.subplanId ?? c.area ?? "";

@@ -14,7 +14,7 @@ export interface UnitsIndex {
   byChapter: Map<string, number>;
 }
 
-const slug = (s: string): string =>
+export const slugTitle = (s: string): string =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "seccion";
 
 /** `6.4.1 SELECT statement` → `6.4`; sin número → "". */
@@ -32,8 +32,8 @@ export function parseUnitsIndex(md: string): UnitsIndex {
     const h = /^##\s+(.+?)\s*$/.exec(line);
     if (h) {
       const title = h[1]!.trim();
-      let id = slug(title);
-      for (let n = 2; sections.some((s) => s.id === id); n++) id = `${slug(title)}-${n}`;
+      let id = slugTitle(title);
+      for (let n = 2; sections.some((s) => s.id === id); n++) id = `${slugTitle(title)}-${n}`;
       sections.push({ id, title });
       cur = sections.length - 1;
       continue;

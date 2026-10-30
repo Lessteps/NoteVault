@@ -22,7 +22,12 @@ export const IGNORED_DIRS = new Set<string>([
   ".gradle", ".cache", "vendor", "Lib", "Scripts",
 ]);
 
-export const MAX_SCAN_NOTES = 4000;
+/**
+ * Tope de seguridad del escaneo, NO un límite de diseño: una vault de estudio real pasa de 9 000 notas (3 por tema más sus ejercicios). Con 4 000 el
+ * escaneo se cortaba en silencio y los temas que caían después dejaban de existir para la app (no entraban al plan, no salían en «Añadir más temas»).
+ * Si algún día se alcanza, `scanTruncated` lo dice en voz alta en vez de callar.
+ */
+export const MAX_SCAN_NOTES = 60_000;
 export const EXCLUDE_FILE = "explorer-ignore.txt";
 
 export function isIgnoredDir(dirPath: string): boolean {
@@ -310,8 +315,12 @@ export class VaultManager {
     );
   }
 
+  /** ¿El último escaneo se cortó por el tope? Nunca debería ser true: si lo es, faltan notas y hay que subir el tope. */
+  scanTruncated = false;
+
   *walkNotePaths(limit: number = MAX_SCAN_NOTES): IterableIterator<string> {
     this.refreshExcluded();
+    this.scanTruncated = false;
     let count = 0;
     const stack = [this.vaultRoot];
 
@@ -341,7 +350,11 @@ export class VaultManager {
             }
             yield full;
             count++;
-            if (count >= limit) return;
+            if (count >= limit) {
+              this.scanTruncated = true;
+              console.warn(`[vault] el escaneo se cortó en ${limit} notas: faltan notas en la app. Sube MAX_SCAN_NOTES.`);
+              return;
+            }
           }
         } catch {
           continue;

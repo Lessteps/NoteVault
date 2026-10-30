@@ -25,6 +25,8 @@ export interface AreaGroup {
   kind: GroupKind;
   /** orden dentro del área (menor primero) */
   order: number;
+  /** `units`: lo creó la app a partir del índice de la vault (`00 Units — …`) y lo mantiene ella; los que crea la persona no llevan marca y no se tocan */
+  auto?: "units";
 }
 
 /** Semanas (1..) del plan en que un área está activa. */
@@ -640,7 +642,7 @@ export function sanitizeGroups(raw: unknown): AreaGroup[] {
     if (!id || !title || seen.has(id)) continue;
     seen.add(id);
     const order = Number.isFinite(Number(g.order)) ? Math.round(Number(g.order)) : kind === "bases" ? 0 : kind === "language" ? 10 : 100;
-    out.push({ id, title, kind, order });
+    out.push({ id, title, kind, order, ...(g?.auto === "units" ? { auto: "units" as const } : {}) });
   }
   return out.slice(0, 32);
 }

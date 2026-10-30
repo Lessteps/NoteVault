@@ -385,7 +385,7 @@ export const api = {
   mentorPlanExtraPracticeRemove: (opts: { id: string; practiceId: string }) => call<import("./types").MentorPlan>("mentor_plan_extra_practice_remove", opts),
   /** Candidatos para añadir como tema extra: los siguientes de la ruta y los temas de la vault fuera del plan. */
   mentorPlanExerciseCandidates: (opts: { id: string; area?: string; limit?: number }) => call<import("./types").MentorExerciseCandidates>("mentor_plan_exercise_candidates", opts),
-  mentorPlanTopicCandidates: (opts: { id: string; query?: string; area?: string; limit?: number; upcoming?: boolean; date?: string; horizon?: number }) => call<import("./types").MentorTopicCandidates>("mentor_plan_topic_candidates", opts),
+  mentorPlanTopicCandidates: (opts: { id: string; query?: string; area?: string; limit?: number; upcoming?: boolean; date?: string; horizon?: number; group?: string }) => call<import("./types").MentorTopicCandidates>("mentor_plan_topic_candidates", opts),
   /** «Reorganizar por áreas»: convierte un plan de estructura antigua; queda en el historial y se puede deshacer. */
   mentorPlanReorganize: (id: string) => call<{ plan: import("./types").MentorPlan; entry: import("./types").MentorChangeEntry; history: import("./types").MentorChangeEntry[]; applied: true }>("mentor_plan_reorganize", { id }),
   /** Cobertura de teoría y práctica de cada área del plan contra la vault (determinista) y la última revisión guardada. */
@@ -484,7 +484,8 @@ export const api = {
   mentorPlanProjectLinks: (opts: { planId: string }) => call<{ links: Record<string, { projectId: string; name: string; issues: { total: number; done: number }; monthId: string }> }>("mentor_plan_project_links", opts),
   mentorPlanProjectCreate: (opts: { planId: string; monthId: string }) => call<{ link: { projectId: string; name: string; issues: { total: number; done: number }; monthId: string }; created: boolean }>("mentor_plan_project_create", opts),
   mentorPlanDossier: (opts: { id: string; question?: string }) => call<{ rel: string; abs: string; answerRel: string; answerAbs: string; shortPrompt: string; topics: number }>("mentor_plan_dossier", opts),
-  mentorPlanSyncReference: (opts: { planId: string }) => call<{ loading: true } | { loading: false; added: string[]; message: string; tidied?: boolean; plan?: import("./types").MentorPlan }>("mentor_plan_sync_reference", opts),
+  mentorPlanSyncReference: (opts: { planId: string }) => call<{ loading: true } | { loading: false; added: string[]; message: string; tidied?: boolean; health?: Array<{ code: string; area: string; message: string; items?: string[] }>; plan?: import("./types").MentorPlan }>("mentor_plan_sync_reference", opts),
+  mentorPlanHealth: (opts: { planId: string }) => call<{ loading: true } | { loading: false; issues: Array<{ code: string; area: string; message: string; items?: string[] }> }>("mentor_plan_health", opts),
   mentorAreaTimesGet: (opts: { planId: string }) => call<{ times: import("./areaTimes").AreaTimes }>("mentor_area_times_get", opts),
   mentorAreaTimeSet: (opts: { planId: string; subplanId: string; start: string | null; durationMin?: number | null }) => call<{ times: import("./areaTimes").AreaTimes }>("mentor_area_time_set", opts),
   mentorPlanFolderCandidates: (opts: { planId: string }) => call<{ candidates: Array<{ folder: string; label: string; role?: import("./folderRoles").FolderRoleKind; objective?: string; topicCount: number; estMinutes: number }> }>("mentor_plan_folder_candidates", opts),

@@ -54,6 +54,10 @@ Do not run git commands except where §6 says. Another AI may be editing the app
    practice manifest. These are the **current** versions; B exists because older notes do not follow them.
 4. `NoteVault/docs/ANTIGRAVITY_PLAN_ATOMIC_TOPICS.md` §4 — the quality bar of an *atomic* note (one thing, deep, verified).
 
+**Section names in `00 Units — <area>.md` must be distinct and say what they contain.** Each `## Section` becomes a subject in the app. Never
+create two sections with near-synonym names (`Foundations` and `Fundamentals` was a real mistake: it became `Databases from zero` and
+`Relational model and design`). Do not rename an existing section without being asked.
+
 **Atomic means one note per statement, clause, type or setting** — like HTML, where each element is its own note. A group topic (an
 overview) comes first and its pieces follow, each linking back to the group with `[[exact folder name]]`.
 

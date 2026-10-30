@@ -149,6 +149,15 @@ describe("AddExtraTopic", () => {
     expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
+  it("con una asignatura pide al servidor SOLO esa asignatura (por su id) y no filtra por título en el navegador", async () => {
+    const withGroup: MentorTopicCandidates = { ...cands, ahead: [{ ...cands.ahead[0]!, group: "Otro título" } as never] };
+    const list = vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue(withGroup);
+    await render(<AddExtraTopic planId="p" date="2026-10-06" area="s-a" lockArea lockSession subject={{ id: "lang-python", title: "Lenguaje: Python" }} onChanged={vi.fn()} />);
+    await click(document.querySelector('[data-testid="add-extra-topic"]'));
+    expect(list).toHaveBeenCalledWith({ id: "p", upcoming: true, date: "2026-10-06", area: "s-a", group: "lang-python" });
+    expect(document.querySelectorAll('[data-testid="extra-topic-candidate"]')).toHaveLength(1);
+  });
+
   it("permite filtrar por esta área o todas las áreas y cambiar el día", async () => {
     const list = vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue(cands);
     await render(<AddExtraTopic planId="p" date="2026-10-06" area="s-a" minDate="2026-10-05" maxDate="2026-10-30" onChanged={() => {}} />);

@@ -189,6 +189,24 @@ describe("mentor_plan_topic_candidates", () => {
 });
 
 describe("mentor_plan_topic_candidates (upcoming)", () => {
+  it("con una asignatura elegida solo salen SUS temas, todos los pendientes, aunque caigan lejos (no solo las próximas semanas del área)", () => {
+    const { id, sa } = writePlan();
+    const st = new PlanStore(dir);
+    const plan = st.load(id)!;
+    const sub = plan.subplans.find((x) => x.id === sa)!;
+    // Alfa se parte en dos asignaturas: las 2 primeras y las 4 últimas (que caen más tarde)
+    sub.groups = [{ id: "uno", title: "Uno", kind: "knowledge", order: 100 }, { id: "dos", title: "Dos", kind: "knowledge", order: 110 }];
+    sub.topics = sub.topics.map((t, i) => ({ ...t, group: i < 2 ? "uno" : "dos", targetWeek: i < 2 ? 1 : 20 }));
+    st.save(plan);
+    const dos: any = api().mentor_plan_topic_candidates({ id, upcoming: true, area: sa, group: "dos" });
+    expect(dos.ahead.map((c: any) => c.title)).toEqual(["Alfa 3", "Alfa 4", "Alfa 5", "Alfa 6"]);
+    expect(dos.ahead.every((c: any) => c.group === "Dos")).toBe(true);
+    // la posición es dentro de la asignatura, no del área
+    expect(dos.ahead.map((c: any) => `${c.position}/${c.total}`)).toEqual(["1/4", "2/4", "3/4", "4/4"]);
+    const uno: any = api().mentor_plan_topic_candidates({ id, upcoming: true, area: sa, group: "uno" });
+    expect(uno.ahead.map((c: any) => c.title)).toEqual(["Alfa 1", "Alfa 2"]);
+  });
+
   it("devuelve los próximos temas por área en orden de ruta, con semana y bloqueo, y sin temas de la vault", () => {
     const { id, sa } = writePlan();
     const r: any = api().mentor_plan_topic_candidates({ id, upcoming: true, area: sa, horizon: 12 });

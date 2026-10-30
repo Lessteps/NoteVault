@@ -66,7 +66,7 @@ export class VaultIndex {
     const known = new Map(this.entries);
     const nextEntries = new Map<string, [[number, number], IndexedNote]>();
 
-    for (const p of this.vault.notePaths(4000)) {
+    for (const p of this.vault.notePaths()) {
       const resolved = fsPath(p);
       let stat: fs.Stats;
       try {

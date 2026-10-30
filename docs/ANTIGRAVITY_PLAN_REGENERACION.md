@@ -128,6 +128,19 @@ For each batch (about 10 topics): rewrite, then from `NoteVault/frontend`
 `node tools/programming_kb/check_examples.mjs "^<regex> "`, `finalize.mjs` (BLOCKED 0) and `links.mjs` (0 unresolved). When a topic is
 finished, delete its line from `DESACTUALIZADOS.md` (this is how you resume and how the person sees what is left).
 
+## 4b. Second pass — the format check (this is what «done» means)
+
+`finalize.mjs` and `links.mjs` do NOT check that a theory note follows the skill. The app does, and the first pass left 217 topics it still
+flags (they start `**X is** … **It works like** …` instead of `**In one sentence.** …`, or have `- **- In the practice:**`). Therefore:
+
+1. From `NoteVault/frontend` run `PKB_SPACE=/home/drawn/projects/Lessteps/knowledge-base/Programación node tools/programming_kb/check_format.mjs`
+   — it lists every failing topic and what is missing. **After every batch run it on that batch** (`… check_format.mjs "^7\\."`).
+2. `DESACTUALIZADOS.md` now lists exactly those topics. Fix them in order; the run is finished ONLY when `check_format.mjs` (no argument) prints
+   `0 do NOT follow` and exits 0. Emptying the list by hand is not «done».
+3. Models that pass: `1 Fundamentals/1.1 What programming is` (chapter-style) and `6 Databases/6.4.1 SELECT statement` (piece-style). Copy their
+   SHAPE (headings, the `**In one sentence.**` opening, numbered mental model, `- **In the practice:**`, the `## Examples` and `## Common mistakes`
+   blocks), not their content. Re-read `resumen_teorico_skill.md` before each batch: drifting from it is exactly what produced this second pass.
+
 ## 5. Quality bar (both packages)
 
 - Same headings, counts and frontmatter as the skills dictate. A note that does not pass `finalize.mjs` is not finished.

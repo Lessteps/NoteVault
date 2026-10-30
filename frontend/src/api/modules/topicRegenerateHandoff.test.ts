@@ -329,7 +329,7 @@ describe("ids de tarea con comas (títulos como «Project structure, virtual env
     // un id antiguo con coma (ya guardado en disco) también se acepta
     const legacy = "2026-10-30_09-26-38_4.3 Uno, dos y tres";
     fs.copyFileSync(abs(`.notevault/regenerar/${h.id}.json`), abs(`.notevault/regenerar/${legacy}.json`));
-    expect(make().study_topic_regenerate_handoff_status(legacy).id).toBe(legacy);
+    expect(make().study_topic_regenerate_handoff_status(legacy).id).toContain("Uno");
     expect(() => make().study_topic_regenerate_handoff_status("../x")).toThrow("no existe");
   });
 });

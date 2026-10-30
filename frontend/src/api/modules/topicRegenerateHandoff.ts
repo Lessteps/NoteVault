@@ -28,6 +28,7 @@ import { catalogFor } from "../../core/practice/skillSelection.js";
 import type { DifficultyLevel } from "../../core/practice/skills.js";
 import { ensureTopicViewFiles, viewFileName } from "../../core/practice/viewFiles.js";
 import { noteWeight } from "../../lib/noteWeight.js";
+import { outdatedByFolder } from "./skillFreshness.js";
 import { practiceCells } from "../../lib/planExecution.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
@@ -599,7 +600,11 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
     const noteAbs = path.join(topicAbs, NOTE_NAME(name));
     if (!fs.existsSync(noteAbs)) return [`Falta la nota «${name}.md».`];
     const backup = t.saved.map((f) => path.join(app.root, ...f.split("/"))).find((f) => path.basename(f) === NOTE_NAME(name));
-    if (backup && sameFile(backup, noteAbs)) return ["La nota no ha cambiado: el agente aún no escribió la teoría nueva."];
+    // Una nota igual a la copia NO es un error por sí sola: si ya se reconstruyó (a mano, o en una tarea anterior) antes de crear esta tarea, la copia ya es la
+    // nota buena. Se juzga por lo que la nota ES: si no cumple la skill (estructura, longitud) falla con SUS motivos, no con «no ha cambiado».
+    const unchanged = !!backup && sameFile(backup, noteAbs);
+    // …pero una nota que sigue desactualizada (más vieja que su skill, sin el formato o demasiado larga) y no cambió sí es «el agente no hizo nada»
+    if (unchanged && outdatedByFolder(app.root, [t.folder]).get(t.folder)?.theory) return ["La nota no ha cambiado y sigue desactualizada: el agente aún no escribió la teoría nueva."];
     let text = fs.readFileSync(noteAbs, "utf-8");
     if (!frontmatterOf(text) && backup) {
       // el agente la escribió sin frontmatter: se le devuelve el de siempre
@@ -607,11 +612,11 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
     }
     const fm = frontmatterOf(text);
     const body = text.slice(fm.length);
-    if (!isCompleteTheory(body)) return ["La nota está cortada: no llega a la sección final «Tarjetas» / «Cards» con contenido."];
+    if (!isCompleteTheory(body)) return [unchanged ? "La nota no ha cambiado y está cortada o sin formato: el agente aún no escribió la teoría nueva." : "La nota está cortada: no llega a la sección final «Tarjetas» / «Cards» con contenido."];
     // una nota que no se aprende de una vez es dos notas: se devuelve al agente (límites de «Size and focus» de la skill)
     if (t.folder.startsWith("Programación/") && !text.includes("curriculum_id:")) {
       const heavy = noteWeight(body).reasons;
-      if (heavy.length) return [`Nota demasiado larga o con más de una idea: ${heavy.join("; ")}. Redúcela a UN concepto y dilo con las mínimas palabras.`];
+      if (heavy.length) return [`${unchanged ? "La nota no ha cambiado y " : ""}Nota demasiado larga o con más de una idea: ${heavy.join("; ")}. Redúcela a UN concepto y dilo con las mínimas palabras.`];
     }
     const known = new Set(siblings(t.folder));
     const cleaned = fm + sanitizeRequires(body, known);

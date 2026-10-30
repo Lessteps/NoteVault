@@ -16,6 +16,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ApiError } from "../../core/errors.js";
+import { noteWeight } from "../../lib/noteWeight.js";
 import { parseFrontmatter } from "../../core/frontmatter.js";
 import { curriculumAreas } from "../../core/curriculum/catalog.js";
 import { parseExercise } from "../../core/practice/exerciseNote.js";
@@ -336,7 +337,9 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
 
       // 2. estructura: las mismas lecturas que usa el generador del mapa
       if (!isCompleteTheory(body)) problems.push("La nota está cortada: no llega a la sección final «Cards» con contenido.");
-      else {
+      else if (e.folder.startsWith("Programación/") && !text.includes("curriculum_id:") && noteWeight(body).reasons.length) {
+        problems.push(`Nota demasiado larga o con más de una idea: ${noteWeight(body).reasons.join("; ")}. Redúcela a UN concepto (límites de «Size and focus» de la skill).`);
+      } else {
         try {
           const concept = readConcept(topicAbs, app.root);
           const rest = concept.warnings.filter((w) => !/prerrequisito/i.test(w));

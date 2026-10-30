@@ -4,6 +4,11 @@
 import fs from "node:fs";
 import { listTopics } from "./common.mjs";
 
+// Same limits as src/lib/noteWeight.ts (a vitest keeps both equal): a note is learned in one go or it is two notes.
+const MAX_EXPLANATION_WORDS = 500;
+const MAX_NOTE_WORDS = 1500;
+const wc = (s) => s.split(/\s+/).filter(Boolean).length;
+
 const re = new RegExp(process.argv[2] ?? ".");
 const bad = [];
 let checked = 0;
@@ -23,6 +28,15 @@ for (const t of listTopics()) {
     if (!raw.includes("## Examples")) miss.push("## Examples");
     if (!raw.includes("**How you will apply it:**") && !raw.includes("**Why it works:**")) miss.push("**How you will apply it:** (or **Why it works:**)");
     if (!raw.includes("## Common mistakes")) miss.push("## Common mistakes");
+  }
+  // size and focus: one concept, minimum words (catalog reference groups hold several items by design and are exempt)
+  if (!raw.includes("curriculum_id:")) {
+    const text = raw.replace(/\r\n/g, "\n");
+    const expl = wc(/## Explanation([\s\S]*?)(?=\n## )/.exec(text)?.[1] ?? "");
+    const total = wc(text.replace(/^---\n[\s\S]*?\n---\n/, ""));
+    if (expl > MAX_EXPLANATION_WORDS) miss.push(`«## Explanation» has ${expl} words (max ${MAX_EXPLANATION_WORDS}): it holds more than one idea — say it in the minimum, or split the topic`);
+    if (total > MAX_NOTE_WORDS) miss.push(`the note has ${total} words (max ${MAX_NOTE_WORDS}): shorten the examples and the text, or split the topic`);
+    if (/^prerequisites:\s*\[\s*"/m.test(text) && /No prerequisites/i.test(/## Requires([\s\S]*?)(?=\n## )/.exec(text)?.[1] ?? "")) miss.push("«## Requires» says «No prerequisites» but the frontmatter lists prerequisites");
   }
   if (miss.length) bad.push({ topic: t.topic, miss });
 }

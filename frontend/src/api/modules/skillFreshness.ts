@@ -11,6 +11,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { isHeavyNote } from "../../lib/noteWeight.js";
 import type { OutdatedSkills } from "../../lib/planTopicCatalog.js";
 
 const SKILL_FILES = { theory: "resumen_teorico_skill.md", canvas: "mapa_skill.md", practica: "practica_skill.md" } as const;
@@ -81,6 +82,7 @@ function skillChangeTimes(root: string, subjects: Iterable<string>): Map<string,
 
 function isProgrammingTheoryOutdated(raw: string): boolean {
   if (!raw) return true;
+  if (!raw.includes("curriculum_id:") && isHeavyNote(raw)) return true; // demasiado larga para aprenderse de una vez (ver «Size and focus» de la skill)
   if (!raw.includes("## Requires")) return true;
   if (!raw.includes("### What it is")) return true;
   // Si no es un tema de catálogo curricular con curriculum_id, debe tener la estructura estándar de 4.1

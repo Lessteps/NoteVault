@@ -27,6 +27,7 @@ import { buildTopicSession, parseExerciseArray, type GeneratedExercise, type Ses
 import { catalogFor } from "../../core/practice/skillSelection.js";
 import type { DifficultyLevel } from "../../core/practice/skills.js";
 import { ensureTopicViewFiles, viewFileName } from "../../core/practice/viewFiles.js";
+import { noteWeight } from "../../lib/noteWeight.js";
 import { practiceCells } from "../../lib/planExecution.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
@@ -593,6 +594,11 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
     const fm = frontmatterOf(text);
     const body = text.slice(fm.length);
     if (!isCompleteTheory(body)) return ["La nota está cortada: no llega a la sección final «Tarjetas» / «Cards» con contenido."];
+    // una nota que no se aprende de una vez es dos notas: se devuelve al agente (límites de «Size and focus» de la skill)
+    if (t.folder.startsWith("Programación/") && !text.includes("curriculum_id:")) {
+      const heavy = noteWeight(body).reasons;
+      if (heavy.length) return [`Nota demasiado larga o con más de una idea: ${heavy.join("; ")}. Redúcela a UN concepto y dilo con las mínimas palabras.`];
+    }
     const known = new Set(siblings(t.folder));
     const cleaned = fm + sanitizeRequires(body, known);
     if (cleaned !== text || text !== fs.readFileSync(noteAbs, "utf-8")) fs.writeFileSync(noteAbs, cleaned.endsWith("\n") ? cleaned : `${cleaned}\n`, "utf-8");

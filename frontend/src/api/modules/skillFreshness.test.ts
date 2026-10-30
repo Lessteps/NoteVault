@@ -45,3 +45,15 @@ describe("outdatedByFolder", () => {
     expect(outdatedByFolder(root, [TOPIC]).size).toBe(0);
   });
 });
+
+describe("notas demasiado pesadas", () => {
+  const body = (n: number): string => `# 2.1.1 X\n\n## Requires\n*No prerequisites.*\n\n## Explanation\n\n### What it is\n**In one sentence.** ${"word ".repeat(n)}\n\n### Mental model\n**In the practice:** x\n\n## Examples\n**How you will apply it:** x\n\n## Common mistakes\nx\n`;
+  it("una nota de Programación con la explicación pasada del límite sale como desactualizada; una corta, no", () => {
+    const heavy = "Programación/2.1 Python/2.1.1 X", light = "Programación/2.1 Python/2.1.2 Y";
+    put(`${heavy}/2.1.1 X.md`, body(700));
+    put(`${light}/2.1.2 Y.md`, body(100));
+    const out = outdatedByFolder(root, [heavy, light]);
+    expect(out.get(heavy)).toMatchObject({ theory: true });
+    expect(out.has(light)).toBe(false);
+  });
+});

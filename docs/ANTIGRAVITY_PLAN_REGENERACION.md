@@ -145,6 +145,17 @@ flags (they start `**X is** … **It works like** …` instead of `**In one sent
    SHAPE (headings, the `**In one sentence.**` opening, numbered mental model, `- **In the practice:**`, the `## Examples` and `## Common mistakes`
    blocks), not their content. Re-read `resumen_teorico_skill.md` before each batch: drifting from it is exactly what produced this second pass.
 
+## 4c. Third pass — short notes, one concept each
+
+The skill now has hard limits («Size and focus» and «Entry level» in `resumen_teorico_skill.md`): `## Explanation` ≤ 500 words (aim 250–350), whole note
+≤ 1500 (aim 900–1100), ONE concept per note, no internals in difficulty-1 topics, a language starts with «run your first program».
+`check_format.mjs` fails above the limits and the app flags those notes as outdated, so they appear in `DESACTUALIZADOS.md`.
+`_handoff/regenerar/NOTAS_PESADAS.md` lists them in route order. Rules for this pass:
+- Shorten by cutting, not by moving text around: remove the second and third concept, the internals and every sentence that does not change what the learner types.
+- If the title lists several concepts («A, B and C»), create atomic pieces `N.M.1`, `N.M.2`… and leave the parent as a one-screen summary that links them.
+- `2.1.1` (Python) must not be topic 1: add `2.1.1.1 Run your first Python program` and `2.1.1.2 Values and print` first, then move project layout, environments and imports to later pieces.
+- Done when `check_format.mjs` (no argument) prints `0 do NOT follow` and exits 0.
+
 ## 5. Quality bar (both packages)
 
 - Same headings, counts and frontmatter as the skills dictate. A note that does not pass `finalize.mjs` is not finished.

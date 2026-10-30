@@ -23,8 +23,10 @@ for (const t of listTopics()) {
   // catalog topics (with curriculum_id) have their own shape; everything else must follow the standard structure
   if (!raw.includes("curriculum_id:")) {
     if (!raw.includes("**In one sentence.**")) miss.push("**In one sentence.** (first line under «### What it is»)");
-    if (!raw.includes("### Mental model")) miss.push("### Mental model");
-    if (!raw.includes("**In the practice:**")) miss.push("a bullet that starts exactly «- **In the practice:**» (not «- **- In the practice:**»)");
+    // two valid shapes: functional modules (current skill) or the older Mental model + In the practice
+    const modular = raw.includes("### How it is organised") && raw.includes("### How it works in the real world");
+    if (!modular && !raw.includes("### Mental model")) miss.push("the modules «### How it is organised» and «### How it works in the real world» (or the older «### Mental model»)");
+    if (!modular && !raw.includes("**In the practice:**")) miss.push("a bullet that starts exactly «- **In the practice:**» (not «- **- In the practice:**»)");
     if (!raw.includes("## Examples")) miss.push("## Examples");
     if (!raw.includes("**How you will apply it:**") && !raw.includes("**Why it works:**")) miss.push("**How you will apply it:** (or **Why it works:**)");
     if (!raw.includes("## Common mistakes")) miss.push("## Common mistakes");

@@ -188,7 +188,7 @@ export function readTheory(text: string): TheoryReading {
       requires: has(/^(requires|requiere|prerequisites|prerrequisitos)\b/),
       explanation: has(/^(explanation|explicacion)\b/),
       whatItIs: h3.some((h) => /^(what it is|que es)\b/.test(h.title)),
-      mentalModel: h3.some((h) => /^(mental model|modelo mental)\b/.test(h.title)),
+      mentalModel: h3.some((h) => /^(mental model|modelo mental|how it is organi[sz]ed|how it works)\b/i.test(h.title)),
       examples: has(reExamples),
       mistakes: has(reMistakes),
       connections: has(/^(connections|conexiones)\b/),
@@ -211,7 +211,7 @@ export function contractProblems(r: TheoryReading): string[] {
   if (!s.explanation) out.push("falta la sección Explanation");
   else {
     if (!s.whatItIs) out.push("falta «What it is» en Explanation");
-    if (!s.mentalModel) out.push("falta «Mental model» en Explanation");
+    if (!s.mentalModel) out.push("falta un módulo tras «What it is» en Explanation («How it is organised» y «How it works in the real world», o «Mental model»)");
   }
   if (!s.examples) out.push("falta la sección Examples");
   else if (r.examples < 3) out.push(`Examples tiene ${r.examples} de 3 ejemplos`);

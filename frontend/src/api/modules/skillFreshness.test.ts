@@ -57,3 +57,17 @@ describe("notas demasiado pesadas", () => {
     expect(out.has(light)).toBe(false);
   });
 });
+
+describe("estructura en módulos funcionales", () => {
+  const note = (mid: string): string => `# 2.1.5 X\n\n## Requires\n*No prerequisites.*\n\n## Explanation\n\n### What it is\n**In one sentence.** word\n\n${mid}\n\n## Examples\n**How you will apply it:** x\n\n## Common mistakes\nx\n`;
+  it("la nota con «How it is organised» + «How it works in the real world» está al día, igual que la antigua con «Mental model»; sin ninguna de las dos, no", () => {
+    const a = "Programación/2.1 Python/2.1.5 A", b = "Programación/2.1 Python/2.1.6 B", c = "Programación/2.1 Python/2.1.7 C";
+    put(`${a}/2.1.5 A.md`, note("### How it is organised\nx\n\n### How it works in the real world\nx"));
+    put(`${b}/2.1.6 B.md`, note("### Mental model\nx\n- **In the practice:** y"));
+    put(`${c}/2.1.7 C.md`, note("### Otra cosa\nx"));
+    const out = outdatedByFolder(root, [a, b, c]);
+    expect(out.has(a)).toBe(false);
+    expect(out.has(b)).toBe(false);
+    expect(out.get(c)).toMatchObject({ theory: true });
+  });
+});

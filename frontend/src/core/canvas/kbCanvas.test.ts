@@ -119,7 +119,7 @@ describe("readConcept", () => {
     const { root, concepto } = makeVault("---\nnumber: \"1.9\"\n---\n\n# 1.9\n\n## Otra cosa\nnada\n");
     const c = readConcept(concepto, root);
     expect(c.warnings.join(" | ")).toContain('falta la sección "## Requiere"');
-    expect(c.warnings.join(" | ")).toContain('falta "### Modelo mental"');
+    expect(c.warnings.join(" | ")).toContain('falta "### Qué es"');
   });
 
   it("accepts an explicit 'Sin prerrequisitos'", () => {
@@ -500,5 +500,19 @@ describe("step-by-step Case (programming)", () => {
     const text = readConcept(folder, root).examples[0]!.fields.find((f) => f.label === "Case")!.text;
     expect(text).toContain("Steps:\n1. Start with n = 3.\n2. Subtract one each turn.");
     expect(text).toContain("# start with three tries");
+  });
+});
+
+describe("explicación en módulos funcionales", () => {
+  const NOTE = `---\nnumber: "2.1.5"\n---\n\n# 2.1.5 T\n\n## Requires\n*No prerequisites.*\n\n## Explanation\n\n### What it is\n**In one sentence.** A thing.\n\n### How it is organised\nThe parts.\n\n### How it works in the real world\nWhere it is used.\n\n## Examples\n\n## Common mistakes\n`;
+  it("lee todos los módulos tras «What it is», en orden, y dibuja un panel por módulo", () => {
+    const { root, concepto } = makeVault(NOTE);
+    const c = readConcept(concepto, root);
+    expect(c.modules.map((m) => m.title)).toEqual(["How it is organised", "How it works in the real world"]);
+    expect(c.warnings.join(" | ")).not.toMatch(/Mental model|módulo/);
+    const doc = buildConceptCanvas(c);
+    const texts = doc.nodes.filter((n) => n.type === "text").map((n) => String((n as { text?: string }).text));
+    expect(texts.some((t) => t.startsWith("## How it is organised"))).toBe(true);
+    expect(texts.some((t) => t.startsWith("## How it works in the real world"))).toBe(true);
   });
 });

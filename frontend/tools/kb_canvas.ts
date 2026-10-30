@@ -120,17 +120,17 @@ export type Lang = "es" | "en";
 /** Words of each language the note parser accepts and the canvas draws. Programming notes are written in English. */
 export const LABELS: Record<Lang, {
   requires: string; noPrereq: string; explanation: string; whatItIs: string; mental: string; examples: string; errors: string;
-  pending: string; baseConcept: string; priorConcept: string; understoodWith: string; appliedIn: string; failsWhen: string; anotherCase: string;
+  pending: string; baseConcept: string; priorConcept: string; understoodWith: string; then: string; appliedIn: string; failsWhen: string; anotherCase: string;
   exampleFields: string[]; errorFields: string[]; follows: string;
 }> = {
   es: {
     requires: "Requiere", noPrereq: "Sin prerrequisitos.", explanation: "Explicación", whatItIs: "Qué es", mental: "Modelo mental", examples: "Ejemplos", errors: "Errores comunes",
-    pending: "(pendiente)", baseConcept: "concepto base", priorConcept: "concepto previo", understoodWith: "se entiende con", appliedIn: "se aplica en", failsWhen: "se falla cuando", anotherCase: "otro caso",
+    pending: "(pendiente)", baseConcept: "concepto base", priorConcept: "concepto previo", understoodWith: "se entiende con", then: "luego", appliedIn: "se aplica en", failsWhen: "se falla cuando", anotherCase: "otro caso",
     exampleFields: ["Contexto", "Caso", "Resultado esperado", "Por qué funciona"], errorFields: ["Error", "Síntoma", "Causa", "Solución"], follows: "sigue",
   },
   en: {
     requires: "Requires", noPrereq: "No prerequisites.", explanation: "Explanation", whatItIs: "What it is", mental: "Mental model", examples: "Examples", errors: "Common mistakes",
-    pending: "(pending)", baseConcept: "base concept", priorConcept: "prior concept", understoodWith: "is understood with", appliedIn: "applied in", failsWhen: "fails when", anotherCase: "another case",
+    pending: "(pending)", baseConcept: "base concept", priorConcept: "prior concept", understoodWith: "is understood with", then: "then", appliedIn: "applied in", failsWhen: "fails when", anotherCase: "another case",
     exampleFields: ["Context", "Case", "Expected result", "Why it works"], errorFields: ["Mistake", "Symptom", "Cause", "Fix"], follows: "follows",
   },
 };
@@ -144,7 +144,10 @@ export interface Concept {
   hasRequiereSection: boolean;
   prerequisites: Prerequisite[];
   queEs: string;
+  /** the first module after «What it is» when it is «Mental model» (old notes); empty otherwise */
   modeloMental: string;
+  /** every module of `## Explanation` after «What it is», in order (old notes: «Mental model»; new notes: «How it is organised», «How it works in the real world»…) */
+  modules: Array<{ title: string; body: string }>;
   examples: Example[];
   errors: CommonError[];
   /** everything the note should have and does not, or has and should not */
@@ -287,9 +290,12 @@ export function readConcept(folder: string, vaultRoot: string): Concept {
   const explicacion = top(all, ["explicación", "explicacion", "explanation"]);
   const queEs = children(explicacion, all).find((s) => ["que es", "what it is", "what is it"].includes(norm(s.title)));
   const modelo = children(explicacion, all).find((s) => ["modelo mental", "mental model"].includes(norm(s.title)));
+  // La explicación se reparte en MÓDULOS funcionales, cada uno con un solo objetivo: qué es, cómo se organiza, cómo actúa en el mundo real.
+  // Las notas antiguas tienen «Qué es» + «Modelo mental»; se dibujan igual (el modelo mental es otro módulo).
+  const modules = children(explicacion, all).filter((s) => s !== queEs).map((s) => ({ title: s.title.trim(), body: s.body.trim() }));
   if (!explicacion) warnings.push(`falta la sección "## ${L.explanation}"`);
   if (!queEs) warnings.push(`falta "### ${L.whatItIs}" dentro de "## ${L.explanation}"`);
-  if (!modelo) warnings.push(`falta "### ${L.mental}" dentro de "## ${L.explanation}"`);
+  if (explicacion && !modules.length) warnings.push(`falta al menos un módulo después de "### ${L.whatItIs}" (p. ej. "### How it is organised" y "### How it works in the real world")`);
 
   /* 3. Ejemplos */
   const ejemplos = top(all, ["ejemplos", "ejemplo", "examples", "example"]);
@@ -316,6 +322,7 @@ export function readConcept(folder: string, vaultRoot: string): Concept {
     prerequisites,
     queEs: queEs?.body.trim() ?? "",
     modeloMental: modelo?.body.trim() ?? "",
+    modules,
     examples,
     errors,
     warnings,
@@ -508,17 +515,21 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
   const xEx = requiereGroup.x + requiereGroup.width + gapFor(toConceptLabels);
 
   const que = b.text(xEx, 0, QUE_W, `## ${L.whatItIs}\n\n${c.queEs}`, C_DEFINITION);
-  const modelo = b.text(
-    xEx, que.height + GAP_Y, QUE_W,
-    `## ${L.mental}\n\n${c.modeloMental}`, C_CONCEPT,
-  );
-  const explicacionGroup = b.add(group(L.explanation, [que, modelo], C_CONCEPT, -2));
+  const moduleNodes: cf.CanvasNode[] = [];
+  let yMod = que.height + GAP_Y;
+  for (const m of c.modules) {
+    const node = b.text(xEx, yMod, QUE_W, `## ${m.title}\n\n${m.body}`, C_CONCEPT);
+    moduleNodes.push(node);
+    yMod += node.height + GAP_Y;
+  }
+  const modelo = moduleNodes[0] ?? que; // the module the examples hang from: the first one after «What it is» keeps the old layout
+  const explicacionGroup = b.add(group(L.explanation, [que, ...moduleNodes], C_CONCEPT, -2));
 
   for (const p of c.prerequisites) {
     const card = prereqCards[c.prerequisites.indexOf(p)];
     if (card) b.edge(card, que, p.reason);
   }
-  b.edge(que, modelo, L.understoodWith, "bottom", "top");
+  moduleNodes.forEach((node, i) => b.edge(i === 0 ? que : moduleNodes[i - 1]!, node, i === 0 ? L.understoodWith : L.then, "bottom", "top"));
 
   /* ── Panels 3 and 4 — Ejemplos, and Errores comunes below them ─────────── */
   // Both hang from `Explicación`, so they share one column. An arrow from column
@@ -578,7 +589,7 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
 
   /* ── Arrows ────────────────────────────────────────────────────────────── */
   const firstExample = exampleFirst[0];
-  if (firstExample) b.edge(modelo, firstExample, L.appliedIn);
+  if (firstExample) b.edge(moduleNodes[moduleNodes.length - 1] ?? modelo, firstExample, L.appliedIn);
   for (let i = 1; i < exampleFirst.length; i++) {
     const prev = exampleLast[i - 1];
     const cur = exampleFirst[i];

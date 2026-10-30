@@ -88,8 +88,12 @@ function isProgrammingTheoryOutdated(raw: string): boolean {
   // Si no es un tema de catálogo curricular con curriculum_id, debe tener la estructura estándar de 4.1
   if (!raw.includes("curriculum_id:")) {
     if (!raw.includes("**In one sentence.**")) return true;
-    if (!raw.includes("### Mental model")) return true;
-    if (!raw.includes("- **In the practice:**") && !raw.includes("**In the practice:**")) return true;
+    // dos estructuras válidas: la nueva, en módulos funcionales, y la anterior (Mental model + In the practice)
+    const modular = raw.includes("### How it is organised") && raw.includes("### How it works in the real world");
+    if (!modular) {
+      if (!raw.includes("### Mental model")) return true;
+      if (!raw.includes("- **In the practice:**") && !raw.includes("**In the practice:**")) return true;
+    }
     if (!raw.includes("## Examples")) return true;
     if (!raw.includes("**How you will apply it:**") && !raw.includes("**Why it works:**")) return true;
     if (!raw.includes("## Common mistakes")) return true;
@@ -108,7 +112,7 @@ function isProgrammingCanvasOutdated(rawCanvas: string, theoryStale: boolean): b
     // Verificar que contenga los marcadores clave del nuevo mapa
     if (!joined.includes("Explanation") && !parsed.nodes.some((n: any) => n.type === "group" && String(n.label).includes("Explanation"))) return true;
     if (!joined.includes("**In one sentence.**") && !joined.includes("What it is")) return true;
-    if (!joined.includes("Mental model") && !joined.includes("In the practice")) return true;
+    if (!joined.includes("Mental model") && !joined.includes("In the practice") && !joined.includes("How it works in the real world")) return true;
     return false;
   } catch {
     return true;

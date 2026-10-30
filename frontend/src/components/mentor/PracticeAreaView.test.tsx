@@ -12,12 +12,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { deriveAreaPractice } from "../../lib/areaPracticeDerive";
 import { api } from "../../lib/bridge";
 import { weekRangesOf } from "../../lib/planTime";
-import { clampToPlan } from "../../lib/planSchedule";
-import { dayByArea } from "../../lib/planTopicsByArea";
 import { buildPracticeTrack } from "../../lib/practiceTrack";
 import type { MentorAreaPractice, MentorPlan as PlanData } from "../../lib/types";
 import { useNavState } from "../../store/navState";
-import { scheduleOf } from "./agendaKit";
 import { PracticeRow } from "./PracticeCard";
 import type { Loaded } from "./planShared";
 
@@ -77,36 +74,39 @@ afterEach(() => {
 });
 
 describe("página individual de un área", () => {
-  it("cabecera, aviso descartable y secciones en orden", () => {
-    expect(q("area-page-title")!.textContent).toMatch(/^Backend · \d+ temas y práctica$/);
-    expect(q("area-page-meta")!.textContent).toMatch(/h estimadas · \d+ colecciones en tu vault · kata/);
-    expect(q("area-tip")!.textContent).toContain("Ruta de aprendizaje activa");
+  it("cabecera, aviso descartable y secciones: solo práctica, sin teoría ni ejercicios de temas", () => {
+    expect(q("area-page-title")!.textContent).toBe("Backend · práctica");
+    expect(q("area-page-meta")!.textContent).toMatch(/kata/);
+    expect(q("area-tip")!.textContent).toContain("Práctica por proyecto");
     const labels = [...host.querySelectorAll("[data-testid=practice-area-view] h4")].map((h) => h.textContent!.replace(/\s+/g, " ").toUpperCase());
-    expect(labels[0]).toMatch(/^TEORÍA DE BACKEND/);
     expect(labels.some((l) => l.startsWith("PRÁCTICA DE BACKEND"))).toBe(true);
-    expect(labels.some((l) => /^VAULT DE EJERCICIOS · \d+ RETOS?$/.test(l))).toBe(true);
-    expect(q("area-session-progress")!.textContent).toMatch(/Progreso de sesión: 0 de \d+ completados/);
+    expect(labels.some((l) => /TEORÍA|VAULT DE EJERCICIOS|LENGUAJE/.test(l))).toBe(false);
+    expect(q("area-session-progress")!.textContent).toMatch(/Progreso de sesión: \d+ de \d+ completados/);
   });
 
   it("el aviso se cierra con un botón con nombre", async () => {
     const close = q("area-tip-close")!;
-    expect(close.getAttribute("aria-label")).toContain("Ruta de aprendizaje activa");
+    expect(close.getAttribute("aria-label")).toContain("Práctica por proyecto");
     await click(close);
     expect(q("area-tip")).toBeNull();
   });
 
-  it("los temas de teoría de hoy son EXACTAMENTE los del selector compartido (dayByArea)", () => {
-    const { schedule } = scheduleOf(PLAN as never, TODAY, []);
-    const day = schedule.byDate.get(clampToPlan(TODAY, PLAN as never))!;
-    const entry = dayByArea(PLAN as never, day, []).find((e) => e.areaId === "backend")!;
-    const expected = [...new Map((entry.blocks ?? []).filter((b) => b.kind === "theory").flatMap((b) => b.items).map((i) => [`${i.folder}:${i.part}`, i.folder] as const)).values()];
-    expect(expected.length).toBeGreaterThan(0);
-    const got = [...host.querySelectorAll("[data-testid=area-theory-row]")].map((r) => r.getAttribute("data-folder"));
-    expect(got).toEqual(expected);
-    const first = host.querySelector("[data-testid=area-theory-row]")!;
-    expect(first.textContent).toContain("Sin tratar");
-    expect(first.textContent).toContain("Backend");
-    expect(first.querySelector("button")!.getAttribute("aria-label")).toMatch(/^Ver tema: /);
+  it("NO muestra temas de teoría ni «Haz los ejercicios del tema»: la práctica es la cadena mes → semana → piezas diarias del área", () => {
+    expect(host.querySelector("[data-testid=area-theory-row]")).toBeNull();
+    expect(host.querySelector("[data-testid=area-theory-list]")).toBeNull();
+    expect(host.querySelector("[data-testid=area-vault-row]")).toBeNull();
+    expect(host.querySelector("[data-testid=area-language-table]")).toBeNull();
+    expect(host.textContent).not.toContain("Haz los ejercicios del tema");
+    const chain = q("area-chain")!;
+    expect(chain).toBeTruthy();
+    expect(chain.querySelector("[data-testid=area-chain-month]")!.textContent).toMatch(/^1 · Proyecto del mes/);
+    expect(chain.querySelector("[data-testid=area-chain-week]")!.textContent).toMatch(/^2 · Proyecto de la semana/);
+    const pieces = [...chain.querySelectorAll("[data-testid=area-chain-piece]")];
+    expect(pieces.length).toBeGreaterThan(0);
+    for (const p of pieces) expect(p.getAttribute("data-id")).toMatch(/^dp:\d{4}-\d{2}-\d{2}$/);
+    // la pieza de hoy dice qué se hace EN ESTA ÁREA, cómo y con qué resultado real
+    const todayPiece = chain.querySelector("[data-testid=area-chain-piece][data-today=true]");
+    if (todayPiece) expect(todayPiece.querySelector("[data-testid=project-result]")).toBeTruthy();
   });
 
   it("kata de hoy: rejilla Context / Task / Deliverable / Time box, plantilla copiable y acciones", async () => {
@@ -144,13 +144,4 @@ describe("página individual de un área", () => {
     expect(q("area-arch")!.textContent).toContain("katas/");
   });
 
-  it("vault de ejercicios: una fila por tema con su cuenta y «Abrir ejercicios»", () => {
-    const heads = [...host.querySelectorAll("[data-testid=area-language-table] th[scope=col]")].map((h) => h.textContent);
-    if (heads.length) expect(heads).toEqual(["Tema", "Módulo", "Progreso", "Tiempo", "Estado", "Acción"]);
-    const rows = [...host.querySelectorAll("[data-testid=area-vault-row]")];
-    expect(rows.length).toBe(host.querySelectorAll("[data-testid=area-theory-row]").length);
-    expect(rows[0]!.textContent).toContain("Haz los ejercicios del tema «");
-    expect(rows[0]!.textContent).toContain("24 en tu vault");
-    expect(rows[0]!.textContent).toContain("Abrir ejercicios");
-  });
 });

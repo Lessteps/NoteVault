@@ -17,6 +17,8 @@ import { SourcesPanel, useSourcesPanel } from "../english/SourcesPanel";
 import { RecordingsPanel, useRecordingsPanel } from "../english/RecordingsPanel";
 import { CodePanel } from "../programming/CodePanel";
 import { useCodePanel } from "../../store/codePanel";
+import { useSkillsPanel } from "../../store/skillsPanel";
+import { SkillsPanel } from "../skills/SkillsPanel";
 
 export function RightPanel({ module }: { module: string }) {
   const assistantOpen = useAssistant((s) => s.open);
@@ -25,11 +27,14 @@ export function RightPanel({ module }: { module: string }) {
   const sourcesOpen = useSourcesPanel((s) => s.open);
   const recordingsOpen = useRecordingsPanel((s) => s.open);
   const codeOpen = useCodePanel((s) => s.open);
+  const skillsOpen = useSkillsPanel((s) => s.open);
   const muscleOpen = useApp((s) => s.muscleOpen);
   const inspectorOpen = useApp((s) => s.inspectorOpen);
   const active = useApp((s) => s.active);
 
-  const face = assistantOpen
+  const face = skillsOpen
+    ? <SkillsPanel />
+    : assistantOpen
     ? <AssistantPanel />
     : pagesOpen
       ? <WebRail />

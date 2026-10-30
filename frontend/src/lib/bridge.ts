@@ -483,6 +483,12 @@ export const api = {
   mentorMethodologyReview: (opts: { prompt: string }) => call<{ aiConfigured: boolean; text: string }>("mentor_methodology_review", opts),
   mentorPlanProjectLinks: (opts: { planId: string }) => call<{ links: Record<string, { projectId: string; name: string; issues: { total: number; done: number }; monthId: string }> }>("mentor_plan_project_links", opts),
   mentorPlanProjectCreate: (opts: { planId: string; monthId: string }) => call<{ link: { projectId: string; name: string; issues: { total: number; done: number }; monthId: string }; created: boolean }>("mentor_plan_project_create", opts),
+  /** Skills (instrucciones de generación): lista, lectura, guardado con historial, restauración y peticiones de cambio (IA de la app o prompt). */
+  skillsList: () => call<{ subjects: Array<{ subject: string; skills: import("./types").SkillInfo[] }>; maxPast: number }>("skills_list"),
+  skillsGet: (o: { subject: string; kind: string; versionId?: string }) => call<{ text: string; info: import("./types").SkillInfo; versionId?: string }>("skills_get", o),
+  skillsSave: (o: { subject: string; kind: string; text: string }) => call<import("./types").SkillInfo>("skills_save", o),
+  skillsRestore: (o: { subject: string; kind: string; versionId: string }) => call<import("./types").SkillInfo>("skills_restore", o),
+  skillsAiEdit: (o: { subject: string; kind: string; instruction: string; mode: "prompt" | "app" }) => call<{ mode: "prompt" | "app"; prompt: string; proposal?: string }>("skills_ai_edit", o),
   mentorPlanDepth: (opts: { planId: string }) => call<{ gaps: Array<{ subplanId: string; areaId: string; area: string; groupId: string; groupTitle: string; groupKind: string; chapters: number; missingPieces: number; coarseCount: number; sample: string[] }>; standard: { minPieces: number; minMinutes: number } }>("mentor_plan_depth", opts),
   mentorPlanDepthHandoff: (opts: { planId: string; subplanId: string; groupId: string }) => call<{ rel: string; abs: string; shortPrompt: string; chapters: number }>("mentor_plan_depth_handoff", opts),
   mentorPlanDossier: (opts: { id: string; question?: string }) => call<{ rel: string; abs: string; answerRel: string; answerAbs: string; shortPrompt: string; topics: number }>("mentor_plan_dossier", opts),

@@ -134,7 +134,9 @@ describe("PanelLaunchers: Mentor", () => {
     mount();
     const labels = [...container.querySelectorAll("aside button")].map((b) => b.getAttribute("aria-label"));
     expect(labels.indexOf("Mentor")).toBe(labels.indexOf("Asistente IA") + 1);
-    expect(labels.indexOf("Páginas del navegador")).toBe(labels.indexOf("Mentor") + 1);
+    // «Skills» va justo debajo del Mentor y antes de las páginas del navegador
+    expect(labels.indexOf("Skills")).toBe(labels.indexOf("Mentor") + 1);
+    expect(labels.indexOf("Páginas del navegador")).toBe(labels.indexOf("Skills") + 1);
 
     act(() => {
       byLabel("Mentor").click();

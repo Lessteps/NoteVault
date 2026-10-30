@@ -7,7 +7,7 @@
 // Los botones se pueden reordenar arrastrándolos con el ratón; el orden se recuerda
 // (ver lib/launcherOrder).
 
-import { Bug, CalendarClock, Crop, Globe, GraduationCap, Headphones, ListTree, Mic, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
+import { Bug, CalendarClock, Crop, Globe, GraduationCap, Headphones, ListTree, Mic, Map as MapIcon, PenTool, ScrollText, Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { toggleFace } from "../../lib/panelFaces";
 import { startScreenCapture } from "../../lib/screenCapture";
@@ -17,6 +17,7 @@ import { useReviewPanel } from "../study/ReviewPanel";
 import { useSourcesPanel } from "../english/SourcesPanel";
 import { useRecordingsPanel } from "../english/RecordingsPanel";
 import { useCodePanel } from "../../store/codePanel";
+import { useSkillsPanel } from "../../store/skillsPanel";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
 import { useWebPages } from "../../store/webPages";
@@ -34,6 +35,7 @@ export function PanelLaunchers({ module }: { module: string }) {
   const sourcesOpen = useSourcesPanel((s) => s.open);
   const recordingsOpen = useRecordingsPanel((s) => s.open);
   const codeOpen = useCodePanel((s) => s.open);
+  const skillsOpen = useSkillsPanel((s) => s.open);
   const [saved, setSaved] = useState<string[]>(loadLauncherOrder);
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
@@ -90,6 +92,16 @@ export function PanelLaunchers({ module }: { module: string }) {
         <button type="button" title="Mentor: plan de hoy, metas y conversación" aria-label="Mentor"
           onClick={() => useApp.getState().setModule("mentor")} className={cell(false)}>
           <GraduationCap size={16} />
+        </button>
+      ),
+    },
+    {
+      // Las instrucciones con las que se generan las notas, los mapas y la práctica: se ven, se editan, tienen historial y se pueden pedir cambios.
+      id: "skills", show: true,
+      node: (
+        <button type="button" title={skillsOpen ? "Cerrar las skills" : "Skills: instrucciones de generación (notas, mapa, práctica)"} aria-label="Skills"
+          aria-pressed={skillsOpen} onClick={() => toggleFace("skills")} className={cell(skillsOpen)} data-testid="launcher-skills">
+          <ScrollText size={16} />
         </button>
       ),
     },

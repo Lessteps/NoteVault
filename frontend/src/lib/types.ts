@@ -2036,3 +2036,15 @@ export interface FixResolution {
   type: "extend_end" | "increase_hours" | "skip_duplicates" | "as_optional";
   reviewId: string;
 }
+
+/** Una skill (instrucciones de generación de una pieza) con su versión actual y hasta 3 pasadas. */
+export interface SkillInfo {
+  subject: string;
+  kind: "theory" | "canvas" | "practica";
+  label: string;
+  file: string;
+  version: string | null;
+  words: number;
+  updatedAt: string | null;
+  past: Array<{ id: string; savedAt: string; version: string; words: number }>;
+}

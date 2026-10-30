@@ -177,6 +177,25 @@ describe("la tarea para el agente externo", () => {
     expect(md).toContain("#### Practice plan");
     expect(md).toContain("ejercicios_<skill>_d<difficulty>.json");
   });
+
+  it("una combinación («teoría + práctica») es UNA tarea con las dos cosas y sin ejercicios", async () => {
+    const h = await make().study_topic_regenerate_handoff([A, B], "theory+practice", true);
+    expect(h.what).toBe("theory+practice");
+    const md = read(h.task);
+    expect(md).toContain("Theory note and practice plan");
+    expect(md).toContain("#### Theory");
+    expect(md).toContain("#### Practice plan");
+    expect(md).toContain("Base the plan on the theory note you write");
+    expect(md).not.toContain("ejercicios_<skill>_d<difficulty>.json");
+  });
+
+  it("«teoría + ejercicios» usa las competencias del plan actual (no hay plan nuevo)", async () => {
+    const h = await make().study_topic_regenerate_handoff(A, "theory+exercises", true);
+    const md = read(h.task);
+    expect(md).toContain("#### Theory");
+    expect(md).not.toContain("#### Practice plan");
+    expect(md).toMatch(/ejercicios_implement_d1/);
+  });
 });
 
 describe("reabrir tareas guardadas", () => {

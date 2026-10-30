@@ -20,7 +20,7 @@ export interface ScopeTopic {
 
 const fold = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-/** Ids de las áreas del currículo de referencia (`html`, `css`, `atomic-design`, `js-reference`, `java`) que cuenta un texto («HTML», «JavaScript», «Frontend»…). */
+/** Ids de las áreas del currículo de referencia (`html`, `css`, `atomic-design`, `js-reference`, `java`, `python`, `javascript`, `typescript`, `electron`, `backend`, `databases`, `automation`, `mobile`, `tooling`) que cuenta un texto («HTML», «JavaScript», «Frontend»…). */
 export function curriculumIdsOfText(text: string): string[] {
   const t = fold(text);
   const out: string[] = [];
@@ -28,7 +28,17 @@ export function curriculumIdsOfText(text: string): string[] {
   if (/\bcss\b/.test(t)) out.push("css");
   if (/atomic/.test(t)) out.push("atomic-design");
   if (/javascript|\bjs\b|typescript|\bts\b/.test(t)) out.push("js-reference");
+  if (/javascript|\bjs\b/.test(t)) out.push("javascript");
+  if (/typescript|\bts\b/.test(t)) out.push("typescript");
+  if (/python/.test(t)) out.push("python");
   if (/\bjava\b/.test(t)) out.push("java");
+  // áreas de conocimiento con su propio currículo de referencia
+  if (/electron|desktop/.test(t)) out.push("electron");
+  if (/backend|back-end/.test(t)) out.push("backend");
+  if (/database|base de datos|bases de datos|\bsql\b|postgres|mysql|sqlite/.test(t)) out.push("databases");
+  if (/automation|automatiz/.test(t)) out.push("automation");
+  if (/mobile|movil/.test(t)) out.push("mobile");
+  if (/tooling|quality/.test(t)) out.push("tooling");
   if (/frontend|front-end|front end/.test(t)) for (const id of ["html", "css", "atomic-design", "js-reference"]) if (!out.includes(id)) out.push(id);
   return out;
 }

@@ -37,15 +37,27 @@ import { classifyForTopic, clearStudySnapshotCache, findTopicManifest, readTheor
 import { isCompleteTheory, sanitizeRequires, theoryMessagesFor } from "./studySpace.js";
 import { copyInto, posix, sameFile, stamp, type RegenWhat } from "./topicRegenerate.js";
 
-export type HandoffWhat = Exclude<RegenWhat, "map">;
-const HANDOFF_WHATS: readonly HandoffWhat[] = ["theory", "practice", "exercises", "all"];
+/** Qué pedirle al agente: una pieza, «all» o una combinación (un solo prompt que hace varias cosas a la vez). */
+export type HandoffWhat = Exclude<RegenWhat, "map"> | "theory+practice" | "theory+exercises" | "practice+exercises";
+const HANDOFF_WHATS: readonly HandoffWhat[] = ["theory", "practice", "exercises", "all", "theory+practice", "theory+exercises", "practice+exercises"];
 const STEPS_OF: Record<HandoffWhat, ReadonlyArray<"theory" | "practice" | "exercises">> = {
   theory: ["theory"],
   practice: ["practice"],
   exercises: ["exercises"],
   all: ["theory", "practice", "exercises"],
+  "theory+practice": ["theory", "practice"],
+  "theory+exercises": ["theory", "exercises"],
+  "practice+exercises": ["practice", "exercises"],
 };
-const WHAT_LABEL: Record<HandoffWhat, string> = { theory: "Theory note", practice: "Practice plan (.practica)", exercises: "Exercises", all: "Theory, practice plan and exercises" };
+const WHAT_LABEL: Record<HandoffWhat, string> = {
+  theory: "Theory note",
+  practice: "Practice plan (.practica)",
+  exercises: "Exercises",
+  all: "Theory, practice plan and exercises",
+  "theory+practice": "Theory note and practice plan",
+  "theory+exercises": "Theory note and exercises",
+  "practice+exercises": "Practice plan and exercises",
+};
 /** ejercicios por celda (skill × dificultad): lo mismo que pide la app con «3-5» */
 const PER_CELL = 4;
 /** válidos mínimos para dar por buena una celda */
@@ -320,7 +332,7 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
     async study_topic_regenerate_handoff(foldersIn: unknown, whatIn: string, confirm?: boolean): Promise<RegenHandoff> {
       if (confirm !== true) throw new ApiError("Falta la confirmación: la tarea respalda y, al validar, reemplaza contenido.");
       if (whatIn === "map") throw new ApiError("El mapa no usa IA: se reconstruye de la nota. Regénéralo con «Con la app».");
-      if (!HANDOFF_WHATS.includes(whatIn as HandoffWhat)) throw new ApiError("Elige qué regenerar: teoría, práctica, ejercicios o todo.");
+      if (!HANDOFF_WHATS.includes(whatIn as HandoffWhat)) throw new ApiError("Elige qué regenerar: teoría, práctica, ejercicios o una combinación.");
       const what = whatIn as HandoffWhat;
       const list = (Array.isArray(foldersIn) ? foldersIn : [foldersIn]).map(parseFolder);
       const folders = [...new Set(list)];
@@ -352,11 +364,12 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
         const plan: (typeof plans)[number] = { folder, cells: [], exercisePrompts: new Map() };
         if (steps.includes("theory")) plan.theory = theoryPrompt(folder);
         if (steps.includes("practice")) plan.practice = practiceCtx(folder).messages;
-        if (what === "exercises") {
+        if (steps.includes("exercises") && !steps.includes("practice")) {
+          // solo ejercicios (con o sin teoría nueva): las competencias son las del plan de práctica actual
           plan.cells = cellsOf(folder);
           if (!plan.cells.length) throw new ApiError(`«${path.posix.basename(folder)}»: no hay competencias (skills) con las que generar ejercicios. Regenera antes la práctica.`);
           for (const c of plan.cells) plan.exercisePrompts.set(`${c.skill}|${c.difficulty}`, await exercisePrompt(folder, c.skill, c.difficulty));
-        } else if (what === "all") {
+        } else if (steps.includes("exercises")) {
           // las celdas del plan NUEVO aún no existen: como modelo se enseña el prompt de la primera celda del plan actual (si lo hay)
           const model = cellsOf(folder)[0];
           if (model) {
@@ -442,7 +455,7 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
             "",
             fenced(user),
             "",
-            what === "all" ? "Base the plan on the theory note you write for this same topic (the request above shows the OLD note)." : "",
+            steps.includes("theory") ? "Base the plan on the theory note you write for this same topic (the request above shows the OLD note)." : "",
             "Output contract: the file contains ONLY the JSON object described in the instructions (`topic_type`, `skills[]` with `skill`, `difficulties`, `why`, and `summary`). Skill ids must come from the catalogue; unknown or unsuitable skills are dropped, and the plan needs at least one valid skill.",
             "",
             `- [ ] \`${t.out}/practica.json\` written`,
@@ -450,7 +463,7 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
           );
         }
         if (steps.includes("exercises")) {
-          if (what === "all") {
+          if (steps.includes("practice")) {
             md.push(
               `#### Exercises — one file per skill × difficulty of YOUR practice plan`,
               "",
@@ -639,7 +652,7 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
   async function applyExercises(t: StateTopic, what: HandoffWhat): Promise<string[]> {
     const outAbs = app.resolve(t.out, { allowRoot: true, mustExist: false });
     // «todo»: las celdas salen del plan recién escrito; «ejercicios»: las que se calcularon al crear la tarea
-    const cells = what === "all" ? cellsOf(t.folder) : t.cells;
+    const cells = STEPS_OF[what].includes("practice") ? cellsOf(t.folder) : t.cells;
     if (!cells.length) return ["El plan de práctica no tiene celdas (skill × dificultad) de las que generar ejercicios."];
     const problems: string[] = [];
     const batches: Array<{ cell: Cell; items: GeneratedExercise[] }> = [];
@@ -711,7 +724,7 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
         } catch {
           /* aún no hay carpeta de resultados */
         }
-        if (s.what === "exercises") {
+        if (!steps.includes("practice")) {
           expected += t.cells.length;
           found += t.done.includes("exercises") ? t.cells.length : t.cells.filter((c) => files.includes(`ejercicios_${c.skill}_d${c.difficulty}.json`)).length;
         } else {

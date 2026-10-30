@@ -37,7 +37,7 @@ describe("study_curriculum_coverage", () => {
 
   it("devuelve las cuatro áreas con cubierto exacto por curriculum_id y parciales por el repaso 5.2 CSS", () => {
     const cov = curriculumCoverageApi(app).study_curriculum_coverage();
-    expect(cov.areas.map((a) => a.areaId)).toEqual(["html", "css", "atomic-design", "js-reference", "java"]);
+    expect(cov.areas.map((a) => a.areaId)).toEqual(["html", "css", "atomic-design", "js-reference", "java", "python", "javascript", "typescript", "electron", "backend", "databases", "automation", "mobile", "tooling"]);
     const css = cov.areas.find((a) => a.areaId === "css")!;
     expect(css.rows.find((r) => r.entry.id === "css.flex-container")).toMatchObject({ status: "cubierto" });
     expect(css.rows.find((r) => r.entry.id === "css.grid-container")).toMatchObject({ status: "parcial" });
@@ -50,7 +50,7 @@ describe("study_curriculum_coverage", () => {
   it("filtra por espacio y reutiliza el resultado mientras el escaneo es el mismo", () => {
     const api = curriculumCoverageApi(app);
     expect(api.study_curriculum_coverage({ space: "Matemáticas" }).areas).toEqual([]);
-    expect(api.study_curriculum_coverage({ space: "Programación" }).areas).toHaveLength(5);
+    expect(api.study_curriculum_coverage({ space: "Programación" }).areas).toHaveLength(14);
     expect(api.study_curriculum_coverage()).toBe(api.study_curriculum_coverage());
   });
 

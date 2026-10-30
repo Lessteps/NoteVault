@@ -290,12 +290,13 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
     else if (h === "missing") setSelected(new Set(visible.filter(pendingGenerate).map((r) => r.folder)));
     else setSelected(new Set(visible.filter((r) => r.exercises === 0).map((r) => r.folder)));
   };
-  const ask = (what: RegenKind, rows: ReadonlyArray<AreaTopicRow>): void => setAsking(planBulk(rows, what, false));
+  const [alsoMap, setAlsoMap] = useState(false);
+  const ask = (what: RegenKind, rows: ReadonlyArray<AreaTopicRow>, withMap = false): void => { setAlsoMap(withMap); setAsking(planBulk(rows, what, false)); };
   const confirmBulk = (): void => {
     const p = asking;
     setAsking(null);
     if (!p || p.run.length === 0) return;
-    void start(p.what, p.run);
+    void start(p.what, p.run, { alsoMap });
   };
   // «Generar lo que falta» de la selección: el diálogo de «Ejecutar plan» (uno por tema) de los que están en ruta y les falta algo
   const generateMissing = (): void => {
@@ -588,7 +589,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
               <div className="flex items-center justify-between pt-1">
                 {addTopicsBar("add-topics-btn")}
               </div>
-              <BulkToolbar count={selectedRows.length} busy={queueBusy} onAsk={(w) => ask(w, selectedRows)} onGenerateMissing={generateMissing} onHelper={helper} groups={groups} onMoveGroup={handleMoveTopics} />
+              <BulkToolbar count={selectedRows.length} busy={queueBusy} onAsk={(w, m) => ask(w, selectedRows, m)} onGenerateMissing={generateMissing} onHelper={helper} groups={groups} onMoveGroup={handleMoveTopics} />
               {queue && <BulkProgress queue={queue} onStop={stop} onClose={dismiss} />}
             </>
           )}
@@ -609,7 +610,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                 <caption className="sr-only">Temas de {active.area}{group.id ? `, grupo ${group.title}` : ""}</caption>
                 <thead className="bg-card text-[12.5px] uppercase tracking-wide text-faint">
                   <tr>
-                    <th scope="col" className="w-9 px-3 py-2">
+                    <th scope="col" className="sticky left-0 z-[1] w-9 bg-card px-3 py-2">
                       <input
                         type="checkbox"
                         aria-label="Seleccionar todos los temas visibles"
@@ -675,8 +676,10 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress, only 
                         }
                       }}
                     >
-                      <td className="px-3 py-2">
-                        <input type="checkbox" aria-label={`Seleccionar ${r.title}`} checked={selected.has(r.folder)} onChange={() => toggleSel(r.folder)} disabled={queueBusy} data-testid="row-select" className="mt-1 h-4 w-4 accent-[var(--nv-accent)]" />
+                      <td className="sticky left-0 z-[1] bg-surface px-0 py-0">
+                        <label className="flex h-full min-h-10 w-full cursor-pointer items-start justify-center px-3 py-2.5">
+                        <input type="checkbox" aria-label={`Seleccionar ${r.title}`} checked={selected.has(r.folder)} onChange={() => toggleSel(r.folder)} disabled={queueBusy} data-testid="row-select" className="h-4 w-4 accent-[var(--nv-accent)]" />
+                        </label>
                       </td>
                       <td className="px-3 py-2 tabular-nums text-dim">
                         <select

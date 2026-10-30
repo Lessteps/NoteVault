@@ -56,6 +56,19 @@ const CONCEPT_SHAPE_OF_MODE: Record<string, string> = {
   explain: "Ask the learner to explain how the concept works and why it matters, with an example of their own, in a concrete situation (a failing request, a slow page, a lost file). No code has to be written. The solution is a model explanation with the key ideas the rubric checks.",
 };
 
+/**
+ * What the learner has READ of a note, as context for the exercises: the explanation (what it is + mental model), the first examples and the cards.
+ * The old prompt gave only the first 1200 characters, so the AI filled the gap with what it knew about the topic and asked about things the note never
+ * taught. Capped per note so five notes still fit.
+ */
+export function taughtContent(content: string, cap = 4500): string {
+  const text = content.replace(/\r\n/g, "\n").replace(/^---\n[\s\S]*?\n---\n/, "");
+  const section = (name: string): string => new RegExp(`## ${name}\\n([\\s\\S]*?)(?=\\n## |$)`).exec(text)?.[1]?.trim() ?? "";
+  const parts = [section("Explanation"), section("Examples").slice(0, 1500), section("Cards").slice(0, 1200)].filter(Boolean);
+  const joined = (parts.length ? parts.join("\n\n") : text).trim();
+  return joined.slice(0, cap);
+}
+
 export function buildProgrammingExercisePrompt(
   manifest: TopicManifest,
   theory: ReadonlyArray<{ title: string; content: string }>,
@@ -73,7 +86,7 @@ export function buildProgrammingExercisePrompt(
   const helper = assistance === "helper";
   const theorySummary = theory
     .slice(0, 5)
-    .map((t) => `### ${t.title}\n${t.content.slice(0, 1200).trim()}`)
+    .map((t) => `### ${t.title}\n${taughtContent(t.content)}`)
     .join("\n\n");
   const conceptTopic = manifest.topic_type === "theoretical";
   const anchors = discipline.skills.map((s) => `- ${s.title}: ${s.anchors.join("; ")}`).join("\n");
@@ -88,6 +101,7 @@ export function buildProgrammingExercisePrompt(
     conceptTopic ? "This topic is a CONCEPT, not a procedure: never ask the learner to write code or commands. Situations may quote a short snippet, a log excerpt or a request/response to READ and reason about." : "",
     "CRITICAL RULES:",
     "1. Every exercise is about the specific concepts of THIS topic, never generic filler; the topic's central mechanism must be what is being tested.",
+    "1b. TAUGHT-ONLY: the learner has read ONLY the theory notes given below (and the topics they require). Use only the terms, functions, syntax and ideas those notes explain. If a word or feature is not in the notes, do not use it in the statement, the hints or the code, and never ask about it. A true/false item, a classification case or a trace must be answerable from what the note says. At level 1 reuse the situations of the note's own examples with different values.",
     "2. Every exercise is real and applied (a script, a pipeline step, a business rule, concrete data). Never toy drills with names like data1 or valueA.",
     "3. Write EVERYTHING in English: title, statement, hints, solution and rubric. Code goes in fenced code blocks (```python, ```ts, ```sql…). The statement is self-contained: it includes every piece of code and data the learner needs.",
     "4. The expected result must be verifiable by reasoning: give exact expected outputs for concrete inputs. Never ask for something that needs to run the code to know the answer.",

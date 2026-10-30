@@ -12,7 +12,7 @@ import { useRegenEngine } from "../../store/regenEngine";
 import { GhostButton, PrimaryButton } from "../common/forms";
 
 const POLL_MS = 4000;
-const WHAT: Record<RegenHandoff["what"], string> = { theory: "la teoría", practice: "la práctica", exercises: "los ejercicios", all: "todo" };
+const WHAT: Record<RegenHandoff["what"], string> = { theory: "la teoría", practice: "la práctica", exercises: "los ejercicios", all: "todo", "theory+practice": "la teoría y la práctica", "theory+exercises": "la teoría y los ejercicios", "practice+exercises": "la práctica y los ejercicios" };
 
 export function RegenHandoffPanel({ handoff, onClose }: { handoff: RegenHandoff; onClose?: () => void }) {
   const toast = useApp((s) => s.toast);

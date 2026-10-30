@@ -8,7 +8,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
 import type { AreaTopicRow } from "../../lib/planAreaTopics";
-import { estimateAiCalls, LABEL, OBJECT, regenBlockedReason, type RegenKind } from "../../lib/topicSelection";
+import { estimateAiCalls, LABEL, OBJECT, regenBlockedReason, type RegenKind, type SingleRegen } from "../../lib/topicSelection";
 import type { TopicRegenerateJob } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
@@ -73,7 +73,7 @@ export function confirmCopy(what: RegenWhat, row: Pick<AreaTopicRow, "title" | "
  * Lanza la regeneración y la sigue hasta el final. Vive FUERA de React: si el panel se pliega a mitad, el aviso final sale igual.
  * `onProgress` se llama con cada estado (la interfaz lo ignora si ya se desmontó).
  */
-export async function runRegeneration(folder: string, what: RegenWhat, onProgress?: (job: TopicRegenerateJob) => void, opts: { /** sin avisos propios (lo hace quien lanza el lote) */ quiet?: boolean; /** con qué IA: la de la app (por defecto) o Claude */ engine?: "app" | "claude" } = {}): Promise<TopicRegenerateJob> {
+export async function runRegeneration(folder: string, what: SingleRegen, onProgress?: (job: TopicRegenerateJob) => void, opts: { /** sin avisos propios (lo hace quien lanza el lote) */ quiet?: boolean; /** con qué IA: la de la app (por defecto) o Claude */ engine?: "app" | "claude" } = {}): Promise<TopicRegenerateJob> {
   const toast = opts.quiet ? () => undefined : useApp.getState().toast;
   try {
     const { jobId } = await api.studyTopicRegenerate(folder, what, true, opts.engine ?? "app");
@@ -132,7 +132,7 @@ export function RegeneratePanel({ row }: { row: AreaTopicRow }) {
         useApp.getState().toast("info", "Tarea creada. Pásasela a tu agente y, cuando termine, pulsa «Ya terminó — validar».");
         return;
       }
-      await runRegeneration(row.folder, what, (j) => alive.current && setJob(j), { engine });
+      await runRegeneration(row.folder, what as SingleRegen, (j) => alive.current && setJob(j), { engine });
     } catch (e) {
       if (engine === "handoff") useApp.getState().toast("error", (e as Error).message);
       /* ya avisado con un mensaje */

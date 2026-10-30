@@ -149,3 +149,20 @@ describe("exercise prompts follow the topic type", () => {
     expect(prompt(manifest(), "pg_compare")).toContain("decisive difference");
   });
 });
+
+describe("la práctica se ata a lo que la nota enseñó", () => {
+  it("el contexto lleva la explicación, los ejemplos y las tarjetas (no solo los primeros 1200 caracteres) y quita el frontmatter", async () => {
+    const { taughtContent } = await import("./programmingExercises");
+    const note = `---\ntitle: x\n---\n# 1.1 X\n\n## Explanation\n${"intro ".repeat(300)}KEY-MECHANISM\n\n## Examples\nEXAMPLE-ONE\n\n## Cards\n### 1\n**Q:** CARD-Q\n`;
+    const out = taughtContent(note);
+    expect(out).toContain("KEY-MECHANISM"); // pasado el carácter 1200, que antes se cortaba
+    expect(out).toContain("EXAMPLE-ONE");
+    expect(out).toContain("CARD-Q");
+    expect(out).not.toContain("title: x");
+  });
+  it("el prompt exige usar solo lo enseñado", async () => {
+    const { buildProgrammingExercisePrompt } = await import("./programmingExercises");
+    const msgs = buildProgrammingExercisePrompt({ title: "T", subject: "programming", folder: "Programación/2.1 Python/2.1.4 Functions" } as never, [{ title: "n", content: "## Explanation\nx" }], "pg_true_false", 1, "helper", 2);
+    expect(msgs[0]!.content).toContain("TAUGHT-ONLY");
+  });
+});

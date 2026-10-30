@@ -50,6 +50,13 @@ const flush = () => act(async () => { await Promise.resolve(); });
 const byTest = (id: string) => host.querySelector<HTMLElement>(`[data-testid=${id}]`);
 const input = (id: string) => byTest(id) as HTMLInputElement;
 const click = async (id: string) => { await act(async () => { byTest(id)!.click(); }); await flush(); };
+const PARTS = ["theory", "map", "practice", "exercises"] as const;
+/** Deja marcada SOLO esa pieza (o las piezas dadas) en la barra y pulsa «Regenerar lo marcado». */
+const regen = async (...want: Array<(typeof PARTS)[number]>) => {
+  for (const p of PARTS) { const el = byTest(`bulk-check-${p}`) as HTMLInputElement; if (el.checked && !want.includes(p) && !el.disabled) await click(`bulk-check-${p}`); }
+  for (const p of want) { const el = byTest(`bulk-check-${p}`) as HTMLInputElement; if (!el.checked) await click(`bulk-check-${p}`); }
+  await click("bulk-regen");
+};
 const clickEl = async (el: HTMLElement) => { await act(async () => { el.click(); }); await flush(); };
 const rowEl = (n: string) => host.querySelector<HTMLElement>(`[data-testid=area-row][data-folder="${F(n)}"]`)!;
 const check = (n: string) => clickEl(rowEl(n).querySelector<HTMLElement>("[data-testid=row-select]")!);
@@ -77,7 +84,7 @@ describe("selector de motor — estados", () => {
     vi.spyOn(api, "studyRegenEngines").mockResolvedValue(engines());
     await mount();
     await check("A");
-    await click("bulk-theory");
+    await regen("theory");
     expect(byTest("engine-choice")).toBeTruthy();
     expect(input("engine-app").checked).toBe(true);
     expect(input("engine-app").disabled).toBe(false);
@@ -94,7 +101,7 @@ describe("selector de motor — estados", () => {
     vi.spyOn(api, "studyRegenEngines").mockResolvedValue(BRIDGE);
     await mount();
     await check("A");
-    await click("bulk-theory");
+    await regen("theory");
     expect(input("engine-app").disabled).toBe(true);
     expect(input("engine-claude").disabled).toBe(true);
     expect(input("engine-handoff").checked).toBe(true);
@@ -107,7 +114,7 @@ describe("selector de motor — estados", () => {
     vi.spyOn(api, "studyRegenEngines").mockResolvedValue(BRIDGE);
     await mount();
     await check("A");
-    await click("bulk-map");
+    await regen("map");
     expect(byTest("engine-choice")).toBeNull();
     expect(byTest("bulk-confirm-calls")!.textContent).toContain("No usa la IA");
   });
@@ -116,16 +123,16 @@ describe("selector de motor — estados", () => {
     vi.spyOn(api, "studyRegenEngines").mockResolvedValue(engines({ claude: true }));
     await mount();
     await check("A");
-    await click("bulk-theory");
+    await regen("theory");
     await clickEl(input("engine-claude"));
     expect(window.localStorage.getItem("nv.regen.engine")).toBe("claude");
     await click("bulk-confirm-cancel");
-    await click("bulk-theory");
+    await regen("theory");
     expect(input("engine-claude").checked).toBe(true);
     // hoy Claude ya no está: se cae a «app» sin perder el valor guardado
     await click("bulk-confirm-cancel");
     vi.mocked(api.studyRegenEngines).mockResolvedValue(engines({ claude: false }));
-    await click("bulk-theory");
+    await regen("theory");
     expect(input("engine-app").checked).toBe(true);
     expect(input("engine-claude").checked).toBe(false);
   });
@@ -138,7 +145,7 @@ describe("motor Claude y motor de la app", () => {
     vi.spyOn(api, "studyTopicRegenerateStatus").mockImplementation(async () => job(F("A")) as never);
     await mount();
     await check("A");
-    await click("bulk-theory");
+    await regen("theory");
     await clickEl(input("engine-claude"));
     await click("bulk-confirm-run");
     await flush(); await flush(); await flush();
@@ -227,7 +234,7 @@ describe("agente externo — lote", () => {
     await mount();
     await check("A");
     await check("B");
-    await click("bulk-theory");
+    await regen("theory");
     expect(byTest("bulk-confirm-lead")!.textContent).toContain("2 temas");
     await click("bulk-confirm-run");
     await flush();

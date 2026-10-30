@@ -42,6 +42,13 @@ const flush = () => act(async () => { await Promise.resolve(); });
 const byTest = (id: string) => host.querySelector<HTMLElement>(`[data-testid=${id}]`);
 const all = (id: string) => [...document.querySelectorAll<HTMLElement>(`[data-testid=${id}]`)];
 const click = async (id: string) => { await act(async () => { byTest(id)!.click(); }); await flush(); };
+const PARTS = ["theory", "map", "practice", "exercises"] as const;
+/** Deja marcada SOLO esa pieza (o las piezas dadas) en la barra y pulsa «Regenerar lo marcado». */
+const regen = async (...want: Array<(typeof PARTS)[number]>) => {
+  for (const p of PARTS) { const el = byTest(`bulk-check-${p}`) as HTMLInputElement; if (el.checked && !want.includes(p) && !el.disabled) await click(`bulk-check-${p}`); }
+  for (const p of want) { const el = byTest(`bulk-check-${p}`) as HTMLInputElement; if (!el.checked) await click(`bulk-check-${p}`); }
+  await click("bulk-regen");
+};
 const clickEl = async (el: HTMLElement) => { await act(async () => { el.click(); }); await flush(); };
 const rowEl = (n: string) => host.querySelector<HTMLElement>(`[data-testid=area-row][data-folder="${F(n)}"]`)!;
 const check = (n: string) => clickEl(rowEl(n).querySelector<HTMLElement>("[data-testid=row-select]")!);
@@ -69,19 +76,25 @@ describe("Temas por área — selección y filtro", () => {
     await mount();
     expect(byTest("bulk-bar")).toBeTruthy();
     expect(byTest("bulk-count")!.textContent).toContain("Selecciona temas para regenerar");
-    for (const w of ["theory", "map", "practice", "exercises", "all", "missing"]) expect(bulk(`bulk-${w}`).disabled).toBe(true);
+    for (const w of ["regen", "missing"]) expect(bulk(`bulk-${w}`).disabled).toBe(true);
   });
 
   it("una casilla por tema: al marcar, la barra cuenta y activa los botones", async () => {
     await mount();
     await check("B");
     expect(byTest("bulk-count")!.textContent).toBe("1 tema seleccionado");
-    for (const w of ["theory", "map", "practice", "exercises", "all", "missing"]) expect(bulk(`bulk-${w}`).disabled).toBe(false);
+    expect(bulk("bulk-missing").disabled).toBe(false);
+    // «Regenerar» espera a que se marque qué regenerar
+    expect(bulk("bulk-regen").disabled).toBe(true);
+    await click("bulk-check-theory");
+    expect(bulk("bulk-regen").disabled).toBe(false);
+    expect(bulk("bulk-regen").textContent).toContain("Regenerar teoría");
+    await click("bulk-check-theory");
     await check("C");
     expect(byTest("bulk-count")!.textContent).toBe("2 temas seleccionados");
     await check("B");
     await check("C");
-    expect(bulk("bulk-map").disabled).toBe(true);
+    expect(bulk("bulk-regen").disabled).toBe(true);
   });
 
   it("la casilla de la cabecera selecciona todo lo visible y vuelve a quitarlo", async () => {
@@ -141,7 +154,7 @@ describe("Temas por área — lote", () => {
     await mount();
     await check("A");
     await check("B");
-    await click("bulk-theory");
+    await regen("theory");
     const text = byTest("bulk-confirm")!.textContent!;
     expect(byTest("bulk-confirm-lead")!.textContent).toContain("REEMPLAZAR la teoría de 2 temas");
     expect(text).toContain("A");
@@ -151,15 +164,26 @@ describe("Temas por área — lote", () => {
     expect(byTest("bulk-confirm")).toBeNull();
     expect(start).not.toHaveBeenCalled();
     // el mapa no usa IA
-    await click("bulk-map");
+    await regen("map");
     expect(byTest("bulk-confirm-calls")!.textContent).toContain("No usa la IA");
+  });
+
+  it("varias casillas = UN solo lote: «teoría + práctica» pide una tarea con las dos y el diálogo lo dice", async () => {
+    vi.spyOn(api, "studyTopicRegenerate");
+    await mount();
+    await check("A");
+    await regen("theory", "practice");
+    const lead = byTest("bulk-confirm-lead")!.textContent!;
+    expect(lead).toContain("la teoría y la práctica");
+    // el mapa se rehace con la teoría: su casilla queda marcada y bloqueada
+    expect((byTest("bulk-check-map") as HTMLInputElement).disabled).toBe(true);
   });
 
   it("los temas que no se pueden regenerar se omiten y se dice por qué", async () => {
     await mount();
     await check("B");
     await check("D");
-    await click("bulk-map");
+    await regen("map");
     expect(byTest("bulk-confirm-skipped")!.textContent).toContain("D: Este tema no tiene teoría");
     expect(byTest("bulk-confirm-lead")!.textContent).toContain("de 1 tema");
   });
@@ -182,7 +206,7 @@ describe("Temas por área — lote", () => {
     });
     await mount();
     await click("select-all");
-    await click("bulk-map");
+    await regen("map");
     expect(byTest("bulk-confirm-skipped")).toBeTruthy(); // D no tiene nota
     await click("bulk-confirm-run");
     await flush(); await flush(); await flush(); await flush();
@@ -207,11 +231,11 @@ describe("Temas por área — lote", () => {
     await check("A");
     await check("B");
     await check("C");
-    await click("bulk-map");
+    await regen("map");
     await click("bulk-confirm-run");
     await flush();
     expect(byTest("bulk-progress-line")!.textContent).toContain("1/3 · A · mapa…");
-    expect(bulk("bulk-map").disabled).toBe(true); // no se lanza otra cola encima
+    expect(bulk("bulk-regen").disabled).toBe(true); // no se lanza otra cola encima
     await click("bulk-stop");
     expect(bulk("bulk-stop").disabled).toBe(true);
     release();
@@ -230,7 +254,7 @@ describe("Temas por área — lote", () => {
     await mount();
     await check("A");
     await check("B");
-    await click("bulk-map");
+    await regen("map");
     await click("bulk-confirm-run");
     await flush(); await flush(); await flush(); await flush();
     expect(all("bulk-summary-item").map((e) => e.dataset.state)).toEqual(["error", "ok"]);
@@ -240,8 +264,8 @@ describe("Temas por área — lote", () => {
     vi.mocked(api.aiSettings).mockResolvedValue({ config: { is_bridge: true }, providers: [], models: [] } as never);
     await mount();
     await check("B");
-    for (const w of ["theory", "map", "practice", "exercises", "all"]) expect(bulk(`bulk-${w}`).disabled).toBe(false);
-    expect(bulk("bulk-theory").title).not.toContain("puente");
+    for (const w of ["theory", "map", "practice", "exercises"]) expect((byTest(`bulk-check-${w}`) as HTMLInputElement).disabled).toBe(false);
+    expect(bulk("bulk-regen").title).not.toContain("puente");
     expect((rowEl("B").querySelector("[data-testid=quick-map]") as HTMLButtonElement).disabled).toBe(false);
   });
 

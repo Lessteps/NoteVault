@@ -4,7 +4,28 @@
 import type { AreaTopicRow } from "./planAreaTopics";
 
 export type StatusFilter = "all" | "noTheory" | "noMap" | "noPractice" | "noExercises" | "complete";
-export type RegenKind = "theory" | "map" | "practice" | "exercises" | "all";
+export type RegenPart = "theory" | "map" | "practice" | "exercises";
+/** Una pieza, «todo» o una combinación de piezas con IA (teoría + práctica…): lo que marcan las casillas de la barra. */
+export type RegenKind = RegenPart | "all" | "theory+practice" | "theory+exercises" | "practice+exercises";
+
+/** Lo que el servidor sabe regenerar en un solo trabajo (una pieza o «todo»); una combinación se hace pieza a pieza. */
+export type SingleRegen = RegenPart | "all";
+
+/** Las piezas con IA, en el orden en que se regeneran (la práctica sale de la teoría; los ejercicios, de la práctica). */
+export const AI_PARTS: ReadonlyArray<Exclude<RegenPart, "map">> = ["theory", "practice", "exercises"];
+
+/** Las piezas que se regeneran con un tipo (`all` = teoría, práctica y ejercicios). */
+export const partsOf = (kind: RegenKind): RegenPart[] => (kind === "all" ? [...AI_PARTS] : (kind.split("+") as RegenPart[]));
+
+/** Lo que marcan las casillas → un tipo. El mapa no usa IA: solo, es «map»; con otras piezas se rehace con la teoría (o aparte, ver `mapAlone`). Sin nada marcado, `null`. */
+export function kindOfChecks(checked: ReadonlySet<RegenPart>): RegenKind | null {
+  const ai = AI_PARTS.filter((p) => checked.has(p));
+  if (ai.length === 0) return checked.has("map") ? "map" : null;
+  if (ai.length === 3) return "all";
+  return ai.join("+") as RegenKind;
+}
+/** ¿Se pide el mapa sin la teoría y junto a otras piezas? Entonces hay que rehacerlo aparte (con la teoría ya se rehace solo). */
+export const mapAlone = (checked: ReadonlySet<RegenPart>): boolean => checked.has("map") && !checked.has("theory") && AI_PARTS.some((p) => checked.has(p));
 
 export const STATUS_FILTERS: ReadonlyArray<{ key: StatusFilter; label: string }> = [
   { key: "all", label: "Todos" },
@@ -35,11 +56,14 @@ export const LABEL: Record<RegenKind, string> = {
   practice: "Regenerar práctica",
   exercises: "Regenerar ejercicios",
   all: "Regenerar todo",
+  "theory+practice": "Regenerar teoría y práctica",
+  "theory+exercises": "Regenerar teoría y ejercicios",
+  "practice+exercises": "Regenerar práctica y ejercicios",
 };
 /** «la teoría», «el mapa»… para los mensajes. */
-export const OBJECT: Record<RegenKind, string> = { theory: "la teoría", map: "el mapa", practice: "la práctica", exercises: "los ejercicios", all: "todo" };
+export const OBJECT: Record<RegenKind, string> = { theory: "la teoría", map: "el mapa", practice: "la práctica", exercises: "los ejercicios", all: "todo", "theory+practice": "la teoría y la práctica", "theory+exercises": "la teoría y los ejercicios", "practice+exercises": "la práctica y los ejercicios" };
 /** Forma corta para el progreso («teoría…»). */
-export const SHORT: Record<RegenKind, string> = { theory: "teoría", map: "mapa", practice: "práctica", exercises: "ejercicios", all: "todo" };
+export const SHORT: Record<RegenKind, string> = { theory: "teoría", map: "mapa", practice: "práctica", exercises: "ejercicios", all: "todo", "theory+practice": "teoría y práctica", "theory+exercises": "teoría y ejercicios", "practice+exercises": "práctica y ejercicios" };
 
 /**
  * Por qué NO se puede regenerar eso de ese tema ("" si se puede). La IA en modo puente YA NO bloquea: queda el motor «agente externo»
@@ -49,16 +73,19 @@ export const SHORT: Record<RegenKind, string> = { theory: "teoría", map: "mapa"
 export function regenBlockedReason(row: AreaTopicRow, what: RegenKind, _bridge = false): string {
   if (row.route === "skipped") return "El tema está fuera del plan: no se regenera.";
   if (!row.exists) return "El tema aún no existe en la vault: usa «Generar todo».";
-  if ((what === "theory" || what === "map") && !row.theory) return "Este tema no tiene teoría todavía: usa «Generar todo».";
-  if (what === "exercises" && !row.manifest) return "Primero genera la práctica (.practica) del tema: de ahí salen las competencias.";
+  const parts = partsOf(what);
+  // si se rehace la práctica, ella da las competencias de los ejercicios y no exige nada previo (como «todo»)
+  if (parts.includes("practice")) return "";
+  if ((parts.includes("theory") || parts.includes("map")) && !row.theory) return "Este tema no tiene teoría todavía: usa «Generar todo».";
+  if (parts.includes("exercises") && !row.manifest) return "Primero genera la práctica (.practica) del tema: de ahí salen las competencias.";
   return "";
 }
 
 /** Llamadas a la IA que aproximadamente cuesta regenerar `what` en un tema (el mapa no usa IA). */
 export function estimateAiCalls(row: AreaTopicRow, what: RegenKind): number {
   const exercises = Math.max(3, row.planExercises ?? row.exercises);
-  const per: Record<Exclude<RegenKind, "all">, number> = { theory: 1, map: 0, practice: 1, exercises };
-  return what === "all" ? per.theory + per.practice + per.exercises : per[what];
+  const per: Record<RegenPart, number> = { theory: 1, map: 0, practice: 1, exercises };
+  return partsOf(what).reduce((n, p) => n + per[p], 0);
 }
 
 export interface BulkPlan {
@@ -74,8 +101,7 @@ export function planBulk(rows: ReadonlyArray<AreaTopicRow>, what: RegenKind, bri
   const run: AreaTopicRow[] = [];
   const skipped: BulkPlan["skipped"] = [];
   for (const row of rows) {
-    // «todo» regenera antes la práctica: de la que salen los ejercicios, así que no exige que ya exista
-    const reason = what === "all" ? regenBlockedReason(row, "practice", bridge) : regenBlockedReason(row, what, bridge);
+    const reason = regenBlockedReason(row, what, bridge);
     if (reason) skipped.push({ row, reason });
     else run.push(row);
   }

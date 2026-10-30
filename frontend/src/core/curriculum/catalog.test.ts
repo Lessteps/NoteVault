@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { curriculumAreas } from "./catalog";
 
-const RANGES: Record<string, [number, number]> = { html: [40, 55], css: [110, 150], "atomic-design": [12, 25], "js-reference": [100, 140], java: [80, 100] };
+const RANGES: Record<string, [number, number]> = { html: [40, 55], css: [110, 150], "atomic-design": [12, 25], "js-reference": [100, 140], java: [80, 100], python: [30, 50], javascript: [20, 35], typescript: [15, 25], electron: [18, 30], backend: [20, 35], databases: [20, 35], automation: [12, 22], mobile: [10, 20], tooling: [12, 22] };
+/** Las áreas de conocimiento tienen menos categorías que las de referencia (HTML, CSS…): bastan 3. */
+const KNOWLEDGE = new Set(["python", "javascript", "typescript", "electron", "backend", "databases", "automation", "mobile", "tooling"]);
 
 describe("catálogo de currículo de referencia", () => {
   const areas = curriculumAreas();
@@ -13,6 +15,15 @@ describe("catálogo de currículo de referencia", () => {
       ["atomic-design", "5 Frontend/Atomic Design"],
       ["js-reference", "13 JavaScript Reference"],
       ["java", "14 Java"],
+      ["python", "2.1 Python"],
+      ["javascript", "2.2 JavaScript"],
+      ["typescript", "2.3 TypeScript"],
+      ["electron", "3 Desktop Apps (Electron)"],
+      ["backend", "4 Backend"],
+      ["databases", "6 Databases"],
+      ["automation", "7 Automation"],
+      ["mobile", "8 Mobile"],
+      ["tooling", "9 Tooling and Quality"],
     ]);
     expect(new Set(areas.map((a) => a.space))).toEqual(new Set(["Programación"]));
   });
@@ -46,7 +57,7 @@ describe("catálogo de currículo de referencia", () => {
         const order: string[] = [];
         for (const e of area.entries) if (order[order.length - 1] !== e.category) order.push(e.category);
         expect(new Set(order).size).toBe(order.length); // una categoría no reaparece más tarde
-        expect(order.length).toBeGreaterThanOrEqual(5);
+        expect(order.length).toBeGreaterThanOrEqual(KNOWLEDGE.has(area.id) ? 3 : 5);
         for (const c of order) expect(area.entries.filter((e) => e.category === c).length).toBeGreaterThan(0);
       });
 

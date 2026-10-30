@@ -1890,7 +1890,7 @@ export interface RegenHandoffTopic {
 }
 export interface RegenHandoff {
   id: string;
-  what: "theory" | "practice" | "exercises" | "all";
+  what: "theory" | "practice" | "exercises" | "all" | "theory+practice" | "theory+exercises" | "practice+exercises";
   createdAt: string;
   task: string;
   taskAbs: string;

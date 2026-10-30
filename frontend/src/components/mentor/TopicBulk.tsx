@@ -6,7 +6,7 @@ import { BookOpen, ChevronDown, ClipboardList, Dumbbell, FolderInput, Loader2, M
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { AreaTopicRow } from "../../lib/planAreaTopics";
-import { LABEL, OBJECT, SHORT, regenBlockedReason, type BulkPlan, type RegenKind } from "../../lib/topicSelection";
+import { LABEL, OBJECT, SHORT, kindOfChecks, mapAlone, partsOf, regenBlockedReason, type BulkPlan, type RegenKind, type RegenPart, type SingleRegen } from "../../lib/topicSelection";
 import { useApp } from "../../store/app";
 import { useRegenEngine } from "../../store/regenEngine";
 import { GhostButton, Modal, PrimaryButton } from "../common/forms";
@@ -48,9 +48,18 @@ export function useRegenQueue(onTopicDone?: () => void) {
     if (alive.current) setQueue((q) => (q ? { ...q, items: q.items.map((i) => (i.folder === folder ? { ...i, ...p } : i)) } : q));
   };
 
-  const start = async (what: RegenKind, rows: ReadonlyArray<Pick<AreaTopicRow, "folder" | "title">>): Promise<void> => {
+  const start = async (what: RegenKind, rows: ReadonlyArray<Pick<AreaTopicRow, "folder" | "title">>, opts: { /** rehacer también el mapa sin la teoría (no usa IA: se hace aquí, antes) */ alsoMap?: boolean } = {}): Promise<void> => {
     stop.current = false;
     const engine = what === "map" ? "app" : useRegenEngine.getState().effective;
+    if (opts.alsoMap && what !== "map") {
+      for (const r of rows) {
+        try {
+          await runRegeneration(r.folder, "map", undefined, { quiet: true, engine: "app" });
+        } catch {
+          /* el mapa no bloquea el resto: se avisa al terminar */
+        }
+      }
+    }
     if (engine === "handoff") {
       // sin IA de la app: UNA tarea con todos los temas; la validación la pide la persona cuando el agente termina
       try {
@@ -76,7 +85,13 @@ export function useRegenQueue(onTopicDone?: () => void) {
       }
       patch(r.folder, { state: "running", note: "Empezando…" });
       try {
-        const st = await runRegeneration(r.folder, what, (j) => patch(r.folder, { note: j.log[j.log.length - 1] ?? "Trabajando…" }), { quiet: true, engine });
+        // una combinación (teoría + práctica…) se hace pieza a pieza, en orden; si una falla no se sigue con las siguientes de ese tema
+        const steps = (what === "all" || what === "map" || !what.includes("+") ? [what] : partsOf(what)) as SingleRegen[];
+        let st = await runRegeneration(r.folder, steps[0]!, (j) => patch(r.folder, { note: j.log[j.log.length - 1] ?? "Trabajando…" }), { quiet: true, engine });
+        for (const next of steps.slice(1)) {
+          if (st.error) break;
+          st = await runRegeneration(r.folder, next, (j) => patch(r.folder, { note: j.log[j.log.length - 1] ?? "Trabajando…" }), { quiet: true, engine });
+        }
         if (st.error) {
           bad++;
           patch(r.folder, { state: "error", error: st.error });
@@ -104,11 +119,12 @@ export function useRegenQueue(onTopicDone?: () => void) {
   };
 }
 
-const BUTTONS: ReadonlyArray<{ what: RegenKind; text: string }> = [
-  { what: "theory", text: "Regenerar teoría" },
-  { what: "map", text: "Regenerar mapa" },
-  { what: "practice", text: "Regenerar práctica" },
-  { what: "exercises", text: "Regenerar ejercicios" },
+/** Las casillas de la barra: lo marcado se regenera JUNTO (un solo prompt si el motor es un agente externo). */
+const CHECKS: ReadonlyArray<{ part: RegenPart; text: string; hint: string }> = [
+  { part: "theory", text: "Teoría", hint: "La nota. Con ella se rehace el mapa solo." },
+  { part: "map", text: "Mapa", hint: "Sin IA: se construye de la nota que ya existe." },
+  { part: "practice", text: "Práctica", hint: "El plan .practica: qué competencias se ejercitan." },
+  { part: "exercises", text: "Ejercicios", hint: "Las preguntas, a partir de la práctica." },
 ];
 
 export type SelectHelper = "all" | "missing" | "noExercises" | "clear";
@@ -117,7 +133,8 @@ export type SelectHelper = "all" | "missing" | "noExercises" | "clear";
 export function BulkToolbar({ count, busy, onAsk, onGenerateMissing, onHelper, groups, onMoveGroup }: {
   count: number;
   busy: boolean;
-  onAsk: (what: RegenKind) => void;
+  /** `alsoMap`: se marcó el mapa junto a otras piezas pero sin la teoría */
+  onAsk: (what: RegenKind, alsoMap: boolean) => void;
   onGenerateMissing: () => void;
   onHelper: (h: SelectHelper) => void;
   groups?: ReadonlyArray<{ id: string; title: string }>;
@@ -125,7 +142,11 @@ export function BulkToolbar({ count, busy, onAsk, onGenerateMissing, onHelper, g
 }) {
   const [menu, setMenu] = useState(false);
   const [moveMenu, setMoveMenu] = useState(false);
+  const [checked, setChecked] = useState<ReadonlySet<RegenPart>>(new Set());
+  const kind = kindOfChecks(checked);
+  const toggle = (p: RegenPart): void => setChecked((c) => { const n = new Set(c); if (!n.delete(p)) n.add(p); return n; });
   const off = count === 0 || busy;
+  const noKind = !kind;
   const why = busy ? "Hay una regeneración en curso." : count === 0 ? "Selecciona temas para regenerar" : "";
   const helpers: ReadonlyArray<{ key: SelectHelper; text: string }> = [
     { key: "all", text: "Seleccionar todos" },
@@ -134,18 +155,33 @@ export function BulkToolbar({ count, busy, onAsk, onGenerateMissing, onHelper, g
     { key: "clear", text: "Limpiar" },
   ];
   return (
-    <div className={cn("sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2", count ? "border-accent" : "border-line")} role="toolbar" aria-label="Acciones sobre los temas seleccionados" data-testid="bulk-bar">
+    <div className={cn("@3xl:sticky @3xl:top-0 @3xl:z-10 flex flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2", count ? "border-accent" : "border-line")} role="toolbar" aria-label="Acciones sobre los temas seleccionados" data-testid="bulk-bar">
       <span className="text-[13.5px] font-semibold" aria-live="polite" data-testid="bulk-count">
         {count === 0 ? <span className="font-normal text-dim">Selecciona temas para regenerar</span> : `${count} ${count === 1 ? "tema seleccionado" : "temas seleccionados"}`}
       </span>
       <span className="flex flex-wrap items-center gap-2">
-        {BUTTONS.map((b) => (
-          <GhostButton key={b.what} onClick={() => onAsk(b.what)} disabled={off} title={why || `${b.text}: respalda lo actual y lo reemplaza`} data-testid={`bulk-${b.what}`}>
-            <RefreshCw size={14} aria-hidden /> {b.text}
-          </GhostButton>
-        ))}
-        <GhostButton onClick={() => onAsk("all")} disabled={off} title={why || "Rehace teoría, mapa, práctica y ejercicios, en ese orden"} data-testid="bulk-all">
-          <RefreshCw size={14} aria-hidden /> Regenerar todo
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1" role="group" aria-label="Qué regenerar" data-testid="bulk-checks">
+          {CHECKS.map((c) => (
+            <label key={c.part} className="inline-flex cursor-pointer items-center gap-1.5 text-[13.5px]" title={c.hint}>
+              <input
+                type="checkbox"
+                checked={checked.has(c.part) || (c.part === "map" && checked.has("theory"))}
+                disabled={busy || (c.part === "map" && checked.has("theory"))}
+                onChange={() => toggle(c.part)}
+                data-testid={`bulk-check-${c.part}`}
+                className="h-4 w-4 accent-[var(--nv-accent)]"
+              />
+              {c.text}
+            </label>
+          ))}
+        </span>
+        <GhostButton
+          onClick={() => kind && onAsk(kind, mapAlone(checked))}
+          disabled={off || noKind}
+          title={why || (noKind ? "Marca qué regenerar: teoría, mapa, práctica o ejercicios" : "Respalda lo actual y lo reemplaza; lo marcado se hace junto")}
+          data-testid="bulk-regen"
+        >
+          <RefreshCw size={14} aria-hidden /> {kind ? LABEL[kind] : "Regenerar lo marcado"}
         </GhostButton>
         <GhostButton onClick={onGenerateMissing} disabled={off} title={why || "Crea lo que falta de los temas elegidos (no toca lo que ya existe)"} data-testid="bulk-missing">
           <Sparkles size={14} aria-hidden /> Generar lo que falta
@@ -221,7 +257,7 @@ export function BulkToolbar({ count, busy, onAsk, onGenerateMissing, onHelper, g
 }
 
 /** Los cuatro iconos de acciones rápidas de una fila (siempre visibles). */
-const QUICK: ReadonlyArray<{ what: Exclude<RegenKind, "all">; Icon: typeof BookOpen }> = [
+const QUICK: ReadonlyArray<{ what: RegenPart; Icon: typeof BookOpen }> = [
   { what: "theory", Icon: BookOpen },
   { what: "map", Icon: MapIcon },
   { what: "practice", Icon: ClipboardList },

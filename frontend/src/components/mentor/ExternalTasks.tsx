@@ -8,7 +8,7 @@ import type { RegenHandoff } from "../../lib/types";
 import { useRegenEngine } from "../../store/regenEngine";
 import { RegenHandoffPanel } from "./RegenHandoffPanel";
 
-const WHAT: Record<RegenHandoff["what"], string> = { theory: "teoría", practice: "práctica", exercises: "ejercicios", all: "todo" };
+const WHAT: Record<RegenHandoff["what"], string> = { theory: "teoría", practice: "práctica", exercises: "ejercicios", all: "todo", "theory+practice": "teoría y práctica", "theory+exercises": "teoría y ejercicios", "practice+exercises": "práctica y ejercicios" };
 const STATUS: Record<RegenHandoff["status"], string> = { waiting: "pendiente", failed: "pendiente (con errores)", validated: "validada", restored: "restaurada" };
 
 export function ExternalTasks() {

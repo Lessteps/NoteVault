@@ -52,7 +52,7 @@ describe("computeCoverage", () => {
     expect(["bajo", "critico"]).toContain(by["js-reference"]!.level);
     expect(by.java).toMatchObject({ covered: 0, partial: 0, pct: 0 });
     // los temas de repaso solo dan parcial, nunca cubierto
-    for (const a of cov.areas) expect(a.covered, a.areaId).toBe(0);
+    for (const a of cov.areas.filter((x) => ["html", "css", "atomic-design", "js-reference", "java"].includes(x.areaId))) expect(a.covered, a.areaId).toBe(0);
     expect(by.css!.partial).toBeGreaterThan(20);
     expect(by.html!.partial).toBeGreaterThan(5);
     expect(by["js-reference"]!.partial).toBeGreaterThan(30);
@@ -131,5 +131,27 @@ describe("computeCoverage", () => {
     const cov = computeCoverage(areas, topics);
     console.log(cov.areas.map((a) => `${a.areaId}: ${a.pct}% ${a.level} (covered ${a.covered}, partial ${a.partial}, missing ${a.missing} of ${a.total})`).join("\n"));
     expect(cov.areas).toHaveLength(5);
+  });
+});
+
+describe("currículos de las áreas de conocimiento (Python, Backend…)", () => {
+  const knowledge = curriculumAreas().filter((a) => a.id === "python" || a.id === "backend");
+  const topics = [
+    { folder: "Programación/2.1 Python/2.1.1 Project structure, virtual environments and imports", title: "2.1.1 Project structure, virtual environments and imports" },
+    { folder: "Programación/2.1 Python/2.1.2 Variables, primitive types and conversions", title: "2.1.2 Variables, primitive types and conversions" },
+    { folder: "Programación/4 Backend/4.2 HTTP in depth", title: "4.2 HTTP in depth" },
+  ];
+  const cov = computeCoverage(knowledge, topics);
+  const py = cov.areas.find((a) => a.areaId === "python")!;
+  const status = (id: string) => py.rows.find((r) => r.entry.id === id)!;
+
+  it("reconoce lo que ya existe y señala lo que falta, con carpeta propuesta numerada tras lo usado", () => {
+    expect(status("python.variables-types").status).toBe("cubierto");
+    expect(status("python.project-venv").status).toBe("cubierto");
+    // un lenguaje que empieza en proyecto/venv/imports no tiene su «primer programa»: el hueco que se notó estudiando
+    expect(status("python.first-program")).toMatchObject({ status: "faltante" });
+    expect(status("python.first-program").suggestedFolder).toMatch(/^Programación\/2\.1 Python\/2\.1\.\d+ Running your first Python program$/);
+    expect(status("python.first-program").suggestedFolder).not.toMatch(/\/2\.1\.[12] /);
+    expect(cov.areas.find((a) => a.areaId === "backend")!.rows.find((r) => r.entry.id === "backend.http")!.status).toBe("cubierto");
   });
 });

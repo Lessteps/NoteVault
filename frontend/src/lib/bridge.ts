@@ -805,7 +805,7 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   /** Motores con los que se puede regenerar ahora mismo (la IA de la app, Claude o un agente externo), según los ajustes de IA. */
   studyRegenEngines: () => call<import("./types").RegenEnginesView>("study_regen_engines"),
   /** Tarea para un agente externo (Antigravity / Claude Code): respalda y escribe el archivo de la tarea en la vault. `folders`: un tema o un lote. */
-  studyTopicRegenerateHandoff: (folders: string | string[], what: "theory" | "practice" | "exercises" | "all", confirm: boolean) => call<import("./types").RegenHandoff>("study_topic_regenerate_handoff", folders, what, confirm),
+  studyTopicRegenerateHandoff: (folders: string | string[], what: "theory" | "practice" | "exercises" | "all" | "theory+practice" | "theory+exercises" | "practice+exercises", confirm: boolean) => call<import("./types").RegenHandoff>("study_topic_regenerate_handoff", folders, what, confirm),
   studyTopicRegenerateHandoffStatus: (id: string) => call<import("./types").RegenHandoff>("study_topic_regenerate_handoff_status", id),
   /** Las tareas para agentes externos guardadas en la vault (reabrirlas tras reiniciar la app). */
   studyTopicRegenerateHandoffList: () => call<import("./types").RegenHandoff[]>("study_topic_regenerate_handoff_list"),

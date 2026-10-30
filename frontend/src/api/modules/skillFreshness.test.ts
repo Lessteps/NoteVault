@@ -90,3 +90,27 @@ describe("marca de versión de la skill", () => {
     expect(outdatedByFolder(root, [f1]).get(f1)).toMatchObject({ theory: true }); // marca de otra versión
   });
 });
+
+describe("stampSkillVersion y quién la llama", () => {
+  it("marca el archivo con la versión actual y es idempotente; sin skill no toca nada", async () => {
+    const { stampSkillVersion, skillVersionOf } = await import("./skillFreshness.js");
+    const { stampOf } = await import("../../lib/skillStamp.js");
+    put("Programación/_skills/resumen_teorico_skill.md", "skill v1");
+    put("Programación/T/T.md", "---\ntitle: x\n---\n# T\n");
+    const f = path.join(root, "Programación/T/T.md");
+    stampSkillVersion(root, "Programación", "theory", f);
+    const once = fs.readFileSync(f, "utf8");
+    expect(stampOf(once)).toBe(skillVersionOf(root, "Programación", "theory"));
+    stampSkillVersion(root, "Programación", "theory", f);
+    expect(fs.readFileSync(f, "utf8")).toBe(once);
+    put("Otra/T/T.md", "---\ntitle: x\n---\n# T\n");
+    stampSkillVersion(root, "Otra", "theory", path.join(root, "Otra/T/T.md"));
+    expect(fs.readFileSync(path.join(root, "Otra/T/T.md"), "utf8")).not.toContain("skill_version");
+  });
+
+  it("guarda: todo módulo que escribe una nota o un .practica.md generado llama a stampSkillVersion (si añades otro escritor, márcalo)", () => {
+    for (const f of ["topicRegenerateHandoff.ts", "curriculumHandoff.ts", "curriculumAuto.ts", "studySpace.ts", "study.ts"]) {
+      expect(fs.readFileSync(path.join(__dirname, f), "utf8"), f).toContain("stampSkillVersion");
+    }
+  });
+});

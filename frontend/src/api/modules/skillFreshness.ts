@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { isHeavyNote } from "../../lib/noteWeight.js";
-import { shortVersion, stampOf } from "../../lib/skillStamp.js";
+import { shortVersion, stampOf, withStamp } from "../../lib/skillStamp.js";
 import type { OutdatedSkills } from "../../lib/planTopicCatalog.js";
 
 const SKILL_FILES = { theory: "resumen_teorico_skill.md", canvas: "mapa_skill.md", practica: "practica_skill.md" } as const;
@@ -56,6 +56,19 @@ export function skillVersionOf(root: string, subject: string, kind: Kind): strin
     return shortVersion(createHash("sha1").update(text.replace(/\r\n/g, "\n")).digest("hex"));
   } catch {
     return null;
+  }
+}
+
+/** Marca un archivo de pieza (nota o `.practica.md`) con la versión actual de su skill. Sin skill o sin frontmatter no hace nada; nunca lanza. */
+export function stampSkillVersion(root: string, subject: string, kind: "theory" | "practica", fileAbs: string): void {
+  try {
+    const v = skillVersionOf(root, subject, kind);
+    if (!v) return;
+    const text = fs.readFileSync(fileAbs, "utf8");
+    const next = withStamp(text, v);
+    if (next !== text) fs.writeFileSync(fileAbs, next, "utf8");
+  } catch {
+    /* la marca es información: si no se puede escribir, la pieza sigue valiendo (y se juzga por fecha) */
   }
 }
 

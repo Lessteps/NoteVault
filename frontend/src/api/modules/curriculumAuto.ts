@@ -25,6 +25,7 @@ import { curriculumCoverageFor } from "./curriculumCoverage.js";
 import { engineBlockedReason } from "./regenEngines.js";
 import { askStructured, clearStudySnapshotCache } from "./study.js";
 import { isCompleteTheory, sanitizeRequires } from "./studySpace.js";
+import { stampSkillVersion } from "./skillFreshness.js";
 
 export const MAX_AUTO_TOPICS = 2000;
 const MAX_CONSECUTIVE_FAILURES = 3;
@@ -95,11 +96,13 @@ export function curriculumAutoApi(app: AppState, hooks: AutoHooks = {}) {
     const known = new Set([...linkable, p.name]);
     fs.mkdirSync(topicAbs, { recursive: true });
     fs.writeFileSync(path.join(topicAbs, `${p.name}.practica.md`), practicaManifest(p), "utf-8");
+    stampSkillVersion(app.root, area.space, "practica", path.join(topicAbs, `${p.name}.practica.md`));
     const fm = noteFrontmatter(p, area, area.areaFolder);
     const msgs = autoNoteMessages(p, area.title, { skills, linkable });
     const write = (reply: string): string => {
       const body = sanitizeRequires(cleanNoteReply(reply), known);
       fs.writeFileSync(noteAbs, `${fm}\n\n${body}\n`, "utf-8");
+      stampSkillVersion(app.root, area.space, "theory", noteAbs);
       return body;
     };
     const problemsOf = (body: string): string[] => {

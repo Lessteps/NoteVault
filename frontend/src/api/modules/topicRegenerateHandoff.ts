@@ -28,8 +28,7 @@ import { catalogFor } from "../../core/practice/skillSelection.js";
 import type { DifficultyLevel } from "../../core/practice/skills.js";
 import { ensureTopicViewFiles, viewFileName } from "../../core/practice/viewFiles.js";
 import { noteWeight } from "../../lib/noteWeight.js";
-import { outdatedByFolder, skillVersionOf } from "./skillFreshness.js";
-import { withStamp } from "../../lib/skillStamp.js";
+import { outdatedByFolder, stampSkillVersion } from "./skillFreshness.js";
 import { practiceCells } from "../../lib/planExecution.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
@@ -594,18 +593,9 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
   /** Marca la pieza validada con la versión de la skill con la que se hizo (`skill_version` en su frontmatter). */
   function stampPiece(t: StateTopic, step: "theory" | "practice" | "exercises"): void {
     if (step === "exercises") return;
-    const subject = t.folder.split("/")[0] ?? "";
-    const version = skillVersionOf(app.root, subject, step === "theory" ? "theory" : "practica");
-    if (!version) return;
     const name = path.basename(topicAbsOf(t.folder));
     const file = path.join(topicAbsOf(t.folder), step === "theory" ? NOTE_NAME(name) : viewFileName(name, "practica"));
-    try {
-      const text = fs.readFileSync(file, "utf-8");
-      const next = withStamp(text, version);
-      if (next !== text) fs.writeFileSync(file, next, "utf-8");
-    } catch {
-      /* sin la pieza no hay nada que marcar */
-    }
+    stampSkillVersion(app.root, t.folder.split("/")[0] ?? "", step === "theory" ? "theory" : "practica", file);
   }
 
   async function validateTopic(s: State, t: StateTopic): Promise<void> {

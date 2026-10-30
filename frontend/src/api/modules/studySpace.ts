@@ -25,6 +25,7 @@ import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 import { curriculumGapsPrompt } from "./curriculumCoverage.js";
 import { askStructured, clearStudySnapshotCache, reevaluateTopic } from "./study.js";
+import { stampSkillVersion } from "./skillFreshness.js";
 
 /** Huecos de las áreas de referencia (catálogo de currículo) para el prompt del temario de Programación; vacío si no hay. */
 function referenceGapsSection(app: AppState, space: string): string {
@@ -427,6 +428,7 @@ export function studySpaceApi(app: AppState) {
           let body = sanitizeRequires(reply.replace(/^```(?:markdown|md)?\s*/i, "").replace(/```\s*$/, "").trim().replace(/^---[\s\S]*?\n---\s*/, ""), known);
           fs.mkdirSync(topicAbs, { recursive: true });
           fs.writeFileSync(file, frontmatter(subjectId, area, topic) + body + "\n", "utf-8");
+          stampSkillVersion(app.root, app.rel(file).split("/")[0] ?? "", "theory", file);
           chat.exchange(asked, reply);
 
           // Self-repair: the note has to satisfy the very checks the map generator runs.
@@ -437,6 +439,7 @@ export function studySpaceApi(app: AppState) {
             reply = await askStructured(cfg, [...msgs, { role: "assistant", content: reply }, { role: "user", content: fix }], isCompleteTheory);
             body = sanitizeRequires(reply.replace(/^```(?:markdown|md)?\s*/i, "").replace(/```\s*$/, "").trim().replace(/^---[\s\S]*?\n---\s*/, ""), known);
             fs.writeFileSync(file, frontmatter(subjectId, area, topic) + body + "\n", "utf-8");
+          stampSkillVersion(app.root, app.rel(file).split("/")[0] ?? "", "theory", file);
             chat.exchange(fix, reply);
             problems = mapProblems(topicAbs);
           }

@@ -33,6 +33,7 @@ import { clearStudySnapshotCache } from "./study.js";
 import { isCompleteTheory } from "./studySpace.js";
 import { posix, stamp } from "./topicRegenerate.js";
 import { curriculumCoverageFor } from "./curriculumCoverage.js";
+import { stampSkillVersion } from "./skillFreshness.js";
 
 /** Más de esto en una sola tarea no es manejable para el agente: la interfaz debe partir la selección en lotes (se recomiendan ≤ 25). */
 export const MAX_ENTRIES_PER_TASK = 40;
@@ -662,6 +663,12 @@ export function curriculumHandoffApi(app: AppState, hooks: CurriculumHandoffHook
           e.problems = r.problems;
           e.warnings = r.warnings;
           e.state = r.problems.length ? "error" : "created";
+          if (!r.problems.length) {
+            // lo que escribió el agente queda marcado con la versión de la skill con la que se validó
+            const sub = e.folder.split("/")[0] ?? "";
+            stampSkillVersion(app.root, sub, "theory", path.join(app.root, ...e.folder.split("/"), `${e.name}.md`));
+            stampSkillVersion(app.root, sub, "practica", path.join(app.root, ...e.folder.split("/"), `${e.name}.practica.md`));
+          }
           s.log.push(r.problems.length ? `✗ «${e.name}»: ${r.problems[0]}` : `✓ «${e.name}»: tema creado y validado.`);
         }
         s.status = s.entries.every((e) => e.state === "created") ? "validated" : "failed";

@@ -85,6 +85,7 @@ import type { DifficultyLevel } from "../../core/practice/skills.js";
 import type { AppState } from "../appState.js";
 import { clearVaultScanCache, hasVaultScan, vaultScan } from "../vaultScan.js";
 import { isoDate } from "../common.js";
+import { stampSkillVersion } from "./skillFreshness.js";
 
 // `vaultScan` vive en ../vaultScan.ts (sin ciclo con appState); se reexporta aquí.
 export { vaultScan };
@@ -393,6 +394,7 @@ export async function reevaluateTopic(app: AppState, folder: string, opts: { cre
   if (!fs.existsSync(practicaAbs)) throw new ApiError("No se pudo crear el archivo .practica del tema.");
   const labels = Object.fromEntries(catalog.map((s) => [s.id, s.label]));
   fs.writeFileSync(practicaAbs, applyPlanToPractica(fs.readFileSync(practicaAbs, "utf-8"), plan, labels), "utf-8");
+  stampSkillVersion(app.root, normFolder.split("/")[0] ?? "", "practica", practicaAbs);
 
   clearExerciseIndexCache();
   clearStudySnapshotCache();

@@ -69,7 +69,7 @@ export const ARTIFACT_WEIGHT: Record<ArtifactId, number> = { theory: 25, contrac
 /** Una línea por artefacto: cómo se detecta en la vault (se muestra a la persona y se entrega a la IA). */
 export const ARTIFACT_DETECTION: Record<ArtifactId, string> = {
   theory: "existe un .md en la carpeta del tema que no es ejercicio, ni `.practica.md`, ni empieza por `_` o `.`",
-  contract: "la nota tiene las secciones Requires, Explanation (What it is, Mental model), Examples (3), Common mistakes (≥3), Connections y Cards (6-9)",
+  contract: "la nota tiene las secciones Requires, Explanation (What it is, How it is organised, How it works in the real world; las notas antiguas: What it is, Mental model), Examples (3), Common mistakes (≥3), Connections y Cards (6-9)",
   canvas: "hay un archivo `*.canvas` en la carpeta del tema (`<tema> — mapa.canvas`)",
   manifest: "existe `<tema>.practica.md` o `_tema.md` con `skills` y `topic_type`",
   skills_fit: "teórico: solo skills de concepto; procedimental: al menos una skill de código de la rama; mixto: concepto y código",

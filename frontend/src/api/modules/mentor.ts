@@ -860,7 +860,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
     for (const s of plan.subplans) {
       if (area && s.id !== area) continue;
       plannedByArea[s.id] = (sch?.byDate.get(date)?.topics ?? []).filter((t) => t.subplanId === s.id).length;
-      let live = s.topics.filter((t) => isLive(t) && (area === "bases" || !isBases({ subplanId: s.id, ...(t.group ? { group: t.group } : {}) })) && (!only || (t.group ?? "core") === only));
+      let live = s.topics.filter((t) => isLive(t) && (area === "bases" || !isBases({ subplanId: s.id, ...(t.group ? { group: t.group } : {}) })) && (!only || (t.group ?? "core") === only) && t.route !== "optional");
       const origIndex = new Map(live.map((t, idx) => [t.folder, idx]));
       live = live.slice().sort((a, b) => {
         const pa = placed.get(a.folder);

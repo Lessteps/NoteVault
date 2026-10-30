@@ -37,7 +37,7 @@ export interface OrganizeResult<T> {
   topics: T[];
   /** carpetas que cambiaron de sitio */
   moved: string[];
-  /** carpetas que pasan a opcionales (temas genéricos antiguos) */
+  /** carpetas que salen de la ruta (temas genéricos antiguos sustituidos por piezas) */
   demoted: string[];
 }
 
@@ -69,9 +69,10 @@ export function organizeTopics<T extends OrganizeTopic>(topics: readonly T[], gr
   const counts = new Map<string, number>();
   for (const t of out) if (!LEGACY_STUB_RE.test(t.folder.replace(/\\/g, "/"))) counts.set(t.group ?? "", (counts.get(t.group ?? "") ?? 0) + 1);
   const final = out.map((t) => {
-    if (LEGACY_STUB_RE.test(t.folder.replace(/\\/g, "/")) && (counts.get(t.group ?? "") ?? 0) >= MIN_PIECES_TO_DEMOTE && (t.route ?? "core") === "core") {
+    if (LEGACY_STUB_RE.test(t.folder.replace(/\\/g, "/")) && (counts.get(t.group ?? "") ?? 0) >= MIN_PIECES_TO_DEMOTE && (t.route ?? "core") !== "skipped") {
+      // fuera de la ruta del todo (no «opcional»: seguiría saliendo en las listas): lo sustituyen las piezas atómicas; se puede volver a incluir a mano
       demoted.push(t.folder);
-      return { ...t, route: "optional" as const };
+      return { ...t, route: "skipped" as const, skippedReason: "Sustituido por las piezas atómicas (un tema por elemento o propiedad)." };
     }
     return t;
   });

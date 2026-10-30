@@ -52,7 +52,7 @@ function TopicRow({ c, day, busy, onAdd, dayText, lockSession }: { c: MentorTopi
   const state = c.state ?? "pendiente";
   const here = !!c.onDay;
   const blocked = !lockSession && !here && !!c.blockedBy;
-  const hint = here ? (state === "adelantado" ? `Adelantado a ${dateLabel(day)}` : `Ya está planeado para ${dateLabel(day)}`) : c.blockedBy ? `Sigue a: ${c.blockedBy}` : state === "adelantado" ? `Adelantado el ${(c.addedDates[0] && dateLabel(c.addedDates[0])) ?? ""}` : c.plannedDate ? `Cae el ${dateLabel(c.plannedDate)}` : "";
+  const hint = here ? (state === "adelantado" ? `Adelantado a ${dateLabel(day)}` : `Ya está planeado para ${dateLabel(day)}`) : c.blockedBy ? `Sigue a: ${c.blockedBy}` : state === "adelantado" ? `Adelantado el ${(c.addedDates[0] && dateLabel(c.addedDates[0])) ?? ""}` : c.plannedDate ? `Cae el ${dateLabel(c.plannedDate)}` : "Aún sin día: no cabe en el calendario con tu ritmo actual";
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2" data-testid="extra-topic-candidate" data-folder={c.folder} data-blocked={blocked || here ? "true" : "false"}>
       <span className="w-12 flex-none font-mono text-[12.5px] text-faint" title="Posición en la ruta del área">{c.position}/{c.total}</span>

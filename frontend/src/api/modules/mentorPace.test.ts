@@ -189,6 +189,19 @@ describe("mentor_plan_topic_candidates", () => {
 });
 
 describe("mentor_plan_topic_candidates (upcoming)", () => {
+  it("lo opcional y lo saltado (p. ej. los temas genéricos antiguos) no salen entre los próximos temas", () => {
+    const { id, sa } = writePlan();
+    const st = new PlanStore(dir);
+    const plan = st.load(id)!;
+    const sub = plan.subplans.find((x) => x.id === sa)!;
+    sub.topics = sub.topics.map((t, i) => (i === 0 ? { ...t, route: "optional" as const } : i === 1 ? { ...t, route: "skipped" as const, skippedReason: "x" } : t));
+    st.save(plan);
+    const r: any = api().mentor_plan_topic_candidates({ id, upcoming: true, area: sa, horizon: 12 });
+    expect(r.ahead.map((c: any) => c.title)).not.toContain("Alfa 1");
+    expect(r.ahead.map((c: any) => c.title)).not.toContain("Alfa 2");
+    expect(r.ahead.map((c: any) => c.title)).toContain("Alfa 3");
+  });
+
   it("con una asignatura elegida solo salen SUS temas, todos los pendientes, aunque caigan lejos (no solo las próximas semanas del área)", () => {
     const { id, sa } = writePlan();
     const st = new PlanStore(dir);

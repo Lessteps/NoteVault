@@ -43,7 +43,10 @@ describe("organizeTopics", () => {
     const pieces: Array<{ folder: string; group: string; route?: "core" | "optional" | "skipped" }> = Array.from({ length: 25 }, (_, i) => ({ folder: html(`5.18.4.${i + 1}`, `p${i}`), group: "html" }));
     const many = organizeTopics([...stubs, ...pieces], groups);
     expect(many.demoted.length).toBe(3);
-    expect(many.topics.filter((t) => t.route === "optional").length).toBe(3);
+    expect(many.topics.filter((t) => t.route === "skipped").length).toBe(3);
+    // los que ya estaban como opcionales (versiones anteriores) también salen de la ruta
+    const old = many.topics.map((t) => (t.route === "skipped" ? { ...t, route: "optional" as const } : t));
+    expect(organizeTopics(old, undefined).demoted.length).toBe(3);
   });
 });
 

@@ -195,6 +195,8 @@ describe("planItemsFor: del plan mensual al plan diario", () => {
     const started = planItemsFor("2026-10-09", [plan], (f) => f === "P/T6");
     expect(started.slice(0, 3).every((i) => i.overdue)).toBe(true);
     expect(started[3]!.overdue).toBe(false);
+    // con el reparto por avance (lo que usa el Mentor) cumplir el ritmo no deja nada «atrasado» por pasar la semana objetivo
+    expect(planItemsFor("2026-10-09", [plan], (f) => f === "P/T6", true).some((i) => i.overdue)).toBe(false);
     expect(w2.every((i) => i.label === "Programación: Backend")).toBe(true);
     // el primer día del mes solo toca la semana 1
     expect(planItemsFor("2026-10-02", [plan]).map((i) => i.folder)).toEqual(["P/T1", "P/T2", "P/T3"]);

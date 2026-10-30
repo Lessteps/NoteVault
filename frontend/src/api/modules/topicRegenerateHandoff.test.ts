@@ -340,3 +340,16 @@ describe("no se pide de nuevo lo que ya está al día", () => {
     expect(h.what).toBe("theory+practice");
   });
 });
+
+describe("invariante: todo id que la app crea, la app lo puede reabrir", () => {
+  const TITLES = ["Uno, dos y tres", "Datos (y más) & cosas", "It's a test #1", "Año 2026; ñandú", "A+B = C", "Con [corchetes] y {llaves}", "x".repeat(80)];
+  it.each(TITLES)("título «%s»: crear → listar → estado", async (title) => {
+    const folder = `${AREA}/4.9 ${title}`;
+    put(`${folder}/4.9 ${title}.md`, OLD_NOTE);
+    put(`${folder}/4.9 ${title}.practica.md`, PRACTICA(["implement"]));
+    const api = make();
+    const h = await api.study_topic_regenerate_handoff(folder, "theory", true);
+    expect(api.study_topic_regenerate_handoff_status(h.id).id).toBe(h.id);
+    expect(api.study_topic_regenerate_handoff_list().some((x) => x.id === h.id)).toBe(true);
+  });
+});

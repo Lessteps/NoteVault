@@ -115,7 +115,8 @@ interface State extends Omit<RegenHandoff, "topics" | "ready" | "taskAbs"> {
 export interface HandoffHooks { now?: () => Date }
 
 const NOTE_NAME = (name: string): string => `${name}.md`;
-const safeSlug = (s: string): string => s.replace(/[\\/:*?"<>|,;]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 48) || "tema";
+// El id de la tarea es el nombre de su archivo y lo comprueba `load`: solo letras, dígitos, punto, guion, subrayado y espacio. Cualquier otro carácter del título (coma, &, #, acentos…) se quita aquí.
+const safeSlug = (s: string): string => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w.\- ]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 48).trim() || "tema";
 /** Un cercado de markdown más largo que cualquier racha de ``` del texto. */
 function fenced(text: string, lang = ""): string {
   const runs = text.match(/`+/g) ?? [];

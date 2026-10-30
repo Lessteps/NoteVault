@@ -202,10 +202,16 @@ export function skillsManagerApi(app: AppState, hooks: { now?: () => Date; ask?:
       const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
       if (cfg.is_bridge) throw new ApiError("La IA de la app está en modo puente (sin API ni modelo local). Usa «Copiar prompt» y pégalo en Antigravity.");
       const ask = hooks.ask ?? ((c, m) => askStructured(c, m));
-      const reply = await ask(cfg, [
-        { role: "system", content: "You rewrite instruction files for a study app. Follow the user's rules exactly and return only the new file text." },
+      let reply = "";
+      try {
+        reply = await ask(cfg, [
+          { role: "system", content: "You rewrite instruction files for a study app. Follow the user's rules exactly and return only the new file text." },
         { role: "user", content: prompt },
-      ]);
+        ]);
+      } catch (e) {
+        // un error del proveedor (clave mala, sin saldo, modelo apagado) se dice en claro y se ofrece la salida que no depende de él
+        throw new ApiError(`La IA de la app no pudo responder: ${(e as Error).message.replace(/^AIError:\s*/, "").slice(0, 200)}. Revisa su configuración en Ajustes o usa «Copiar prompt para Antigravity».`);
+      }
       const proposal = reply.trim().replace(/^```(?:markdown|md)?\s*\n/i, "").replace(/\n```\s*$/, "");
       if (!proposal) throw new ApiError("La IA no devolvió ningún texto. Inténtalo de nuevo o usa «Copiar prompt».");
       return { mode: "app", prompt, proposal };

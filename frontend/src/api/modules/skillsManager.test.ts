@@ -84,3 +84,11 @@ describe("gestor de skills", () => {
     await expect(mk().skills_ai_edit({ subject: "Programación", kind: "canvas", instruction: "  x ", mode: "app" })).rejects.toThrow("qué quieres cambiar");
   });
 });
+
+describe("errores de la IA", () => {
+  it("un fallo del proveedor se convierte en un mensaje claro que ofrece el prompt, sin guardar nada", async () => {
+    const ask = vi.fn().mockRejectedValue(new Error("AIError: HTTP 401: Authentication Fails"));
+    await expect(mk({ ask }).skills_ai_edit({ subject: "Programación", kind: "theory", instruction: "Acorta la explicación", mode: "app" })).rejects.toThrow(/no pudo responder: HTTP 401.*Copiar prompt/);
+    expect(fs.readFileSync(skillPath("resumen_teorico_skill.md"), "utf8")).toContain("version 0");
+  });
+});

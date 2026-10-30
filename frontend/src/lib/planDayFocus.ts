@@ -447,13 +447,22 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
     return [...keys];
   };
 
+  // LA FASE SE ABRE POR PROGRESO, NO POR CALENDARIO: una fase posterior (p. ej. Automation, semanas 23–26) empieza en su semana, pero NO espera a ella si todas las áreas de las
+  // fases anteriores ya no tienen nada pendiente (terminaste antes). El principio y el fin de la ruta (inicio y fin del plan) no cambian; lo que se mueve es el orden real.
+  const phaseOpenEarly = (s: FocusSubIn): boolean => {
+    const win = windowOf(s);
+    const before = plan.subplans.filter((o) => o !== s && windowOf(o).to < win.from);
+    if (!before.length) return false;
+    return before.every((o) => !ownLanes(o).some((k) => pendingOf(lanes.get(k))));
+  };
+
   // ¿Qué áreas son enfoque? Las que tienen carriles propios con temas; los acompañantes van dentro de su principal cuando coinciden.
   const isCandidate = (s: FocusSubIn, week: number, dynamic: boolean): boolean => {
     const win = windowOf(s);
     const own = ownLanes(s).filter((k) => !templateFor(s.areaId).companions.some((c) => subByArea.get(c) && k.startsWith(`${subByArea.get(c)!.id}|`)));
     if (!own.length) return false;
     if (dynamic && !own.some((k) => pendingOf(lanes.get(k)))) return false;
-    return week >= win.from && (week <= win.to || dynamic);
+    return (week >= win.from || (dynamic && phaseOpenEarly(s))) && (week <= win.to || dynamic);
   };
   const candidatesOf = (week: number, dynamic: boolean): FocusSubIn[] => {
     const list = plan.subplans.filter((s) => isCandidate(s, week, dynamic));
@@ -596,16 +605,16 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
         }
         const live = keys.filter((k) => {
           const l = lanes.get(k)!;
-          return l.queue.length > 0 && (week >= l.startWeek || k === "bases" || l.owners.has(s.id));
+          return l.queue.length > 0 && (week >= l.startWeek || k === "bases" || l.owners.has(s.id) || [...l.owners].some((o) => { const so = plan.subplans.find((x) => x.id === o); return !!so && phaseOpenEarly(so); }));
         });
         if (live.length) return { def, lanes: live, status: "topic", ownerSub };
-        const notStarted = keys.map((k) => lanes.get(k)!).find((l) => pendingOf(l) && week < l.startWeek);
+        const notStarted = keys.map((k) => lanes.get(k)!).find((l) => pendingOf(l) && week < l.startWeek && ![...l.owners].some((o) => { const so = plan.subplans.find((x) => x.id === o); return !!so && phaseOpenEarly(so); }));
         const what = ownerSub?.area ?? areaName;
         return {
           def,
           lanes: keys,
           status: "review",
-          note: notStarted ? `${what} empieza en la semana ${notStarted.startWeek}: hoy, repaso y práctica libre.` : `Ya no quedan temas pendientes de este tipo en ${what}: repaso de lo estudiado.`,
+          note: notStarted ? `${what} empieza al terminar las áreas anteriores (o en la semana ${notStarted.startWeek}): hoy, repaso y práctica libre.` : `Ya no quedan temas pendientes de este tipo en ${what}: repaso de lo estudiado.`,
           ownerSub,
         };
       });

@@ -28,7 +28,8 @@ import { catalogFor } from "../../core/practice/skillSelection.js";
 import type { DifficultyLevel } from "../../core/practice/skills.js";
 import { ensureTopicViewFiles, viewFileName } from "../../core/practice/viewFiles.js";
 import { noteWeight } from "../../lib/noteWeight.js";
-import { outdatedByFolder } from "./skillFreshness.js";
+import { outdatedByFolder, skillVersionOf } from "./skillFreshness.js";
+import { withStamp } from "../../lib/skillStamp.js";
 import { practiceCells } from "../../lib/planExecution.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
@@ -590,6 +591,23 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
     s.log.push(`↩ «${t.title}»: ${t.saved.length ? "se devolvió la copia de seguridad" : "no había nada que devolver"}.`);
   }
 
+  /** Marca la pieza validada con la versión de la skill con la que se hizo (`skill_version` en su frontmatter). */
+  function stampPiece(t: StateTopic, step: "theory" | "practice" | "exercises"): void {
+    if (step === "exercises") return;
+    const subject = t.folder.split("/")[0] ?? "";
+    const version = skillVersionOf(app.root, subject, step === "theory" ? "theory" : "practica");
+    if (!version) return;
+    const name = path.basename(topicAbsOf(t.folder));
+    const file = path.join(topicAbsOf(t.folder), step === "theory" ? NOTE_NAME(name) : viewFileName(name, "practica"));
+    try {
+      const text = fs.readFileSync(file, "utf-8");
+      const next = withStamp(text, version);
+      if (next !== text) fs.writeFileSync(file, next, "utf-8");
+    } catch {
+      /* sin la pieza no hay nada que marcar */
+    }
+  }
+
   async function validateTopic(s: State, t: StateTopic): Promise<void> {
     const steps = STEPS_OF[s.what];
     t.problems = [];
@@ -602,6 +620,7 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
         s.log.push(`✗ «${t.title}» (${step}): ${problems[0]}`);
         return;
       }
+      stampPiece(t, step);
       t.done.push(step);
       s.log.push(`✓ «${t.title}»: ${step === "theory" ? "teoría y mapa" : step === "practice" ? "práctica" : "ejercicios"} validados.`);
     }

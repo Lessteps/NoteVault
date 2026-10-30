@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { isHeavyNote } from "../../lib/noteWeight.js";
+import { shortVersion, stampOf } from "../../lib/skillStamp.js";
 import type { OutdatedSkills } from "../../lib/planTopicCatalog.js";
 
 const SKILL_FILES = { theory: "resumen_teorico_skill.md", canvas: "mapa_skill.md", practica: "practica_skill.md" } as const;
@@ -37,6 +38,24 @@ function saveRegistry(root: string, reg: Registry): void {
     fs.writeFileSync(registryPath(root), JSON.stringify(reg, null, 2), "utf8");
   } catch {
     // sin permiso de escritura no se recuerdan los cambios: se sigue con la fecha del archivo
+  }
+}
+
+const readText = (abs: string): string => {
+  try {
+    return fs.readFileSync(abs, "utf8");
+  } catch {
+    return "";
+  }
+};
+
+/** La versión actual de una skill de una materia (8 hex del sha1 de su texto), o null si no existe. */
+export function skillVersionOf(root: string, subject: string, kind: Kind): string | null {
+  try {
+    const text = fs.readFileSync(path.join(root, subject, "_skills", SKILL_FILES[kind]), "utf8");
+    return shortVersion(createHash("sha1").update(text.replace(/\r\n/g, "\n")).digest("hex"));
+  } catch {
+    return null;
   }
 }
 
@@ -135,7 +154,12 @@ export function outdatedByFolder(root: string, folders: Iterable<string>): Map<s
       const changed = times.get(`${subject}/${kind}`);
       const filePath = path.join(root, folder, pieces[kind]);
       const made = mtime(filePath);
-      if (changed !== undefined && made !== null && made < changed) stale[kind] = true;
+      // con marca de versión manda la marca (la pieza dice con qué skill se hizo); sin marca, la fecha del archivo
+      const stamp = made !== null && kind !== "canvas" ? stampOf(readText(filePath)) : null;
+      const current = stamp ? skillVersionOf(root, subject, kind) : null;
+      if (stamp && current) {
+        if (stamp !== current) stale[kind] = true;
+      } else if (changed !== undefined && made !== null && made < changed) stale[kind] = true;
     }
 
     // Comprobación estructural en caliente para Programación

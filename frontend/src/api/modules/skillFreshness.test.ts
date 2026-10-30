@@ -71,3 +71,22 @@ describe("estructura en módulos funcionales", () => {
     expect(out.get(c)).toMatchObject({ theory: true });
   });
 });
+
+describe("marca de versión de la skill", () => {
+  const FM = (v: string): string => `---\ntitle: x\nskill_version: "${v}"\n---\n`;
+  const GOOD = "# 2.1.5 X\n\n## Requires\n*No prerequisites.*\n\n## Explanation\n\n### What it is\n**In one sentence.** w\n\n### How it is organised\nx\n\n### How it works in the real world\nx\n\n## Examples\n**How you will apply it:** x\n\n## Common mistakes\nx\n";
+  it("con marca manda la marca (no la fecha): igual a la skill actual = al día aunque la skill sea más nueva; distinta = desactualizada", async () => {
+    const { skillVersionOf } = await import("./skillFreshness.js");
+    const f1 = "Programación/2.1 Python/2.1.5 A", f2 = "Programación/2.1 Python/2.1.6 B";
+    put(`${f1}/2.1.5 A.md`, FM("00000000") + GOOD, 2 * DAY);
+    put(`${f2}/2.1.6 B.md`, GOOD, 2 * DAY); // sin marca: cae a la fecha
+    put("Programación/_skills/resumen_teorico_skill.md", "skill v2"); // más nueva que ambas notas
+    const v = skillVersionOf(root, "Programación", "theory")!;
+    put(`${f1}/2.1.5 A.md`, FM(v) + GOOD, 2 * DAY);
+    const out = outdatedByFolder(root, [f1, f2]);
+    expect(out.has(f1)).toBe(false); // la marca coincide
+    expect(out.get(f2)).toMatchObject({ theory: true }); // sin marca y más vieja que la skill
+    put(`${f1}/2.1.5 A.md`, FM("deadbeef") + GOOD, 0);
+    expect(outdatedByFolder(root, [f1]).get(f1)).toMatchObject({ theory: true }); // marca de otra versión
+  });
+});

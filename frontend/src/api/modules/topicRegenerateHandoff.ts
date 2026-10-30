@@ -335,10 +335,23 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
       if (confirm !== true) throw new ApiError("Falta la confirmación: la tarea respalda y, al validar, reemplaza contenido.");
       if (whatIn === "map") throw new ApiError("El mapa no usa IA: se reconstruye de la nota. Regénéralo con «Con la app».");
       if (!HANDOFF_WHATS.includes(whatIn as HandoffWhat)) throw new ApiError("Elige qué regenerar: teoría, práctica, ejercicios o una combinación.");
-      const what = whatIn as HandoffWhat;
+      let what = whatIn as HandoffWhat;
       const list = (Array.isArray(foldersIn) ? foldersIn : [foldersIn]).map(parseFolder);
       const folders = [...new Set(list)];
       if (!folders.length) throw new ApiError("Elige al menos un tema.");
+      // Una teoría que ya cumple la skill actual (reconstruida antes: no desactualizada y dentro de los límites) no se vuelve a pedir en una combinación:
+      // la tarea pide solo lo que falta. Si se pidió SOLO la teoría, se respeta (la persona la quiere rehacer).
+      let skippedTheory = false;
+      if (STEPS_OF[what].length > 1 && STEPS_OF[what].includes("theory")) {
+        const stale = outdatedByFolder(app.root, folders);
+        if (folders.every((f) => !stale.get(f)?.theory)) {
+          const rest = STEPS_OF[what].filter((x) => x !== "theory").join("+") as HandoffWhat;
+          if (HANDOFF_WHATS.includes(rest)) {
+            what = rest;
+            skippedTheory = true;
+          }
+        }
+      }
       const steps = STEPS_OF[what];
       const at = nowDate();
       const space = folders[0]!.split("/")[0]!;
@@ -418,7 +431,7 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
         prompt: `Read \`${taskAbs}\` and execute it. Do only what that file lists, write nothing outside the files it names, and tell me when you are done.`,
         status: "waiting",
         topics,
-        log: [`Tarea creada: ${topics.length} tema(s). Copias en .trash/regenerar.`],
+        log: [`Tarea creada: ${topics.length} tema(s). Copias en .trash/regenerar.`, ...(skippedTheory ? ["La teoría ya cumple la skill actual: no se vuelve a pedir."] : [])],
       };
       const blocks: TopicBlock[] = topics.map((t, i) => {
         const plan = plans[i]!;

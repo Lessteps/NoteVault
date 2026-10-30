@@ -333,3 +333,10 @@ describe("ids de tarea con comas (títulos como «Project structure, virtual env
     expect(() => make().study_topic_regenerate_handoff_status("../x")).toThrow("no existe");
   });
 });
+
+describe("no se pide de nuevo lo que ya está al día", () => {
+  it("«todo» sobre temas con la teoría vieja (desactualizada) la sigue pidiendo", async () => {
+    const h = await make().study_topic_regenerate_handoff(A, "theory+practice", true);
+    expect(h.what).toBe("theory+practice");
+  });
+});

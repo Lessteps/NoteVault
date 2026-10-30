@@ -73,9 +73,25 @@ interface PreparedTopic {
   own: boolean;
 }
 
+// Las palabras de cada entrada se normalizan UNA vez (antes, por cada pareja tema × entrada: con 14 áreas eran cientos de miles de normalizaciones por consulta).
+const textCache = new WeakMap<CurriculumEntry, { words: Set<string>; text: string }>();
 function entryText(e: CurriculumEntry): { words: Set<string>; text: string } {
-  const text = normalizeText(`${e.id} ${e.title} ${e.keywords.join(" ")}`);
-  return { words: new Set(text.split(" ")), text };
+  let hit = textCache.get(e);
+  if (!hit) {
+    const text = normalizeText(`${e.id} ${e.title} ${e.keywords.join(" ")}`);
+    hit = { words: new Set(text.split(" ")), text };
+    textCache.set(e, hit);
+  }
+  return hit;
+}
+const matchCache = new WeakMap<CurriculumEntry, { title: string[]; keywords: string[][] }>();
+function entryWords(e: CurriculumEntry): { title: string[]; keywords: string[][] } {
+  let hit = matchCache.get(e);
+  if (!hit) {
+    hit = { title: wordsOf(e.title), keywords: e.keywords.map(wordsOf) };
+    matchCache.set(e, hit);
+  }
+  return hit;
 }
 
 function touches(rule: OverviewRule, e: CurriculumEntry): boolean {
@@ -90,12 +106,11 @@ function strongMatch(p: PreparedTopic, e: CurriculumEntry): boolean {
   if (p.topic.curriculumId && p.topic.curriculumId === e.id) return true;
   // un subtema atómico («gap», «target», «min») es una palabra corriente: solo lo cubre una nota de SU área, nunca una cualquiera que la contenga
   if (e.parentId && !p.own) return false;
-  const titleWords = wordsOf(e.title);
+  const { title: titleWords, keywords } = entryWords(e);
   if (containsPhrase(p.titleWords, titleWords)) return true;
   // fuera de la carpeta del área (otros lenguajes, Fundamentals…) solo cuentan el id exacto o el título completo
   if (!p.own) return false;
-  for (const k of e.keywords) {
-    const kw = wordsOf(k);
+  for (const kw of keywords) {
     if (!kw.length) continue;
     if (kw.length >= 2) {
       if (containsPhrase(p.titleWords, kw)) return true;

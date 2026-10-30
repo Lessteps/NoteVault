@@ -19,7 +19,27 @@ export interface NoteWeight {
   reasons: string[];
 }
 
-const wc = (s: string): number => s.split(/\s+/).filter(Boolean).length;
+const wc = (s: string): number => {
+  let n = 0;
+  let inWord = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    const space = c === 32 || c === 10 || c === 13 || c === 9 || c === 160;
+    if (!space && !inWord) n++;
+    inWord = !space;
+  }
+  return n;
+};
+
+/** El texto de la sección `## Name` hasta la siguiente `## ` (sin expresiones regulares con búsqueda perezosa: esto se llama por cada nota de la vault). */
+function sectionOf(text: string, name: string): string {
+  const head = `## ${name}`;
+  const at = text.startsWith(head) ? 0 : text.indexOf(`\n${head}`) + 1;
+  if (at <= 0 && !text.startsWith(head)) return "";
+  const start = at + head.length;
+  const end = text.indexOf("\n## ", start);
+  return text.slice(start, end < 0 ? undefined : end);
+}
 
 /** Cuántos conceptos enumera un título: separados por comas o «and». `Functions` → 1; `Project structure, virtual environments and imports` → 3. */
 export function titleConceptsOf(title: string): number {
@@ -30,11 +50,11 @@ export function titleConceptsOf(title: string): number {
 
 export function noteWeight(raw: string): NoteWeight {
   const text = raw.replace(/\r\n/g, "\n");
-  const explanation = /## Explanation([\s\S]*?)(?=\n## )/.exec(text)?.[1] ?? "";
+  const explanation = sectionOf(text, "Explanation");
   const heading = /^#\s+(.+)$/m.exec(text)?.[1] ?? /^title:\s*"?(.+?)"?\s*$/m.exec(text)?.[1] ?? "";
   const body = text.replace(/^---\n[\s\S]*?\n---\n/, "");
   const fmPrereq = /^prerequisites:\s*\[\s*"/m.test(text);
-  const requiresSection = /## Requires([\s\S]*?)(?=\n## )/.exec(text)?.[1] ?? "";
+  const requiresSection = sectionOf(text, "Requires");
   const w: NoteWeight = {
     words: wc(body),
     explanationWords: wc(explanation),

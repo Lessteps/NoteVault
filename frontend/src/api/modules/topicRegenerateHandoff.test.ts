@@ -318,3 +318,18 @@ describe("validar lo que escribió el agente", () => {
     expect(read(`${B}/4.2 Dos.md`)).not.toContain("cortada");
   });
 });
+
+describe("ids de tarea con comas (títulos como «Project structure, virtual environments…»)", () => {
+  it("una tarea creada con un tema cuyo título lleva coma se puede reabrir y validar (antes: «Esa tarea no existe»)", async () => {
+    const T = `${AREA}/4.3 Uno, dos y tres`;
+    put(`${T}/4.3 Uno, dos y tres.md`, OLD_NOTE);
+    put(`${T}/4.3 Uno, dos y tres.practica.md`, PRACTICA(["implement"]));
+    const h = await make().study_topic_regenerate_handoff(T, "theory", true);
+    expect(h.id).not.toContain(",");
+    // un id antiguo con coma (ya guardado en disco) también se acepta
+    const legacy = "2026-10-30_09-26-38_4.3 Uno, dos y tres";
+    fs.copyFileSync(abs(`.notevault/regenerar/${h.id}.json`), abs(`.notevault/regenerar/${legacy}.json`));
+    expect(make().study_topic_regenerate_handoff_status(legacy).id).toBe(legacy);
+    expect(() => make().study_topic_regenerate_handoff_status("../x")).toThrow("no existe");
+  });
+});

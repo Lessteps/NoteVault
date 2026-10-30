@@ -114,7 +114,7 @@ interface State extends Omit<RegenHandoff, "topics" | "ready" | "taskAbs"> {
 export interface HandoffHooks { now?: () => Date }
 
 const NOTE_NAME = (name: string): string => `${name}.md`;
-const safeSlug = (s: string): string => s.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 48) || "tema";
+const safeSlug = (s: string): string => s.replace(/[\\/:*?"<>|,;]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 48) || "tema";
 /** Un cercado de markdown más largo que cualquier racha de ``` del texto. */
 function fenced(text: string, lang = ""): string {
   const runs = text.match(/`+/g) ?? [];
@@ -134,7 +134,8 @@ export function topicRegenerateHandoffApi(app: AppState, hooks: HandoffHooks = {
     fs.writeFileSync(stateFile(s.id), JSON.stringify(s, null, 2), "utf-8");
   };
   const load = (id: string): State => {
-    if (!/^[\w.\- ]+$/.test(String(id ?? ""))) throw new ApiError("Esa tarea no existe.");
+    // los ids viejos llevan comas del título del tema («Project structure, virtual…»): se aceptan; lo que no puede haber es una ruta
+    if (!/^[\w.,()\- ]+$/.test(String(id ?? "")) || String(id).includes("..")) throw new ApiError("Esa tarea no existe.");
     try {
       return JSON.parse(fs.readFileSync(stateFile(id), "utf-8")) as State;
     } catch {

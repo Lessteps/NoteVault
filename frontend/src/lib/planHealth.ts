@@ -9,7 +9,7 @@
 import { numberKey, compareKeys } from "./planOrganize.js";
 import { parseUnitsIndex, worthGrouping } from "./planUnits.js";
 
-export type HealthCode = "missing-topics" | "ungrouped" | "similar-sections" | "out-of-order" | "scan-truncated";
+export type HealthCode = "over-capacity" | "missing-topics" | "ungrouped" | "similar-sections" | "out-of-order" | "scan-truncated";
 
 export interface HealthIssue {
   code: HealthCode;
@@ -32,6 +32,8 @@ export interface HealthInput {
   /** texto del índice `00 Units` por id de área del plan */
   unitsIndexOf?: (areaId: string) => string | null;
   scanTruncated?: boolean;
+  /** minutos de teoría que faltan por hacer y minutos que el calendario ofrece de hoy al fin */
+  capacity?: { neededMin: number; availableMin: number };
 }
 
 const cap = <T,>(a: readonly T[], n = 8): T[] => a.slice(0, n);
@@ -47,6 +49,12 @@ export function planHealth(input: HealthInput): HealthIssue[] {
 
   if (input.scanTruncated) {
     out.push({ code: "scan-truncated", area: "", message: "El escaneo de la vault se cortó por el tope de notas: faltan temas en la app. Sube MAX_SCAN_NOTES." });
+  }
+
+  const cap0 = input.capacity;
+  if (cap0 && cap0.availableMin > 0 && cap0.neededMin > cap0.availableMin) {
+    const h = (m: number): number => Math.round(m / 60);
+    out.push({ code: "over-capacity", area: "", message: `El plan no cabe en su fecha de fin: faltan ${h(cap0.neededMin)} h de temas y el calendario ofrece ${h(cap0.availableMin)} h (${h(cap0.neededMin - cap0.availableMin)} h de más). Hay que ampliar la fecha, subir los minutos diarios o recortar temas.` });
   }
 
   const missing = new Map<string, string[]>();

@@ -34,6 +34,7 @@ import { Tabs, TabPanel, type TabDef } from "./planKit";
 import { openPractice } from "./PracticeCard";
 import { ProgressBar } from "./parts";
 import { agendaDateKey, agendaViewKey, pageTabKey, STATUS_COLOUR, STATUS_LABEL, type Loaded } from "./planShared";
+import { DepthBanner } from "./DepthBanner";
 import { MethodologyWarningBanner } from "./MethodologyWarningBanner";
 import { useAutoOrganize } from "./useAutoOrganize";
 import { useAutoSync } from "./useAutoSync";
@@ -262,6 +263,7 @@ export function PlanScopePage(props: PlanScopePageProps) {
   return (
     <div className="space-y-5 pt-4" data-testid="plan-agenda" data-scope={key}>
       <VaultSyncBanner planId={plan.id} />
+      <DepthBanner planId={plan.id} {...(activeSubplan ? { subplanId: activeSubplan.id } : {})} />
       <MethodologyWarningBanner
         plan={plan}
         subplan={activeSubplan}

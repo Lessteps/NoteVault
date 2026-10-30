@@ -157,6 +157,7 @@ import { mentorPlanFoldersApi } from "./mentorPlanFolders.js";
 import { mentorAreaTimesApi } from "./mentorAreaTimes.js";
 import { mentorProjectLinksApi } from "./mentorProjectLinks.js";
 import { mentorPlanDossierApi } from "./mentorPlanDossier.js";
+import { mentorPlanDepthApi } from "./mentorPlanDepth.js";
 import { mentorDayCloseApi } from "./mentorDayClose.js";
 import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
@@ -583,7 +584,18 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const sub = plan.subplans.find((x) => x.areaId === areaId);
       return sub ? areaFolderOf(areaId, sub.topics.map((t) => t.folder)) : undefined;
     };
-    return planHealth({ plan, vaultTopics, offered, unitsIndexOf: (areaId) => { const f = folderOf(areaId); return f ? readUnitsIndex(f) : null; }, scanTruncated: app.vault.scanTruncated });
+    // lo que falta por hacer frente a lo que el calendario ofrece de hoy al fin (teoría)
+    let capacity: { neededMin: number; availableMin: number } | undefined;
+    try {
+      const today = localDate();
+      const sch = buildSchedule(progressPlan(plan, { today }));
+      const availableMin = sch.days.filter((d) => d.study && d.date >= today).reduce((n, d) => n + (d.capacityMinutes ?? 0), 0);
+      const neededMin = plan.subplans.flatMap((s) => s.topics).filter((t) => isLive(t) && t.route !== "optional" && !t.completedAt).reduce((n, t) => n + (t.estMinutes || 0), 0);
+      capacity = { neededMin, availableMin };
+    } catch {
+      capacity = undefined;
+    }
+    return planHealth({ plan, vaultTopics, offered, ...(capacity ? { capacity } : {}), unitsIndexOf: (areaId) => { const f = folderOf(areaId); return f ? readUnitsIndex(f) : null; }, scanTruncated: app.vault.scanTruncated });
   };
   const tidyPlan = (plan: Plan): { plan: Plan; changed: boolean; organized: boolean } => {
     let cur = regroupByUnits(plan, readUnitsIndex);
@@ -3268,6 +3280,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
     ...mentorProjectLinksApi(app),
     // «Preguntar con otra IA»: el dosier del plan para que Antigravity responda sin la app abierta (ver `mentorPlanDossier.ts`)
     ...mentorPlanDossierApi(app),
+    ...mentorPlanDepthApi(app),
     ...mentorPlanFoldersApi(app, { allTopics: () => buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 }), today: () => localDate() }),
     /** Compatibilidad: el flujo anterior (un BORRADOR en el chat que se acepta aparte); el camino principal crea el plan propuesto. */
     mentor_plan_generate_draft: (opts: unknown) => api.mentor_plan_generate({ ...((opts && typeof opts === "object" ? opts : {}) as object), asDraft: true }),

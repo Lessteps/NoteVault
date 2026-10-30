@@ -12,9 +12,11 @@ Cada fallo de abajo ocurrió de verdad. Para cada uno hay una **guarda** (códig
 | 6 | «Bases» aparecía como asignatura de Backend | Una vista listaba todos los grupos, incluido el de fundamentos | Las vistas de asignaturas excluyen `kind: "bases"` (tiene su propia pestaña) | `PlanAgenda.test.tsx` |
 | 7 | Todo «atrasado» sin haber empezado | `overdue` salía de un número de semana fijo | Solo hay atraso si la ruta ya empezó | `plan.test.ts` |
 | 8 | 217 notas «hechas» que no seguían la skill | El validador de Antigravity no comprobaba el formato de la teoría | `tools/programming_kb/check_format.mjs` (mismos marcadores que el detector de la app); «terminado» = 0 fallos | `skillFreshness` + el propio script |
+| 9 | Backend, Automation, Tooling y los lenguajes tenían un tema por capítulo y la app nunca lo dijo | La metodología solo vigilaba HTML y CSS; no había una regla de profundidad ni un límite | `lib/areaDepth.ts`: un capítulo necesita ≥ 3 piezas (si dura ≥ 60 min). `DepthBanner` lo avisa por área y escribe SOLA la instrucción para Antigravity (`_handoff/desglosar/…`) | `areaDepth.test.ts`, `DepthBanner.test.tsx` |
+| 10 | El plan crecía (+350 temas) sin avisar de que ya no cabe en su fecha de fin | Nada comparaba las horas de temas con las del calendario | `planHealth`: `over-capacity` (horas que faltan vs horas que ofrece el calendario) | `planHealth.test.ts` |
 
 ## Cómo se ve en la app
-Al abrir un plan, `useAutoSync` llama a `mentor_plan_sync_reference`: añade lo nuevo, reparte en asignaturas, ordena y, si algo sigue mal (`health`), lo dice con un aviso **una vez por plan**. `mentor_plan_health` hace la misma revisión bajo demanda y solo lee.
+El aviso de profundidad (`DepthBanner`) sale arriba de cada área con el botón «Copiar instrucción para Antigravity»: la app mide, escribe el archivo de la tarea y copia la frase; no hay que redactar nada. Al abrir un plan, `useAutoSync` llama a `mentor_plan_sync_reference`: añade lo nuevo, reparte en asignaturas, ordena y, si algo sigue mal (`health`), lo dice con un aviso **una vez por plan**. `mentor_plan_health` hace la misma revisión bajo demanda y solo lee.
 
 ## Regla para añadir una función nueva
 Si arreglas un fallo de este tipo, añade **una fila** aquí con su guarda y su prueba. Un arreglo sin prueba que se rompa si vuelve el fallo no cuenta como arreglo.

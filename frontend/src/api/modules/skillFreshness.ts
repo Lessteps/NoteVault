@@ -59,6 +59,16 @@ export function skillVersionOf(root: string, subject: string, kind: Kind): strin
   }
 }
 
+/** La versión de la skill con la que se generó un mapa (`canvas_versions.json`), o null si no se sabe. */
+function canvasVersionOf(root: string, rel: string): string | null {
+  try {
+    const all = JSON.parse(fs.readFileSync(path.join(root, ".notevault", "estudio", "canvas_versions.json"), "utf8")) as Record<string, string>;
+    return typeof all[rel] === "string" ? all[rel]! : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Marca un archivo de pieza (nota o `.practica.md`) con la versión actual de su skill. Sin skill o sin frontmatter no hace nada; nunca lanza. */
 export function stampSkillVersion(root: string, subject: string, kind: "theory" | "practica", fileAbs: string): void {
   try {
@@ -102,8 +112,17 @@ function skillChangeTimes(root: string, subjects: Iterable<string>): Map<string,
         reg[key] = { hash, changedAt: mtime(abs) ?? now };
         dirty = true;
       } else if (known.hash !== hash) {
-        reg[key] = { hash, changedAt: now };
+        // cuándo se EDITÓ la skill (la fecha de su archivo), no cuándo la vio la app: si la app se abre horas después, las piezas hechas entre medias
+        // con la skill ya nueva no pueden salir como atrasadas
+        reg[key] = { hash, changedAt: Math.min(now, mtime(abs) ?? now) };
         dirty = true;
+      } else {
+        // una fecha guardada más tardía que la del archivo vino de cuando la VIO la app, no de cuando se editó: se corrige hacia atrás
+        const m = mtime(abs);
+        if (m !== null && m < known.changedAt) {
+          reg[key] = { hash, changedAt: m };
+          dirty = true;
+        }
       }
       out.set(key, reg[key]!.changedAt);
     }
@@ -168,7 +187,7 @@ export function outdatedByFolder(root: string, folders: Iterable<string>): Map<s
       const filePath = path.join(root, folder, pieces[kind]);
       const made = mtime(filePath);
       // con marca de versión manda la marca (la pieza dice con qué skill se hizo); sin marca, la fecha del archivo
-      const stamp = made !== null && kind !== "canvas" ? stampOf(readText(filePath)) : null;
+      const stamp = made !== null ? (kind === "canvas" ? canvasVersionOf(root, path.posix.join(folder, pieces.canvas)) : stampOf(readText(filePath))) : null;
       const current = stamp ? skillVersionOf(root, subject, kind) : null;
       if (stamp && current) {
         if (stamp !== current) stale[kind] = true;

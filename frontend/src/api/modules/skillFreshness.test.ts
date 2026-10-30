@@ -114,3 +114,32 @@ describe("stampSkillVersion y quién la llama", () => {
     }
   });
 });
+
+describe("el mapa y la fecha de cambio de la skill", () => {
+  const MAP = JSON.stringify({ nodes: [{ id: "g", type: "group", label: "Explanation", x: 0, y: 0, width: 10, height: 10 }, { id: "t", type: "text", text: "## What it is\n**In one sentence.** x\n## How it works in the real world", x: 0, y: 0, width: 10, height: 10 }], edges: [] });
+  const NOTE = "---\ntitle: x\n---\n# 2.1.5 X\n\n## Requires\n*No prerequisites.*\n\n## Explanation\n\n### What it is\n**In one sentence.** w\n\n### How it is organised\nx\n\n### How it works in the real world\nx\n\n## Examples\n**How you will apply it:** x\n\n## Common mistakes\nx\n";
+  const F = "Programación/2.1 Python/2.1.5 A";
+
+  it("un mapa hecho DESPUÉS de editar la skill no sale atrasado aunque la app vea el cambio horas más tarde", () => {
+    put("Programación/_skills/mapa_skill.md", "mapa v1", 5 * DAY);
+    put(`${F}/2.1.5 A.md`, NOTE, 4 * DAY);
+    put(`${F}/2.1.5 A — mapa.canvas`, MAP, 4 * DAY);
+    expect(outdatedByFolder(root, [F]).size).toBe(0); // la app ve la skill v1
+    put("Programación/_skills/mapa_skill.md", "mapa v2", 2 * DAY); // se edita hace 2 días…
+    put(`${F}/2.1.5 A — mapa.canvas`, MAP, DAY); // …y el mapa se rehace hace 1 día
+    expect(outdatedByFolder(root, [F]).has(F)).toBe(false); // antes: salía atrasado porque la app «vio» el cambio hoy
+  });
+
+  it("con la versión del mapa registrada manda ella: igual a la skill actual = al día; distinta = atrasado", async () => {
+    const { skillVersionOf } = await import("./skillFreshness.js");
+    put("Programación/_skills/mapa_skill.md", "mapa v1", DAY);
+    put(`${F}/2.1.5 A.md`, NOTE, 4 * DAY);
+    put(`${F}/2.1.5 A — mapa.canvas`, MAP, 4 * DAY); // más viejo que la skill: sin versión saldría atrasado
+    expect(outdatedByFolder(root, [F]).get(F)).toMatchObject({ canvas: true });
+    const v = skillVersionOf(root, "Programación", "canvas")!;
+    put(".notevault/estudio/canvas_versions.json", JSON.stringify({ [`${F}/2.1.5 A — mapa.canvas`]: v }));
+    expect(outdatedByFolder(root, [F]).has(F)).toBe(false);
+    put(".notevault/estudio/canvas_versions.json", JSON.stringify({ [`${F}/2.1.5 A — mapa.canvas`]: "deadbeef" }));
+    expect(outdatedByFolder(root, [F]).get(F)).toMatchObject({ canvas: true });
+  });
+});

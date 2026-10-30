@@ -763,7 +763,32 @@ export function writeGenerated(target: string, doc: cf.CanvasDoc, vaultRoot: str
   fs.rmSync(tmp, { force: true });
   manifest[rel] = hash;
   writeManifest(vaultRoot, manifest);
+  recordCanvasSkillVersion(vaultRoot, rel);
   return `written ${target}`;
+}
+
+/**
+ * Un mapa es JSON Canvas (sin frontmatter), así que la versión de su skill (`mapa_skill.md`: 8 primeros hex del sha1 del texto con LF, igual que
+ * `skillVersionOf` de la API) se guarda aparte, en `.notevault/estudio/canvas_versions.json`: { "<ruta del mapa>": "<versión>" }. Nunca lanza.
+ */
+export function recordCanvasSkillVersion(vaultRoot: string, rel: string): void {
+  try {
+    const subject = rel.split("/")[0] ?? "";
+    const text = fs.readFileSync(path.join(vaultRoot, subject, "_skills", "mapa_skill.md"), "utf8");
+    const version = crypto.createHash("sha1").update(text.replace(/\r\n/g, "\n")).digest("hex").slice(0, 8);
+    const file = path.join(vaultRoot, ".notevault", "estudio", "canvas_versions.json");
+    let all: Record<string, string> = {};
+    try {
+      all = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, string>;
+    } catch {
+      /* primera vez */
+    }
+    all[rel] = version;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(all, null, 2), "utf8");
+  } catch {
+    /* sin skill o sin permiso: el mapa se juzga por fecha */
+  }
 }
 
 /* ── CLI ─────────────────────────────────────────────────────────────────── */

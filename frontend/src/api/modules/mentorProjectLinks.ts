@@ -12,7 +12,8 @@ import { P_ACTIVE } from "../../core/projectManager.js";
 import { PLAN_ID_RE, PlanStore, type Plan } from "../../core/mentor/plan.js";
 import * as store from "../../core/store.js";
 import { chainSignalsOf, planChain, type ChainMonth } from "../../lib/planChain.js";
-import { buildSchedule } from "../../lib/planSchedule.js";
+import { buildSchedule, progressPlan } from "../../lib/planSchedule.js";
+import { localDateOf } from "../../core/mentor/practiceState.js";
 import type { AppState } from "../appState.js";
 import { dailyProjectDoneOf } from "./mentorProjects.js";
 
@@ -62,7 +63,7 @@ export function mentorProjectLinksApi(app: AppState) {
     if (!plan) throw new ApiError("Ese plan ya no existe.");
     return plan;
   };
-  const chainOf = (plan: Plan) => planChain(plan as never, buildSchedule(plan as never), chainSignalsOf(null, dailyProjectDoneOf(app.root, plan)));
+  const chainOf = (plan: Plan) => planChain(plan as never, buildSchedule(progressPlan(plan as never, { today: localDateOf(new Date()) })), chainSignalsOf(null, dailyProjectDoneOf(app.root, plan)));
 
   /** Los issues del proyecto real siguen a las piezas: lo hecho en la carpeta del proyecto diario pasa a la columna final. */
   function sync(month: ChainMonth, pid: string): { total: number; done: number } {

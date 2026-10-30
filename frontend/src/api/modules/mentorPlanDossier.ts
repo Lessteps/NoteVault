@@ -9,7 +9,8 @@ import { PLAN_ID_RE, PlanStore } from "../../core/mentor/plan.js";
 import { ChangeStore } from "../../core/mentor/planChange.js";
 import { chainSignalsOf, planChain } from "../../lib/planChain.js";
 import { buildDossier, type DossierPlan } from "../../lib/planDossier.js";
-import { buildSchedule } from "../../lib/planSchedule.js";
+import { buildSchedule, progressPlan } from "../../lib/planSchedule.js";
+import { localDateOf } from "../../core/mentor/practiceState.js";
 import type { AppState } from "../appState.js";
 import { dailyProjectDoneOf } from "./mentorProjects.js";
 
@@ -53,7 +54,7 @@ export function mentorPlanDossierApi(app: AppState, hooks: { now?: () => Date } 
       };
       let chain: ReturnType<typeof planChain>["months"] = [];
       try {
-        chain = planChain(plan as never, buildSchedule(plan as never), chainSignalsOf(null, dailyProjectDoneOf(app.root, plan))).months;
+        chain = planChain(plan as never, buildSchedule(progressPlan(plan as never, { today: localDateOf(new Date()) })), chainSignalsOf(null, dailyProjectDoneOf(app.root, plan))).months;
       } catch {
         /* planes sin cadena de proyectos: el dosier sigue siendo útil */
       }

@@ -3,7 +3,7 @@
 //
 //  · DEFINICIÓN (determinista, sin IA): sale del reparto del plan (días de estudio, enfoques, temas de cada día) y de las plantillas del
 //    sistema de práctica de cada área (`planAreaPractice.ts`). Misma entrada → misma cadena; nada se guarda aparte.
-//  · MES DEL PLAN: ventanas «de aniversario» a partir del inicio (6 oct → 5 nov, 6 nov → 5 dic…). Cada semana pertenece a UN solo mes (el de
+//  · MES DEL PLAN: ventanas «de aniversario» a partir del PRIMER DÍA CON TRABAJO (el progreso manda, no la fecha de inicio del plan: si empiezas el 29 oct, tu mes 1 es 29 oct → 28 nov). Cada semana pertenece a UN solo mes (el de
 //    su día central); una última ventana de menos de dos semanas se une a la anterior.
 //  · AVANCE (derivado, NUNCA manual): una pieza diaria está hecha cuando el estudiante completa las casillas de su carpeta de proyecto
 //    (`mentor_projects_list`); la semana está hecha cuando lo están todas sus piezas (o sus fases de práctica), y el mes cuando lo están
@@ -148,7 +148,11 @@ function windowOfWeek(w: { start: string; days: number }, windows: ReadonlyArray
  */
 export function planChain(plan: SchedulePlan, sch: PlanSchedule, signals?: ChainSignals): PlanChain {
   if (plan.structure !== "areas") return { months: [], pieces: 0, weeks: 0 };
-  const windows = planMonthWindows(plan);
+  // EL PLAN SE MIDE POR TU PROGRESO, NO POR EL CALENDARIO: los meses del proyecto cuentan desde el primer día con trabajo (lo hecho se queda donde se hizo y lo
+  // pendiente se reparte desde hoy), no desde la fecha de inicio del plan. Si empezaste el 29 aunque el plan diga el 6, tu mes 1 empieza el 29 y tiene sus semanas enteras.
+  const firstWork = sch.days.find((d) => d.topics.length > 0)?.date;
+  const anchor = firstWork && firstWork > plan.start && firstWork <= plan.end ? firstWork : plan.start;
+  const windows = planMonthWindows({ start: anchor, end: plan.end });
   const ranges = weekRangesOf(plan.start, plan.end);
   const cur = plan.practiceCurriculum?.monthly ?? [];
 

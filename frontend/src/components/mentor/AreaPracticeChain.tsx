@@ -81,7 +81,7 @@ export function AreaPracticeChain({ plan, m, loaded, areaId, areaLabel, today, c
               return (
                 <li key={p.id} className={cn("rounded-xl border px-3 py-2.5", isToday ? "border-accent/50 bg-surface" : "border-line")} data-testid="area-chain-piece" data-id={p.id} data-status={p.status} data-today={isToday ? "true" : "false"}>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className={cn("text-[14.5px] font-medium", p.done && "text-faint line-through decoration-faint/60")}>{p.title}</span>
+                    <span className={cn("text-[14.5px] font-medium", p.done && "text-faint line-through decoration-faint/60")} data-testid="area-chain-piece-title">{sectionsOf(p)[0]?.what ?? p.title}</span>
                     <span className="flex-1" />
                     {isToday && <Chip colour={colour}>Hoy</Chip>}
                     {!isToday && p.current && <Chip colour={colour}>Te toca</Chip>}
@@ -91,6 +91,7 @@ export function AreaPracticeChain({ plan, m, loaded, areaId, areaLabel, today, c
                     <code className="rounded bg-hover px-1 font-mono text-[12.5px] text-text" title="Id de la pieza en el plan">{p.id}</code> · pieza {p.n} de {p.of} · {isToday ? "hoy" : dateLabel(p.date)}
                   </p>
                   <p className="text-[13.5px] text-dim">{p.slice}</p>
+                  {sectionsOf(p)[0] && <p className="text-[13px] text-faint">Pieza común del día para todas las áreas: {p.title}</p>}
                   {(isToday || p.current) && <AreaSections sections={sectionsOf(p)} testid="area-chain-sections" />}
                 </li>
               );

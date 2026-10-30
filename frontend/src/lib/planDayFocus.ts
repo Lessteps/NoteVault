@@ -373,6 +373,8 @@ export const shortTopic = (t: string): string => t.replace(/^[\d.\s_-]+/, "").tr
 const fill = (s: string, lang: string, area: string): string => s.replace(/\{lang\}/g, lang).replace(/\{area\}/g, area.toLowerCase()).replace(/\s+\(\)/, "");
 
 export interface FocusOpts {
+  /** reparto POR AVANCE (hay un «hoy»): las fases se abren por progreso y no esperan a su semana de calendario si lo anterior ya está hecho. Sin él (diseño del plan) rige el calendario de las fases */
+  byProgress?: boolean;
   /** capacidad de temas del día (ya sin kata ni sesión del proyecto semanal) */
   capOf: (date: string) => number;
   /** semana del plan de una fecha */
@@ -450,6 +452,7 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
   // LA FASE SE ABRE POR PROGRESO, NO POR CALENDARIO: una fase posterior (p. ej. Automation, semanas 23–26) empieza en su semana, pero NO espera a ella si todas las áreas de las
   // fases anteriores ya no tienen nada pendiente (terminaste antes). El principio y el fin de la ruta (inicio y fin del plan) no cambian; lo que se mueve es el orden real.
   const phaseOpenEarly = (s: FocusSubIn): boolean => {
+    if (!opts.byProgress) return false;
     const win = windowOf(s);
     const before = plan.subplans.filter((o) => o !== s && windowOf(o).to < win.from);
     if (!before.length) return false;

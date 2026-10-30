@@ -313,7 +313,7 @@ function buildScheduleBase(plan: SchedulePlan): PlanSchedule {
   if (plan.structure === "areas") {
     // ── agenda por enfoque (planes por áreas) ──
     const langs = plan.preconditions?.languages;
-    const res = buildFocusSchedule({ start: plan.start, end: plan.end, subplans: plan.subplans, areaMode: effectiveAreaMode(plan), ...(langs?.length ? { languages: langs.map((l) => ({ id: l.id, ...(l.weight ? { weight: l.weight } : {}) })) } : {}) }, { capOf, weekOf: (d) => Math.floor(daysBetween(plan.start, d) / 7) + 1 });
+    const res = buildFocusSchedule({ start: plan.start, end: plan.end, subplans: plan.subplans, areaMode: effectiveAreaMode(plan), ...(langs?.length ? { languages: langs.map((l) => ({ id: l.id, ...(l.weight ? { weight: l.weight } : {}) })) } : {}) }, { capOf, weekOf: (d) => Math.floor(daysBetween(plan.start, d) / 7) + 1, ...(asOf ? { byProgress: true } : {}) });
     const total = new Map(plan.subplans.map((s) => [s.id, s.topics.length] as const));
     const position = new Map<string, number>();
     for (const s of plan.subplans) s.topics.forEach((t, i) => position.set(`${s.id}|${t.folder}`, i + 1));

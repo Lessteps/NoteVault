@@ -1,5 +1,5 @@
 site_name: NoteVault
-site_description: "Estudio, notas y gestión personal local-first. Documentación oficial de NoteVault."
+site_description: "NoteVault documentation — local-first study, notes and personal management."
 site_author: "Lessteps"
 repo_url: https://github.com/Lessteps/NoteVault
 repo_name: Lessteps/NoteVault
@@ -25,7 +25,6 @@ theme:
         icon: material/brightness-7
         name: Cambiar a modo oscuro
   features:
-    - navigation.instant
     - navigation.tracking
     - navigation.sections
     - navigation.expand
@@ -34,6 +33,39 @@ theme:
     - search.highlight
     - content.code.copy
     - content.tabs.link
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: es
+          default: true
+          name: Español
+          build: true
+        - locale: en
+          name: English
+          build: true
+          nav_translations:
+            Inicio: Home
+            Empezar: Getting started
+            Instalación: Installation
+            Primeros pasos: First steps
+            Guía de uso: User guide
+            Módulos: Modules
+            La bóveda: The vault
+            Skills: Skills
+            IA: AI
+            Proyecto: Project
+            Licencia y créditos: License and credits
+            Contribuir: Contributing
+            Hoja de ruta: Roadmap
+            Apoyar el proyecto: Support the project
+            Ingeniería: Engineering
+            Portal de arquitectura: Architecture portal
 
 markdown_extensions:
   - admonition

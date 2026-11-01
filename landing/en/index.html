@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NoteVault — study, notes and personal management</title>
+<meta name="description" content="Open-source desktop app to study and organize your life. Markdown notes, a Mentor-built study plan, tasks, habits, goals and finances. Your data is plain files you own.">
+<link rel="icon" href="../favicon.ico">
+<meta property="og:title" content="NoteVault">
+<meta property="og:description" content="Study, notes and personal management in an open-source desktop app. Your data is plain files you own.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://lessteps.com/en/">
+<link rel="canonical" href="https://lessteps.com/en/">
+<link rel="alternate" hreflang="es" href="https://lessteps.com/">
+<link rel="alternate" hreflang="en" href="https://lessteps.com/en/">
+<link rel="alternate" hreflang="x-default" href="https://lessteps.com/">
+<style>
+  :root {
+    --bg: #fafaf9; --surface: #ffffff; --text: #1c1917; --muted: #57534e; --line: #e7e5e4;
+    --accent: #4f46e5; --accent-text: #ffffff; --accent-soft: #eef2ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12110f; --surface: #1b1a17; --text: #f5f5f4; --muted: #a8a29e; --line: #2e2c28;
+      --accent: #818cf8; --accent-text: #12110f; --accent-soft: #1e1b3a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12110f; --surface: #1b1a17; --text: #f5f5f4; --muted: #a8a29e; --line: #2e2c28;
+    --accent: #818cf8; --accent-text: #12110f; --accent-soft: #1e1b3a;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header { border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .logo { font-weight: 700; font-size: 18px; color: var(--text); text-decoration: none; letter-spacing: -0.01em; }
+  nav { display: flex; gap: 20px; font-size: 14px; }
+  nav a { color: var(--muted); text-decoration: none; }
+  nav a:hover { color: var(--text); }
+  .lang { font-size: 13px; font-weight: 600; text-decoration: none; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; background: var(--surface); }
+  .hero { padding: 72px 0 56px; text-align: center; }
+  .hero h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.1; letter-spacing: -0.02em; margin: 0 auto 16px; max-width: 18ch; }
+  .hero p.lead { font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); max-width: 56ch; margin: 0 auto 28px; }
+  .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--surface); }
+  .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .btn[aria-disabled="true"] { opacity: .55; pointer-events: none; }
+  .badge { display: inline-block; font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; margin-bottom: 20px; background: var(--surface); }
+  .note { font-size: 13px; color: var(--muted); margin-top: 14px; }
+  .shots { display: grid; gap: 20px; grid-template-columns: 1fr; padding-bottom: 56px; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+  .shots figcaption { text-align: center; color: var(--muted); font-size: 14px; margin-top: 10px; }
+  @media (min-width: 860px) { .shots { grid-template-columns: 1fr 1fr; } }
+  section { padding: 56px 0; border-top: 1px solid var(--line); }
+  section h2 { font-size: clamp(24px, 3.5vw, 32px); letter-spacing: -0.01em; margin: 0 0 8px; }
+  section .sub { color: var(--muted); margin: 0 0 32px; max-width: 62ch; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .card .tag { display: inline-block; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 2px 8px; margin-bottom: 10px; }
+  .price { font-size: 28px; font-weight: 700; margin: 4px 0 12px; }
+  .card ul { margin: 0 0 16px; padding-left: 18px; color: var(--muted); font-size: 15px; }
+  .card .btn { width: 100%; text-align: center; }
+  .card .pay { margin: 14px 0 0; font-size: 14px; color: var(--muted); }
+  .card .pay code { font-size: 15px; color: var(--text); }
+  .copy { font: inherit; font-size: 13px; margin-left: 6px; padding: 2px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; }
+  details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { color: var(--muted); margin: 10px 0 0; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+  footer a { color: var(--muted); }
+  @media (max-width: 560px) { nav { display: none; } .hero { padding-top: 48px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="logo" href="#">NoteVault</a>
+    <nav aria-label="Main">
+      <a href="#que-incluye">What's included</a>
+      <a href="#como-funciona">How it works</a>
+      <a href="#apoyar">Support</a>
+      <a href="../docs/en/">Docs</a>
+      <a href="https://github.com/Lessteps/NoteVault">GitHub</a>
+    </nav>
+    <a class="lang" href="../" hreflang="es" lang="es">Español</a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <span class="badge">Open source · GPL-3.0</span>
+    <h1>Study and organize your life with files you own</h1>
+    <p class="lead">NoteVault is a desktop app with Markdown notes, a Mentor that builds your study plan, and tasks, habits, goals and finances. No account, no server, no telemetry.</p>
+    <div class="actions">
+      <a class="btn primary" id="cta-download" href="https://github.com/Lessteps/NoteVault/releases">Download</a>
+      <a class="btn" href="../docs/en/">Read the docs</a>
+    </div>
+    <p class="note">Windows installer. Linux and macOS from source.</p>
+  </div>
+
+  <div class="wrap shots">
+    <figure><img src="../img/notas.png" width="1416" height="900" alt="NoteVault note editor showing a Markdown note with a formula and a code block" loading="lazy"><figcaption>Markdown notes with live preview</figcaption></figure>
+    <figure><img src="../img/vista-general.png" width="1416" height="900" alt="NoteVault Overview with today's habits and exercise, projects, tasks and finance panels" loading="lazy"><figcaption>Overview: your day at a glance</figcaption></figure>
+  </div>
+
+  <section id="que-incluye">
+    <div class="wrap">
+      <h2>Everything in one place</h2>
+      <p class="sub">What you usually spread across several apps, stored in one folder on your disk.</p>
+      <div class="grid">
+        <div class="card"><h3>Markdown notes</h3><p>Live preview, links between notes, formulas and canvases to map out ideas. They are plain <code>.md</code> files.</p></div>
+        <div class="card"><h3>Study Mentor</h3><p>A plan that fits your dates, with spaced reviews, Pomodoro and the daily pace you need in each subject.</p></div>
+        <div class="card"><h3>Theory, map and practice</h3><p>Each topic becomes a note, a concept map and a practice file with exercises.</p></div>
+        <div class="card"><h3>Personal management</h3><p>Tasks, projects, calendar, habits, goals, finances, exercise and nutrition.</p></div>
+        <div class="card"><h3>Optional AI</h3><p>Use your own API, a local model (Ollama, LM Studio) or a prompt you paste yourself. It works without AI too.</p></div>
+        <div class="card"><h3>Editable skills</h3><p>The instructions that generate your notes are in plain view, with version history and a warning for anything left outdated.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="como-funciona">
+    <div class="wrap">
+      <h2>Your data, your folder</h2>
+      <p class="sub">The vault is a folder on your disk with text any editor can open.</p>
+      <div class="grid">
+        <div class="card"><h3>No account, no cloud</h3><p>There is no NoteVault server. Nothing leaves your computer except what you send to the AI provider you choose.</p></div>
+        <div class="card"><h3>Open format</h3><p>Markdown with frontmatter and JSON, documented and versioned. Compatible with Obsidian.</p></div>
+        <div class="card"><h3>Sync your way</h3><p>Syncthing, Git or your favorite cloud on the same folder. A backup is just copying the folder.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="apoyar">
+    <div class="wrap">
+      <h2>Free, and kept alive by your support</h2>
+      <p class="sub">The app is free and open source. We are students with no funding or financial backing: any help, however small, lets us keep developing NoteVault.</p>
+      <div class="grid">
+        <div class="card">
+          <span class="tag">Free</span>
+          <h3>The app</h3>
+          <div class="price">$0</div>
+          <ul><li>Every module</li><li>Open source (GPL-3.0)</li><li>Updates from GitHub</li></ul>
+          <a class="btn primary" href="https://github.com/Lessteps/NoteVault/releases">Download</a>
+        </div>
+        <div class="card">
+          <span class="tag">Content</span>
+          <h3>Study packs</h3>
+          <div class="price">Soon</div>
+          <ul><li>Complete ready-to-use paths</li><li>First one: Full Stack Junior · Technical interviews</li><li>Notes, maps and practice included</li></ul>
+          <a class="btn" id="cta-pack" href="#" aria-disabled="true">Coming soon</a>
+        </div>
+        <div class="card">
+          <span class="tag">Support</span>
+          <h3>Support the project</h3>
+          <div class="price">You choose</div>
+          <ul><li>Funds maintenance and new platforms</li><li>No hidden strings</li><li>Thank you, truly</li></ul>
+          <a class="btn primary" id="cta-support" href="https://paypal.me/lessteps" rel="noopener">Support with PayPal</a>
+          <p class="pay">From Colombia: <strong>Bre-B / Nequi</strong> key<br><code id="nequi-key">0093524288</code> <button type="button" class="copy" id="copy-key">Copy</button></p>
+          <p class="pay"><a href="https://drive.google.com/file/d/1ea34-aOhxh8nAmhpLI0lX2B1oQqEDQG6/view?usp=sharing" rel="noopener">View PayPal and Nequi QR code</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="preguntas">
+    <div class="wrap">
+      <h2>Frequently asked questions</h2>
+      <p class="sub"></p>
+      <details><summary>Who is behind NoteVault?</summary><p>Lessteps, a team of students who build software. “NoteVault” is a <strong>provisional name</strong> for the product; the company behind it is Lessteps. If the name changes, we will announce it here and in the repository.</p></details>
+      <details><summary>Do I need to pay for AI to use it?</summary><p>No. NoteVault works without AI. If you want it, you can use a free local model or the API of your choice.</p></details>
+      <details><summary>Where is my data stored?</summary><p>In the folder you choose, as Markdown and JSON files. NoteVault has no servers and sends no telemetry.</p></details>
+      <details><summary>Is there a mobile or web version?</summary><p>Not yet. They are planned; the vault format is already designed so a mobile client can read and write the same files.</p></details>
+      <details><summary>If it is open source, what is sold?</summary><p>The code is free. What is sold is ready-made study content and, voluntarily, support for the project.</p></details>
+      <details><summary>Can I modify it or use it at my company?</summary><p>Yes, under the terms of the GPL-3.0. If you distribute a modified version, you must publish its source code. The name and logo have a <a href="https://github.com/Lessteps/NoteVault/blob/main/TRADEMARK.md">separate policy</a>.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 Lessteps · NoteVault is a provisional name · GPL-3.0-or-later</span>
+    <span>
+      <a href="../docs/en/">Docs</a> ·
+      <a href="https://github.com/Lessteps/NoteVault">GitHub</a> ·
+      <a href="https://github.com/Lessteps/NoteVault/blob/main/SECURITY.md">Security</a> ·
+      <a href="https://github.com/Lessteps/NoteVault/issues">Help</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  // Study pack purchase link: paste it here when it exists. Empty = the button stays “Coming soon”.
+  // (The support links — PayPal and Bre-B — are directly in the “Support the project” card.)
+  var LINKS = {
+    pack: ""
+  };
+  var copyBtn = document.getElementById("copy-key");
+  if (copyBtn) copyBtn.addEventListener("click", function () {
+    var key = document.getElementById("nequi-key").textContent;
+    var done = function () { copyBtn.textContent = "Copied"; setTimeout(function () { copyBtn.textContent = "Copy"; }, 1800); };
+    if (navigator.clipboard) navigator.clipboard.writeText(key).then(done, function () {});
+  });
+  [["cta-pack", LINKS.pack, "Buy"]].forEach(function (e) {
+    var el = document.getElementById(e[0]);
+    if (!el || !e[1]) return;
+    el.href = e[1];
+    el.rel = "noopener";
+    el.textContent = e[2];
+    el.removeAttribute("aria-disabled");
+    el.classList.add("primary");
+  });
+</script>
+</body>
+</html>

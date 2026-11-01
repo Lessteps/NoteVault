@@ -79,3 +79,6 @@ odd/
 # ── Claude / agent tooling (local, not source) ───────────────────
 .claude/
 .codegraph/
+
+# Salida de la build de Vercel
+public/

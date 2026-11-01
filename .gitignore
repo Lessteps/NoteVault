@@ -81,4 +81,4 @@ odd/
 .codegraph/
 
 # Salida de la build de Vercel
-public/
+/public/

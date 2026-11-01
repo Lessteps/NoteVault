@@ -29,10 +29,19 @@
       "dist-electron/**"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "public/icon.ico"
     },
     "directories": {
       "output": "release"
+    },
+    "copyright": "Copyright © 2026 Lessteps. GPL-3.0-or-later",
+    "linux": {
+      "target": "AppImage",
+      "category": "Office"
+    },
+    "nsis": {
+      "artifactName": "NoteVault-Setup-${version}.${ext}"
     }
   },
   "dependencies": {

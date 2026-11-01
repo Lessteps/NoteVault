@@ -244,7 +244,9 @@ export function HomeModule() {
               </span>
               <span className="ml-1.5 text-xs font-medium text-slate-400">pendientes</span>
             </div>
-            <SmoothSparkline colour="#22d3ee" values={[2, 3, 5, 4, 7, 6, 8, Math.max(1, hDone)]} height={38} />
+            {rangeDays && rangeDays.length > 1 && (
+              <SmoothSparkline colour="#22d3ee" values={rangeDays.map((d) => d.done.length)} height={38} />
+            )}
           </div>
 
           {/* Card 2: Ejercicio */}
@@ -266,7 +268,6 @@ export function HomeModule() {
               </span>
               <span className="ml-1.5 text-xs font-medium text-amber-400/90">{weekdayCap}</span>
             </div>
-            <SmoothSparkline colour="#f59e0b" values={[3, 5, 4, 7, 6, 9, 7, Math.max(1, eDone)]} height={38} />
           </div>
 
           {/* Card 3: Proyectos */}
@@ -286,7 +287,6 @@ export function HomeModule() {
               <span className="text-2xl font-bold tracking-tight text-white">{sprintIssues}</span>
               <span className="ml-1.5 text-xs font-medium text-slate-400">Issues en sprint</span>
             </div>
-            <SmoothSparkline colour="#c084fc" values={[4, 3, 6, 5, 8, 7, 9, sprintIssues || 6]} height={38} />
           </div>
 
           {/* Card 4: Tareas */}
@@ -313,7 +313,6 @@ export function HomeModule() {
               <span className="text-2xl font-bold tracking-tight text-white">{dueTasks}</span>
               <span className="ml-1.5 text-xs font-medium text-slate-400">Atrasadas: {lateTasks}</span>
             </div>
-            <SmoothSparkline colour="#60a5fa" values={[2, 3, 5, 4, 6, 5, 7, Math.max(1, dueTasks)]} height={38} />
           </div>
 
           {/* Card 5: Finanzas */}
@@ -330,7 +329,6 @@ export function HomeModule() {
               </span>
               <span className="ml-1.5 text-xs font-medium text-slate-400">Ahorro/Mes</span>
             </div>
-            <SmoothSparkline colour="#34d399" values={[3, 4, 6, 5, 8, 7, 9, 11]} height={38} />
           </div>
         </div>
 

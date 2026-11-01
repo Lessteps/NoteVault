@@ -88,7 +88,7 @@ describe("HomeModule", () => {
 
     // Verify Title & Subtitle
     expect(container.textContent).toContain("Vista General");
-    expect(container.textContent).toContain("Sprint v2.4");
+    expect(container.textContent).not.toContain("Sprint v");
     expect(container.textContent).toContain("NOTEVAULT FOCUS ENGINE");
     expect(container.textContent).toContain("14 Días de Racha activa");
 

@@ -135,7 +135,8 @@ describe("PlanForm — precondiciones", () => {
     await click(chip("Periodo del plan", "1 semana"));
     expect(byLabel("Fin del plan").value).toBe(addDays(TODAY, 6));
     await click(chip("Periodo del plan", "6 meses"));
-    expect(host.querySelector("[data-testid=plan-period-summary]")!.textContent).toContain("26 semanas");
+    // 6 meses son 26 semanas, o 25,9 según los días de los meses que toquen
+    expect(host.querySelector("[data-testid=plan-period-summary]")!.textContent).toMatch(/(26|25,9) semanas/);
     await setValue(byLabel("Fin del plan"), addDays(TODAY, 20));
     expect(pressed(chip("Periodo del plan", "Personalizado"))).toBe(true);
     expect(host.querySelector("[data-testid=plan-period-summary]")!.textContent).toContain("3 semanas");

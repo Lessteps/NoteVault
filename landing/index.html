@@ -44,6 +44,11 @@
   .btn[aria-disabled="true"] { opacity: .55; pointer-events: none; }
   .badge { display: inline-block; font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; margin-bottom: 20px; background: var(--surface); }
   .note { font-size: 13px; color: var(--muted); margin-top: 14px; }
+  .shots { display: grid; gap: 20px; grid-template-columns: 1fr; padding-bottom: 56px; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+  .shots figcaption { text-align: center; color: var(--muted); font-size: 14px; margin-top: 10px; }
+  @media (min-width: 860px) { .shots { grid-template-columns: 1fr 1fr; } }
   section { padding: 56px 0; border-top: 1px solid var(--line); }
   section h2 { font-size: clamp(24px, 3.5vw, 32px); letter-spacing: -0.01em; margin: 0 0 8px; }
   section .sub { color: var(--muted); margin: 0 0 32px; max-width: 62ch; }
@@ -89,6 +94,11 @@
       <a class="btn" href="docs/">Leer la documentación</a>
     </div>
     <p class="note">Instalador para Windows. Linux y macOS desde el código fuente.</p>
+  </div>
+
+  <div class="wrap shots">
+    <figure><img src="img/notas.png" width="1416" height="900" alt="Editor de notas de NoteVault con una nota en Markdown, fórmula y bloque de código" loading="lazy"><figcaption>Notas en Markdown con vista previa en vivo</figcaption></figure>
+    <figure><img src="img/vista-general.png" width="1416" height="900" alt="Vista General de NoteVault con hábitos del día y paneles de ejercicio, proyectos, tareas y finanzas" loading="lazy"><figcaption>Vista General: tu día de un vistazo</figcaption></figure>
   </div>
 
   <section id="que-incluye">

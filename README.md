@@ -10,6 +10,10 @@ NoteVault reúne notas en Markdown, tareas, calendario, hábitos, metas, proyect
 - **Sitio web:** <https://lessteps.github.io/NoteVault/>
 - **Descargas:** [Releases](https://github.com/Lessteps/NoteVault/releases)
 
+![Editor de notas de NoteVault](landing/img/notas.png)
+
+![Vista General de NoteVault](landing/img/vista-general.png)
+
 ## Características
 
 - Editor Markdown con vista previa en vivo, enlaces, fórmulas y lienzos (`.canvas`).

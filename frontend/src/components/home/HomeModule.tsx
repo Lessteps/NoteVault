@@ -121,10 +121,9 @@ export function HomeModule() {
   const finDiffPct =
     f.prev.gasto > 0
       ? ((f.month.gasto - f.prev.gasto) / f.prev.gasto) * 100
-      : 14.2;
+      : 0;
 
-  // Streak: use habit streak or default active baseline
-  const streak = stats?.streak && stats.streak > 0 ? stats.streak : (hDone > 0 ? 14 : 14);
+  const streak = stats?.streak && stats.streak > 0 ? stats.streak : 0;
 
   // Focus engine text calculations
   const exCategory = data.exercise.rows[0]?.how_to?.toLowerCase().includes("agarre")
@@ -143,12 +142,9 @@ export function HomeModule() {
             <div className="flex items-center gap-2.5">
               <span className="h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.7)]" />
               <h1 className="text-xl font-bold tracking-tight text-white md:text-2xl">Vista General</h1>
-              <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-cyan-300">
-                Sprint v{info?.api_version ? `2.${info.api_version}` : "2.4"}
-              </span>
             </div>
             <p className="mt-1 font-mono text-xs text-slate-400">
-              Vault {info?.vault_name || "Programming"} · Modo Productividad Profunda
+              Vault {info?.vault_name || "NoteVault"} · Modo Productividad Profunda
             </p>
           </div>
 
@@ -180,9 +176,11 @@ export function HomeModule() {
               <span className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider text-cyan-400 uppercase">
                 NOTEVAULT FOCUS ENGINE
               </span>
-              <span className="flex items-center gap-1 text-xs font-semibold text-amber-400">
-                🔥 {streak} Días de Racha activa
-              </span>
+              {streak > 0 && (
+                <span className="flex items-center gap-1 text-xs font-semibold text-amber-400">
+                  🔥 {streak} Días de Racha activa
+                </span>
+              )}
             </div>
 
             <div className="flex items-center rounded-lg border border-slate-800 bg-[#090b12] p-0.5 text-xs">
@@ -328,7 +326,7 @@ export function HomeModule() {
             </div>
             <div className="my-1.5 flex items-baseline">
               <span className="text-2xl font-bold tracking-tight text-white">
-                {formatMoney(monthBalance !== 0 ? Math.abs(monthBalance) : 342000)}
+                {formatMoney(Math.abs(monthBalance))}
               </span>
               <span className="ml-1.5 text-xs font-medium text-slate-400">Ahorro/Mes</span>
             </div>

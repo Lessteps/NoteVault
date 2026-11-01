@@ -65,6 +65,7 @@ plugins:
             Contribuir: Contributing
             Hoja de ruta: Roadmap
             Apoyar el proyecto: Support the project
+            Privacidad y términos: Privacy and terms
             Ingeniería: Engineering
             Portal de arquitectura: Architecture portal
 
@@ -106,6 +107,7 @@ nav:
       - Contribuir: proyecto/contribuir.md
       - Hoja de ruta: proyecto/hoja-de-ruta.md
       - Apoyar el proyecto: proyecto/apoyar.md
+      - Privacidad y términos: proyecto/privacidad.md
   - Ingeniería:
       - Portal de arquitectura: ingenieria.md
       - 00. Reconocimiento del Problema:

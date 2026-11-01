@@ -4,7 +4,7 @@ This page says where the project is, not when things will happen.
 
 ## Now
 
-- First public desktop version (Windows with installer; Linux and macOS from source).
+- First public desktop version (Windows installer and portable; Linux .deb and AppImage; macOS from source).
 - Testing, bug fixing and performance and stability improvements.
 - Public documentation and community.
 

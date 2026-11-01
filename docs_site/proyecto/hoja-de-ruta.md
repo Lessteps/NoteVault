@@ -4,7 +4,7 @@ Esta página dice dónde está el proyecto, no promete fechas.
 
 ## Ahora
 
-- Primera versión pública de escritorio (Windows con instalador; Linux y macOS desde el código fuente).
+- Primera versión pública de escritorio (Windows con instalador y versión portátil; Linux con .deb y AppImage; macOS desde el código fuente).
 - Pruebas, corrección de errores y mejora de rendimiento y estabilidad.
 - Documentación pública y comunidad.
 

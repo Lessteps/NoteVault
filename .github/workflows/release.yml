@@ -1,6 +1,7 @@
 name: Release
 
 # Se ejecuta al publicar una etiqueta de versión: git tag v0.1.0 && git push origin v0.1.0
+# Genera el instalador y la versión portátil de Windows, y el AppImage y el .deb de Linux, y crea un BORRADOR de release.
 on:
   push:
     tags: ["v*"]
@@ -9,8 +10,18 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --win nsis portable
+            files: "release/*.exe"
+          - os: ubuntu-latest
+            args: --linux AppImage deb
+            files: "release/*.AppImage release/*.deb"
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: frontend
@@ -23,9 +34,28 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
-      - run: npx electron-builder --win --publish never
-      - name: Borrador de release con el instalador
-        shell: bash
+      - run: npx electron-builder ${{ matrix.args }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: |
+            frontend/release/*.exe
+            frontend/release/*.AppImage
+            frontend/release/*.deb
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Borrador de release con los instaladores
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${GITHUB_REF_NAME}" release/*.exe --draft --generate-notes --title "NoteVault ${GITHUB_REF_NAME}"
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -la dist
+          gh release create "${GITHUB_REF_NAME}" dist/* --draft --generate-notes --title "NoteVault ${GITHUB_REF_NAME}"

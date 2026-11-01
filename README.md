@@ -27,7 +27,10 @@ NoteVault reúne notas en Markdown, tareas, calendario, hábitos, metas, proyect
 
 ## Instalación
 
-**Windows:** descarga el instalador desde [Releases](https://github.com/Lessteps/NoteVault/releases).
+Todo va incluido: no necesitas instalar nada más. Descarga desde [Releases](https://github.com/Lessteps/NoteVault/releases):
+
+- **Windows:** `NoteVault-Setup-<versión>.exe` (instalador) o `NoteVault-Portable-<versión>.exe` (sin instalar).
+- **Linux:** `.deb` (Ubuntu/Debian) o `.AppImage`.
 
 **Desde el código fuente (Windows, Linux, macOS):** requiere Node.js 20+ y npm 10+.
 

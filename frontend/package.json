@@ -30,7 +30,10 @@
       "dist-electron/**"
     ],
     "win": {
-      "target": "nsis",
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "public/icon.ico"
     },
     "directories": {
@@ -38,8 +41,16 @@
     },
     "copyright": "Copyright © 2026 Lessteps. GPL-3.0-or-later",
     "linux": {
-      "target": "AppImage",
-      "category": "Office"
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "maintainer": "Lessteps",
+      "description": "Estudio, notas y gestión personal local-first",
+      "synopsis": "Study, notes and personal management",
+      "executableName": "notevault",
+      "artifactName": "NoteVault-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -47,6 +58,12 @@
       "perMachine": false,
       "artifactName": "NoteVault-Setup-${version}.${ext}",
       "shortcutName": "NoteVault"
+    },
+    "portable": {
+      "artifactName": "NoteVault-Portable-${version}.${ext}"
+    },
+    "deb": {
+      "packageName": "notevault"
     }
   },
   "dependencies": {

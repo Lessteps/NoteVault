@@ -55,6 +55,15 @@
   .shots img { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
   .shots figcaption { text-align: center; color: var(--muted); font-size: 14px; margin-top: 10px; }
   @media (min-width: 860px) { .shots { grid-template-columns: 1fr 1fr; } }
+  .goal { display: inline-block; margin: 0 auto 24px; padding: 8px 16px; border-radius: 12px; background: var(--accent-soft); color: var(--text); font-weight: 600; font-size: 15px; }
+  .cmp-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  table.cmp { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 15px; }
+  table.cmp th, table.cmp td { padding: 12px 14px; text-align: center; border-bottom: 1px solid var(--line); }
+  table.cmp th:first-child, table.cmp td:first-child { text-align: left; }
+  table.cmp thead th { font-size: 13px; color: var(--muted); }
+  table.cmp th.us, table.cmp td.us { background: var(--accent-soft); font-weight: 600; }
+  table.cmp tr:last-child td { border-bottom: 0; }
+  .ahead { margin-top: 18px; color: var(--muted); max-width: 70ch; }
   section { padding: 56px 0; border-top: 1px solid var(--line); }
   section h2 { font-size: clamp(24px, 3.5vw, 32px); letter-spacing: -0.01em; margin: 0 0 8px; }
   section .sub { color: var(--muted); margin: 0 0 32px; max-width: 62ch; }
@@ -86,6 +95,7 @@
     <nav aria-label="Main">
       <a href="#que-incluye">What's included</a>
       <a href="#como-funciona">How it works</a>
+      <a href="#comparar">Why NoteVault</a>
       <a href="#apoyar">Support</a>
       <a href="../docs/en/">Docs</a>
       <a href="https://github.com/Lessteps/NoteVault">GitHub</a>
@@ -99,6 +109,7 @@
     <span class="badge">Open source · GPL-3.0</span>
     <h1>Study and organize your life with files you own</h1>
     <p class="lead">NoteVault is a desktop app with Markdown notes, a Mentor that builds your study plan, and tasks, habits, goals and finances. No account, no server, no telemetry.</p>
+    <p class="goal">🎯 Our goal: to surpass Obsidian and Notion, with constant updates.</p>
     <div class="actions">
       <a class="btn primary" id="cta-download" href="https://github.com/Lessteps/NoteVault/releases">Download</a>
       <a class="btn" href="../docs/en/">Read the docs</a>
@@ -135,6 +146,29 @@
         <div class="card"><h3>Open format</h3><p>Markdown with frontmatter and JSON, documented and versioned. Compatible with Obsidian.</p></div>
         <div class="card"><h3>Sync your way</h3><p>Syncthing, Git or your favorite cloud on the same folder. A backup is just copying the folder.</p></div>
       </div>
+    </div>
+  </section>
+
+  <section id="comparar">
+    <div class="wrap">
+      <h2>Why NoteVault</h2>
+      <p class="sub">Obsidian and Notion are great and set the bar. We are building the app that goes further: open, local, and with your whole day inside.</p>
+      <div class="cmp-wrap">
+        <table class="cmp">
+          <thead><tr><th></th><th class="us">NoteVault</th><th>Obsidian</th><th>Notion</th></tr></thead>
+          <tbody>
+            <tr><td>Your data as plain local files</td><td class="us">✅</td><td>✅</td><td>❌ cloud</td></tr>
+            <tr><td>Open source</td><td class="us">✅ GPL-3.0</td><td>❌</td><td>❌</td></tr>
+            <tr><td>Works with an existing Obsidian vault</td><td class="us">✅</td><td>✅</td><td>❌</td></tr>
+            <tr><td>Study Mentor: a plan that fits your dates, spaced reviews and daily pace</td><td class="us">✅ built in</td><td>plugins</td><td>templates</td></tr>
+            <tr><td>Tasks, habits, goals, finances, exercise and nutrition</td><td class="us">✅ built in</td><td>plugins</td><td>templates</td></tr>
+            <tr><td>Editable AI “skills” that generate notes, maps and practice</td><td class="us">✅</td><td>❌</td><td>❌</td></tr>
+            <tr><td>AI with your own API or a local model</td><td class="us">✅</td><td>plugins</td><td>❌</td></tr>
+            <tr><td>No account required</td><td class="us">✅</td><td>✅</td><td>❌</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="ahead"><strong>Where they are ahead today:</strong> plugin ecosystems, mobile apps, real-time collaboration and polish. That is the gap we are closing, release after release. <strong>We ship updates constantly:</strong> see the <a href="https://github.com/Lessteps/NoteVault/releases">releases</a>.</p>
     </div>
   </section>
 

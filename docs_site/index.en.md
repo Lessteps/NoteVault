@@ -14,6 +14,9 @@ NoteVault brings together what you normally spread across several apps: Markdown
 - **AI is optional.** It works without AI. If you want it, you choose the provider: an API, a local model (Ollama, LM Studio) or a prompt you paste into the tool you prefer. See [AI](guia/ia.md).
 - **Open source.** GPL-3.0 license. You can read it, modify it and improve it. See [license](proyecto/licencia.md).
 
+!!! success "Our goal: to surpass Obsidian and Notion"
+    Obsidian and Notion are great and set the bar. NoteVault aims to go further: **open** (GPL-3.0), **local** (your data is plain files you own), with **your study and your life inside** (Mentor, tasks, habits, goals, finances…) and **constant updates**. Today they are ahead in plugins, mobile apps, collaboration and polish; that is the gap we are closing. See [the full comparison](https://lessteps.com/en/#comparar).
+
 ## What is included
 
 | Module | What it is for |

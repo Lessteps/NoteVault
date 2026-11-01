@@ -14,6 +14,9 @@ NoteVault reúne en una app lo que normalmente repartes entre varias: notas en M
 - **La IA es opcional.** Funciona sin IA. Si la quieres, eliges proveedor: API, modelo local (Ollama, LM Studio) o un prompt que pegas tú en la herramienta que prefieras. Ver [IA](guia/ia.md).
 - **Código abierto.** Licencia GPL-3.0. Puedes leerlo, modificarlo y mejorarlo. Ver [licencia](proyecto/licencia.md).
 
+!!! success "Nuestra meta: superar a Obsidian y Notion"
+    Obsidian y Notion son excelentes y ponen el listón alto. NoteVault busca ir más lejos: **abierto** (GPL-3.0), **local** (tus datos son archivos tuyos), con **tu estudio y tu vida dentro** (Mentor, tareas, hábitos, metas, finanzas…) y con **actualizaciones constantes**. Hoy ellos van por delante en plugins, apps móviles, colaboración y pulido; esa es la distancia que estamos cerrando. Mira [la comparación completa](https://lessteps.com/#comparar).
+
 ## Qué incluye
 
 | Módulo | Para qué sirve |

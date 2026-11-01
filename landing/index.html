@@ -55,6 +55,15 @@
   .shots img { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
   .shots figcaption { text-align: center; color: var(--muted); font-size: 14px; margin-top: 10px; }
   @media (min-width: 860px) { .shots { grid-template-columns: 1fr 1fr; } }
+  .goal { display: inline-block; margin: 0 auto 24px; padding: 8px 16px; border-radius: 12px; background: var(--accent-soft); color: var(--text); font-weight: 600; font-size: 15px; }
+  .cmp-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  table.cmp { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 15px; }
+  table.cmp th, table.cmp td { padding: 12px 14px; text-align: center; border-bottom: 1px solid var(--line); }
+  table.cmp th:first-child, table.cmp td:first-child { text-align: left; }
+  table.cmp thead th { font-size: 13px; color: var(--muted); }
+  table.cmp th.us, table.cmp td.us { background: var(--accent-soft); font-weight: 600; }
+  table.cmp tr:last-child td { border-bottom: 0; }
+  .ahead { margin-top: 18px; color: var(--muted); max-width: 70ch; }
   section { padding: 56px 0; border-top: 1px solid var(--line); }
   section h2 { font-size: clamp(24px, 3.5vw, 32px); letter-spacing: -0.01em; margin: 0 0 8px; }
   section .sub { color: var(--muted); margin: 0 0 32px; max-width: 62ch; }
@@ -86,6 +95,7 @@
     <nav aria-label="Principal">
       <a href="#que-incluye">Qué incluye</a>
       <a href="#como-funciona">Cómo funciona</a>
+      <a href="#comparar">Por qué NoteVault</a>
       <a href="#apoyar">Apoyar</a>
       <a href="docs/">Documentación</a>
       <a href="https://github.com/Lessteps/NoteVault">GitHub</a>
@@ -99,6 +109,7 @@
     <span class="badge">Código abierto · GPL-3.0</span>
     <h1>Estudia y organiza tu vida con archivos que son tuyos</h1>
     <p class="lead">NoteVault es una app de escritorio con notas en Markdown, un Mentor que arma tu plan de estudio, y tareas, hábitos, metas y finanzas. Sin cuenta, sin servidor y sin telemetría.</p>
+    <p class="goal">🎯 Nuestra meta: superar a Obsidian y Notion, con actualizaciones constantes.</p>
     <div class="actions">
       <a class="btn primary" id="cta-download" href="https://github.com/Lessteps/NoteVault/releases">Descargar</a>
       <a class="btn" href="docs/">Leer la documentación</a>
@@ -135,6 +146,29 @@
         <div class="card"><h3>Formato abierto</h3><p>Markdown con frontmatter y JSON, documentado y versionado. Compatible con Obsidian.</p></div>
         <div class="card"><h3>Sincroniza como quieras</h3><p>Syncthing, Git o tu nube favorita sobre la misma carpeta. Una copia de seguridad es copiar la carpeta.</p></div>
       </div>
+    </div>
+  </section>
+
+  <section id="comparar">
+    <div class="wrap">
+      <h2>Por qué NoteVault</h2>
+      <p class="sub">Obsidian y Notion son excelentes y ponen el listón alto. Estamos construyendo la app que va más lejos: abierta, local y con todo tu día dentro.</p>
+      <div class="cmp-wrap">
+        <table class="cmp">
+          <thead><tr><th></th><th class="us">NoteVault</th><th>Obsidian</th><th>Notion</th></tr></thead>
+          <tbody>
+            <tr><td>Tus datos como archivos locales</td><td class="us">✅</td><td>✅</td><td>❌ nube</td></tr>
+            <tr><td>Código abierto</td><td class="us">✅ GPL-3.0</td><td>❌</td><td>❌</td></tr>
+            <tr><td>Funciona con una bóveda de Obsidian</td><td class="us">✅</td><td>✅</td><td>❌</td></tr>
+            <tr><td>Mentor de estudio: plan que cabe en tus fechas, repasos espaciados y ritmo diario</td><td class="us">✅ incluido</td><td>plugins</td><td>plantillas</td></tr>
+            <tr><td>Tareas, hábitos, metas, finanzas, ejercicio y alimentación</td><td class="us">✅ incluido</td><td>plugins</td><td>plantillas</td></tr>
+            <tr><td>«Skills» de IA editables que generan notas, mapas y práctica</td><td class="us">✅</td><td>❌</td><td>❌</td></tr>
+            <tr><td>IA con tu API o un modelo local</td><td class="us">✅</td><td>plugins</td><td>❌</td></tr>
+            <tr><td>No exige cuenta</td><td class="us">✅</td><td>✅</td><td>❌</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="ahead"><strong>Dónde van por delante hoy:</strong> ecosistema de plugins, apps móviles, colaboración en tiempo real y pulido. Esa es la distancia que estamos cerrando, versión tras versión. <strong>Publicamos actualizaciones constantemente:</strong> mira las <a href="https://github.com/Lessteps/NoteVault/releases">versiones</a>.</p>
     </div>
   </section>
 

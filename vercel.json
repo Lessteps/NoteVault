@@ -1,8 +1,0 @@
-{
-  "framework": null,
-  "installCommand": "pip install mkdocs-material",
-  "buildCommand": "NO_MKDOCS_2_WARNING=1 mkdocs build --strict -d public/docs && cp -r landing/. public/",
-  "outputDirectory": "public",
-  "cleanUrls": false,
-  "trailingSlash": false
-}

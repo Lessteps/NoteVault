@@ -6,8 +6,8 @@ NoteVault reúne notas en Markdown, tareas, calendario, hábitos, metas, proyect
 
 [![Licencia: GPL-3.0](https://img.shields.io/badge/licencia-GPL--3.0-blue.svg)](LICENSE)
 
-- **Documentación:** <https://lessteps.github.io/NoteVault/docs/>
-- **Sitio web:** <https://lessteps.github.io/NoteVault/>
+- **Documentación:** <https://lessteps.com/docs/>
+- **Sitio web:** <https://lessteps.com/>
 - **Descargas:** [Releases](https://github.com/Lessteps/NoteVault/releases)
 
 ![Editor de notas de NoteVault](landing/img/notas.png)

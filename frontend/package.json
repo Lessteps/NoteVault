@@ -80,6 +80,6 @@
     "vite-plugin-electron": "^1.1.2",
     "vitest": "^5.0.1"
   },
-  "homepage": "https://lessteps.github.io/NoteVault/",
+  "homepage": "https://lessteps.com/",
   "bugs": "https://github.com/Lessteps/NoteVault/issues"
 }

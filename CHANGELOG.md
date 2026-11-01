@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 
 ## [Sin publicar]
 
+## [0.1.0] - 2026-11-01
+
 ### Añadido
 - Primera versión pública del código bajo GPL-3.0-or-later.
 - Documentación pública con MkDocs, sitio web y archivos de comunidad.
@@ -13,3 +15,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 
 ### Cambiado
 - Licencia: de Apache-2.0 a GPL-3.0-or-later.
+- Vista General: la racha, el ahorro y las gráficas muestran datos reales (antes salían valores de ejemplo).
+- Instalador de Windows con icono y nombre `NoteVault-Setup-<versión>.exe`.
+
+### Corregido
+- El paso a paso de JavaScript ya no agota el tiempo en programas largos.

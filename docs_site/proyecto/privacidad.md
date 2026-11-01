@@ -26,4 +26,4 @@ NoteVault se ofrece **«tal cual», sin garantía**, bajo la licencia GPL-3.0-or
 
 ## Contacto
 
-Abre un [issue](https://github.com/Lessteps/NoteVault/issues) o, para temas de seguridad, sigue [`SECURITY.md`](https://github.com/Lessteps/NoteVault/blob/main/SECURITY.md).
+Escribe a [lesstepscompany@gmail.com](mailto:lesstepscompany@gmail.com) (más canales en [Contacto](contacto.md)) o abre un [issue](https://github.com/Lessteps/NoteVault/issues). Para temas de seguridad, sigue [`SECURITY.md`](https://github.com/Lessteps/NoteVault/blob/main/SECURITY.md).

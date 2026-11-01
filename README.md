@@ -12,6 +12,8 @@
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/Lessteps/NoteVault?label=release)](https://github.com/Lessteps/NoteVault/releases/latest)
 [![Website](https://img.shields.io/badge/web-lessteps.com-4f46e5)](https://lessteps.com)
+[![Instagram](https://img.shields.io/badge/Instagram-@lesstepscompany-E4405F)](https://www.instagram.com/lesstepscompany/)
+[![YouTube](https://img.shields.io/badge/YouTube-Lessteps-FF0000)](https://www.youtube.com/channel/UC9NXc30n_PoqyDWnndQE2iQ)
 
 ![NoteVault note editor / Editor de notas](landing/img/notas.png)
 
@@ -113,6 +115,13 @@ We are students with no funding or financial backing. NoteVault is free and open
 
 Not able to donate? Star the repo ⭐, report bugs, improve the docs, or tell a friend.
 
+## Contact
+
+- ✉️ [lesstepscompany@gmail.com](mailto:lesstepscompany@gmail.com)
+- 📸 [Instagram @lesstepscompany](https://www.instagram.com/lesstepscompany/)
+- 👍 [Facebook](https://www.facebook.com/profile.php?id=61595351223179)
+- ▶️ [YouTube](https://www.youtube.com/channel/UC9NXc30n_PoqyDWnndQE2iQ)
+
 ## About the name
 
 **“NoteVault” is a provisional name** for the product. The company behind it is **Lessteps**. If the name changes, it will be announced in this repository.
@@ -212,6 +221,13 @@ Somos estudiantes y no tenemos apoyo ni sustento económico. NoteVault es libre 
 - **Código QR de PayPal y Nequi:** [verlo aquí](https://drive.google.com/file/d/1ea34-aOhxh8nAmhpLI0lX2B1oQqEDQG6/view?usp=sharing)
 
 ¿No puedes donar? Dale una estrella al repo ⭐, reporta errores, mejora la documentación o cuéntaselo a alguien.
+
+## Contacto
+
+- ✉️ [lesstepscompany@gmail.com](mailto:lesstepscompany@gmail.com)
+- 📸 [Instagram @lesstepscompany](https://www.instagram.com/lesstepscompany/)
+- 👍 [Facebook](https://www.facebook.com/profile.php?id=61595351223179)
+- ▶️ [YouTube](https://www.youtube.com/channel/UC9NXc30n_PoqyDWnndQE2iQ)
 
 ## Sobre el nombre
 

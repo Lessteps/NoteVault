@@ -47,7 +47,7 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@lezer/highlight": "^1.2.4",
-    "@milkdown/kit": "^7.22.2",
+    "@milkdown/kit": "^7.23.0",
     "@milkdown/react": "^7.22.2",
     "@vscode/markdown-it-katex": "^1.1.2",
     "dompurify": "^3.4.16",

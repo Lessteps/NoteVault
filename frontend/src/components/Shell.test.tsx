@@ -6,7 +6,7 @@
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MenuHost } from "./ui";
@@ -47,6 +47,12 @@ function tab(label: string): HTMLElement {
 
 const closeButton = (el: HTMLElement) =>
   [...el.querySelectorAll("button")].find((b) => b.title === "Cerrar pestaña");
+
+// Sin esto el árbol de React sigue vivo al terminar y su planificador dispara tras cerrar jsdom («window is not defined»).
+afterEach(() => {
+  act(() => root?.unmount());
+  container?.remove();
+});
 
 beforeEach(() => {
   localStorage.clear();

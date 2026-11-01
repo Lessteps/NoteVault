@@ -35,6 +35,10 @@ Todos los módulos están descritos en [Módulos](guia/modulos.md).
 
 NoteVault está en desarrollo activo. La versión actual es de escritorio (Windows con instalador; Linux y macOS desde el código fuente). El cliente móvil y la versión web están en el plan, todavía no publicados. Ver [hoja de ruta](proyecto/hoja-de-ruta.md).
 
+## Quiénes somos y cómo apoyar
+
+NoteVault lo desarrolla **Lessteps**, un equipo de estudiantes sin apoyo ni sustento económico. «NoteVault» es un **nombre provisional** del producto; la empresa que lo representa es Lessteps. Si el proyecto te sirve, cualquier ayuda nos permite seguir desarrollándolo: [cómo apoyar](proyecto/apoyar.md).
+
 ## Para desarrolladores
 
 La arquitectura, los requisitos y las decisiones de diseño están en la sección [Ingeniería](ingenieria.md). Para colaborar, empieza por [Contribuir](proyecto/contribuir.md).

@@ -67,4 +67,12 @@ El código se publica bajo **GPL-3.0-or-later** (ver [LICENSE](LICENSE)). La doc
 
 ## Apoyar el proyecto
 
-NoteVault es libre y se mantiene con el apoyo de quien lo usa. Si te sirve, puedes apoyarlo desde la [página del proyecto](https://lessteps.github.io/NoteVault/#apoyar).
+Somos estudiantes y no tenemos apoyo ni sustento económico. NoteVault es libre y gratuito, y cualquier ayuda, por pequeña que sea, nos permite seguir desarrollándolo.
+
+- **PayPal:** <https://paypal.me/lessteps>
+- **Colombia (Bre-B / Nequi):** llave `0093524288`
+- **Código QR de PayPal y Nequi:** [verlo aquí](https://drive.google.com/file/d/1ea34-aOhxh8nAmhpLI0lX2B1oQqEDQG6/view?usp=sharing)
+
+## Sobre el nombre
+
+**«NoteVault» es un nombre provisional** del producto. La empresa que lo representa es **Lessteps**. Si el nombre cambia, se anunciará en este repositorio.

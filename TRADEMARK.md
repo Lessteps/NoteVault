@@ -1,5 +1,7 @@
 # Política de marca
 
+> **«NoteVault» es un nombre provisional.** La empresa que representa el proyecto es **Lessteps**. Si el nombre del producto cambia, esta política pasará a aplicarse al nuevo nombre.
+
 El código de NoteVault es libre (GPL-3.0-or-later). **El nombre «NoteVault», el nombre «Lessteps» y sus logotipos no forman parte de esa licencia.**
 
 ## Puedes

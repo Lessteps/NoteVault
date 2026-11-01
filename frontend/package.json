@@ -1,5 +1,6 @@
 {
   "name": "notevault-ui",
+  "productName": "NoteVault",
   "private": true,
   "version": "0.1.0",
   "license": "GPL-3.0-or-later",
@@ -41,7 +42,11 @@
       "category": "Office"
     },
     "nsis": {
-      "artifactName": "NoteVault-Setup-${version}.${ext}"
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "artifactName": "NoteVault-Setup-${version}.${ext}",
+      "shortcutName": "NoteVault"
     }
   },
   "dependencies": {

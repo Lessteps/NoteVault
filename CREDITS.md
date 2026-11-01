@@ -23,3 +23,7 @@ para este proyecto. No proceden de ningún dataset de terceros.
 Revisión: son correctas en técnica general, pero no están revisadas por un
 profesional de la salud. Si vas a entrenar peso fuerte con un ejercicio nuevo,
 comprueba la técnica con alguien cualificado antes de subir carga.
+
+## Otras dependencias
+
+Las dependencias de producción usan licencias compatibles con GPL-3.0 (MIT, BSD, ISC, SIL OFL 1.1, MPL-2.0/Apache-2.0 para DOMPurify, PSF-2.0). Sus licencias se incluyen con cada paquete en `node_modules/`.

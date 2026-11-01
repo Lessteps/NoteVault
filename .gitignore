@@ -75,3 +75,7 @@ frontend/public/workout-guide-assets/
 odd/
 
 
+
+# ── Claude / agent tooling (local, not source) ───────────────────
+.claude/
+.codegraph/

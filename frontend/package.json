@@ -2,11 +2,12 @@
   "name": "notevault-ui",
   "private": true,
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "main": "dist-electron/main.js",
   "description": "NoteVault's HTML/CSS/TypeScript interface. Runs inside an Electron shell; talks to the core over IPC.",
-  "author": "NoteVault",
-  "repository": "https://github.com/camilolayos54-dotcom/NoteVault",
+  "author": "Lessteps",
+  "repository": "https://github.com/Lessteps/NoteVault",
   "scripts": {
     "dev": "vite",
     "postinstall": "node tools/copy-workout-assets.mjs",
@@ -78,5 +79,7 @@
     "vite": "^8.3.1",
     "vite-plugin-electron": "^1.1.2",
     "vitest": "^5.0.1"
-  }
+  },
+  "homepage": "https://lessteps.github.io/NoteVault/",
+  "bugs": "https://github.com/Lessteps/NoteVault/issues"
 }

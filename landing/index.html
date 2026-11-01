@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NoteVault — estudio, notas y gestión personal</title>
+<meta name="description" content="App de escritorio de código abierto para estudiar y organizar tu vida. Notas en Markdown, plan de estudio con Mentor, tareas, hábitos, metas y finanzas. Tus datos son archivos tuyos.">
+<link rel="icon" href="favicon.ico">
+<meta property="og:title" content="NoteVault">
+<meta property="og:description" content="Estudio, notas y gestión personal en una app de escritorio de código abierto. Tus datos son archivos tuyos.">
+<meta property="og:type" content="website">
+<style>
+  :root {
+    --bg: #fafaf9; --surface: #ffffff; --text: #1c1917; --muted: #57534e; --line: #e7e5e4;
+    --accent: #4f46e5; --accent-text: #ffffff; --accent-soft: #eef2ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12110f; --surface: #1b1a17; --text: #f5f5f4; --muted: #a8a29e; --line: #2e2c28;
+      --accent: #818cf8; --accent-text: #12110f; --accent-soft: #1e1b3a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12110f; --surface: #1b1a17; --text: #f5f5f4; --muted: #a8a29e; --line: #2e2c28;
+    --accent: #818cf8; --accent-text: #12110f; --accent-soft: #1e1b3a;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header { border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .logo { font-weight: 700; font-size: 18px; color: var(--text); text-decoration: none; letter-spacing: -0.01em; }
+  nav { display: flex; gap: 20px; font-size: 14px; }
+  nav a { color: var(--muted); text-decoration: none; }
+  nav a:hover { color: var(--text); }
+  .hero { padding: 72px 0 56px; text-align: center; }
+  .hero h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.1; letter-spacing: -0.02em; margin: 0 auto 16px; max-width: 18ch; }
+  .hero p.lead { font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); max-width: 56ch; margin: 0 auto 28px; }
+  .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--surface); }
+  .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .btn[aria-disabled="true"] { opacity: .55; pointer-events: none; }
+  .badge { display: inline-block; font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; margin-bottom: 20px; background: var(--surface); }
+  .note { font-size: 13px; color: var(--muted); margin-top: 14px; }
+  section { padding: 56px 0; border-top: 1px solid var(--line); }
+  section h2 { font-size: clamp(24px, 3.5vw, 32px); letter-spacing: -0.01em; margin: 0 0 8px; }
+  section .sub { color: var(--muted); margin: 0 0 32px; max-width: 62ch; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .card .tag { display: inline-block; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 2px 8px; margin-bottom: 10px; }
+  .price { font-size: 28px; font-weight: 700; margin: 4px 0 12px; }
+  .card ul { margin: 0 0 16px; padding-left: 18px; color: var(--muted); font-size: 15px; }
+  .card .btn { width: 100%; text-align: center; }
+  details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { color: var(--muted); margin: 10px 0 0; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+  footer a { color: var(--muted); }
+  @media (max-width: 560px) { nav { display: none; } .hero { padding-top: 48px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="logo" href="#">NoteVault</a>
+    <nav aria-label="Principal">
+      <a href="#que-incluye">Qué incluye</a>
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#apoyar">Apoyar</a>
+      <a href="docs/">Documentación</a>
+      <a href="https://github.com/Lessteps/NoteVault">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <span class="badge">Código abierto · GPL-3.0</span>
+    <h1>Estudia y organiza tu vida con archivos que son tuyos</h1>
+    <p class="lead">NoteVault es una app de escritorio con notas en Markdown, un Mentor que arma tu plan de estudio, y tareas, hábitos, metas y finanzas. Sin cuenta, sin servidor y sin telemetría.</p>
+    <div class="actions">
+      <a class="btn primary" id="cta-download" href="https://github.com/Lessteps/NoteVault/releases">Descargar</a>
+      <a class="btn" href="docs/">Leer la documentación</a>
+    </div>
+    <p class="note">Instalador para Windows. Linux y macOS desde el código fuente.</p>
+  </div>
+
+  <section id="que-incluye">
+    <div class="wrap">
+      <h2>Todo en un solo lugar</h2>
+      <p class="sub">Lo que normalmente repartes entre varias apps, guardado en una carpeta de tu disco.</p>
+      <div class="grid">
+        <div class="card"><h3>Notas en Markdown</h3><p>Vista previa en vivo, enlaces entre notas, fórmulas y lienzos para dibujar mapas de ideas. Son archivos <code>.md</code> normales.</p></div>
+        <div class="card"><h3>Mentor de estudio</h3><p>Un plan que cabe en tus fechas, con repasos espaciados, Pomodoro y el ritmo diario que necesitas en cada asignatura.</p></div>
+        <div class="card"><h3>Teoría, mapa y práctica</h3><p>Cada tema se convierte en una nota, un mapa conceptual y un archivo de práctica con ejercicios.</p></div>
+        <div class="card"><h3>Gestión personal</h3><p>Tareas, proyectos, calendario, hábitos, metas, finanzas, ejercicio y alimentación.</p></div>
+        <div class="card"><h3>IA opcional</h3><p>Úsala con tu API, con un modelo local (Ollama, LM Studio) o con un prompt que pegas tú. Sin IA también funciona.</p></div>
+        <div class="card"><h3>Skills editables</h3><p>Las instrucciones con las que se generan tus notas están a la vista, con historial de versiones y aviso de lo que quedó desactualizado.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="como-funciona">
+    <div class="wrap">
+      <h2>Tus datos, tu carpeta</h2>
+      <p class="sub">La bóveda es una carpeta de tu disco con texto que cualquier editor puede abrir.</p>
+      <div class="grid">
+        <div class="card"><h3>Sin cuenta ni nube</h3><p>No hay servidor de NoteVault. Nada sale de tu equipo salvo lo que tú envíes al proveedor de IA que elijas.</p></div>
+        <div class="card"><h3>Formato abierto</h3><p>Markdown con frontmatter y JSON, documentado y versionado. Compatible con Obsidian.</p></div>
+        <div class="card"><h3>Sincroniza como quieras</h3><p>Syncthing, Git o tu nube favorita sobre la misma carpeta. Una copia de seguridad es copiar la carpeta.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="apoyar">
+    <div class="wrap">
+      <h2>Libre, y se mantiene con tu apoyo</h2>
+      <p class="sub">La app es gratis y de código abierto. Si te sirve, hay formas de ayudar a que siga creciendo.</p>
+      <div class="grid">
+        <div class="card">
+          <span class="tag">Gratis</span>
+          <h3>La app</h3>
+          <div class="price">$0</div>
+          <ul><li>Todos los módulos</li><li>Código abierto (GPL-3.0)</li><li>Actualizaciones desde GitHub</li></ul>
+          <a class="btn primary" href="https://github.com/Lessteps/NoteVault/releases">Descargar</a>
+        </div>
+        <div class="card">
+          <span class="tag">Contenido</span>
+          <h3>Paquetes de estudio</h3>
+          <div class="price">Pronto</div>
+          <ul><li>Rutas completas listas para usar</li><li>Primero: Full Stack Junior · Entrevistas técnicas</li><li>Notas, mapas y práctica incluidos</li></ul>
+          <a class="btn" id="cta-pack" href="#" aria-disabled="true">Disponible pronto</a>
+        </div>
+        <div class="card">
+          <span class="tag">Apoyo</span>
+          <h3>Apoyar el proyecto</h3>
+          <div class="price">Tú eliges</div>
+          <ul><li>Financia mantenimiento y nuevas plataformas</li><li>Sin contrapartidas ocultas</li><li>Tu nombre en los créditos, si quieres</li></ul>
+          <a class="btn" id="cta-support" href="#" aria-disabled="true">Disponible pronto</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="preguntas">
+    <div class="wrap">
+      <h2>Preguntas frecuentes</h2>
+      <p class="sub"></p>
+      <details><summary>¿Necesito pagar IA para usarlo?</summary><p>No. NoteVault funciona sin IA. Si la quieres, puedes usar un modelo local gratuito o la API de tu elección.</p></details>
+      <details><summary>¿Dónde se guardan mis datos?</summary><p>En la carpeta que elijas, como archivos Markdown y JSON. NoteVault no tiene servidores ni envía telemetría.</p></details>
+      <details><summary>¿Hay versión móvil o web?</summary><p>Todavía no. Están en el plan; el formato de la bóveda ya está pensado para que un cliente móvil lea y escriba los mismos archivos.</p></details>
+      <details><summary>¿Si es de código abierto, qué se vende?</summary><p>El código es libre. Lo que se vende es contenido de estudio ya preparado y, voluntariamente, el apoyo al proyecto.</p></details>
+      <details><summary>¿Puedo modificarlo o usarlo en mi empresa?</summary><p>Sí, bajo los términos de la GPL-3.0. Si distribuyes una versión modificada, debes publicar su código. El nombre y el logo tienen una <a href="https://github.com/Lessteps/NoteVault/blob/main/TRADEMARK.md">política aparte</a>.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 Lessteps · NoteVault se publica bajo GPL-3.0-or-later</span>
+    <span>
+      <a href="docs/">Documentación</a> ·
+      <a href="https://github.com/Lessteps/NoteVault">GitHub</a> ·
+      <a href="https://github.com/Lessteps/NoteVault/blob/main/SECURITY.md">Seguridad</a> ·
+      <a href="https://github.com/Lessteps/NoteVault/issues">Soporte</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  // Enlaces de pago: pega aquí las URLs cuando existan. Vacío = el botón queda como «Disponible pronto».
+  var LINKS = {
+    pack: "",     // checkout del paquete de estudio
+    support: ""   // GitHub Sponsors, Ko-fi, etc.
+  };
+  [["cta-pack", LINKS.pack, "Comprar"], ["cta-support", LINKS.support, "Apoyar"]].forEach(function (e) {
+    var el = document.getElementById(e[0]);
+    if (!el || !e[1]) return;
+    el.href = e[1];
+    el.rel = "noopener";
+    el.textContent = e[2];
+    el.removeAttribute("aria-disabled");
+    el.classList.add("primary");
+  });
+</script>
+</body>
+</html>

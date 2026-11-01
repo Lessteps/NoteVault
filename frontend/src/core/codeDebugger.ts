@@ -58,6 +58,8 @@ export interface RunOptions {
 
 const MAX_OUTPUT = 200_000;
 const MAX_STEPS = 400;
+/** Share of the trace timeout spent recording steps; the rest lets the program run to its end. */
+const STEP_BUDGET = 0.6;
 const DEFAULT_TIMEOUT = 10_000;
 const TRACE_TIMEOUT = 20_000;
 
@@ -619,7 +621,8 @@ async function traceScript(file: string, dir: string, stdin: string, timeoutMs: 
             await cdp.send("Debugger.resume");
           } else if (!inUser(cf)) {
             await cdp.send("Debugger.stepOut");
-          } else if (steps.length >= MAX_STEPS) {
+          } else if (steps.length >= MAX_STEPS || Date.now() - started > timeoutMs * STEP_BUDGET) {
+            // Over the step cap, or out of time budget on a slow machine: stop recording and let the program finish.
             stepsTruncated = true;
             await cdp.send("Debugger.disable");
             await cdp.send("Debugger.resume").catch(() => undefined);

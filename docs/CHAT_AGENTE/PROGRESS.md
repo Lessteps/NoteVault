@@ -102,7 +102,7 @@ App empaquetada (CDP 9223), vault real:
 - Borrar desde la fila (confirmación con el texto del aviso) → el historial queda
   en «Aún no hay conversaciones guardadas.».
 - Nada se escribió dentro del vault: los ficheros están en
-  `C:\Users\Julian\.notevault\conversations\`.
+  `%USERPROFILE%\.notevault\conversations\`.
 
 ### Defecto encontrado y arreglado en esta fase
 

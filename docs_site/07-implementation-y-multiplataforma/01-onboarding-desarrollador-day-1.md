@@ -34,9 +34,9 @@
 ### Paso 1: Clonar Repositorios
 ```bash
 # Clonar repositorio de escritorio
-git clone https://github.com/camilolayos54-dotcom/NoteVault.git
+git clone https://github.com/Lessteps/NoteVault.git
 # Clonar repositorio móvil
-git clone https://github.com/camilolayos54-dotcom/notevault_mobile.git
+git clone https://github.com/Lessteps/notevault_mobile.git
 ```
 
 ### Paso 2: Instalar Dependencias de Escritorio

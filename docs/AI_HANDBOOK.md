@@ -31,7 +31,7 @@ English only so that it is unambiguous for an AI.
 
 | | Desktop | Mobile |
 |---|---|---|
-| Repo | `camilolayos54-dotcom/NoteVault` (private) | `camilolayos54-dotcom/notevault_mobile` (private) |
+| Repo | `Lessteps/NoteVault` | `Lessteps/notevault_mobile` (private) |
 | Local path | `C:\PROGRAMMING\NoteVault` | `C:\PROGRAMMING\notevault_mobile` |
 | Stack | Python 3.13 + PySide6 (Qt 6), packaged with PyInstaller as `NoteVault.exe` | Flutter / Dart, Android (API 26+) |
 | Entry | `app_entry.py` → `notevault_app/main.py` | `lib/main.dart` |

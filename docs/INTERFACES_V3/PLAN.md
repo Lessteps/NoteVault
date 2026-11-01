@@ -14,7 +14,7 @@ Four areas (A–D). Reference mock for Area A: **`docs/INTERFACES_V3/navbar_ref.
 
 Reference: open `docs/INTERFACES_V3/navbar_ref.png`. It shows a single horizontal
 **tab strip** across the top: left workspace icons (panel, folder, search,
-bookmark), then the open **tabs** (e.g. "Graph view", "camilolayos54-dotcom",
+bookmark), then the open **tabs** (e.g. "Graph view", "NoteVault",
 "Canvas ×", "0.PYTHON_TRAINING_SYSTEM"), a "+" to open new, and window controls on
 the right. Replicate this layout (reference-fidelity rule: verify by rendering).
 

@@ -1,19 +1,21 @@
-# Política de marca
+# Trademark policy
 
-> **«NoteVault» es un nombre provisional.** La empresa que representa el proyecto es **Lessteps**. Si el nombre del producto cambia, esta política pasará a aplicarse al nuevo nombre.
+*[Leer en español](translations/es/TRADEMARK.md)*
 
-El código de NoteVault es libre (GPL-3.0-or-later). **El nombre «NoteVault», el nombre «Lessteps» y sus logotipos no forman parte de esa licencia.**
+> **“NoteVault” is a provisional name.** The company behind the project is **Lessteps**. If the product name changes, this policy will apply to the new name.
 
-## Puedes
+NoteVault's code is free (GPL-3.0-or-later). **The name “NoteVault”, the name “Lessteps” and their logos are not part of that license.**
 
-- Mencionar NoteVault para decir que tu proyecto es compatible, está basado en él o lo usa.
-- Escribir reseñas, tutoriales y artículos sobre NoteVault.
-- Distribuir copias sin modificar con el nombre original, indicando su procedencia.
+## You may
 
-## No puedes
+- Mention NoteVault to say your project is compatible with it, based on it or uses it.
+- Write reviews, tutorials and articles about NoteVault.
+- Distribute unmodified copies under the original name, stating where they come from.
 
-- Publicar una versión **modificada** con el nombre o el logo de NoteVault. Si bifurcas el proyecto, dale un nombre distinto.
-- Dar a entender que tu producto es oficial, o que Lessteps lo respalda.
-- Registrar el nombre, dominios o cuentas que se confundan con el proyecto oficial.
+## You may not
 
-Para pedir un permiso distinto, abre un issue en el repositorio.
+- Publish a **modified** version under the NoteVault name or logo. If you fork the project, give it a different name.
+- Imply that your product is official or endorsed by Lessteps.
+- Register names, domains or accounts that could be confused with the official project.
+
+To ask for a different permission, open an issue in the repository.

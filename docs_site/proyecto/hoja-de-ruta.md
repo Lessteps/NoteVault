@@ -1,20 +1,20 @@
-# Hoja de ruta
+# Roadmap
 
-Esta página dice dónde está el proyecto, no promete fechas.
+This page says where the project is, not when things will happen.
 
-## Ahora
+## Now
 
-- Primera versión pública de escritorio (Windows con instalador y versión portátil; Linux con .deb y AppImage; macOS desde el código fuente).
-- Pruebas, corrección de errores y mejora de rendimiento y estabilidad.
-- Documentación pública y comunidad.
+- First public desktop version (Windows installer and portable; Linux .deb and AppImage; macOS from source).
+- Testing, bug fixing and performance and stability improvements.
+- Public documentation and community.
 
-## Después
+## Next
 
-- Cliente móvil (Android) que lee y escribe la misma bóveda. El formato ya está pensado para ello.
-- Empaquetado para macOS.
-- Versión web.
-- Instalador firmado.
+- Mobile client (Android) that reads and writes the same vault. The format is already designed for it.
+- macOS packaging.
+- Web version.
+- Signed installer.
 
-## Cómo influir
+## How to influence it
 
-Abre un [issue](https://github.com/Lessteps/NoteVault/issues) con lo que necesitas. Las propuestas con un caso de uso concreto avanzan más rápido.
+Open an [issue](https://github.com/Lessteps/NoteVault/issues) with what you need. Proposals with a concrete use case move faster.

@@ -1,31 +1,31 @@
-# Instalación
+# Installation
 
-NoteVault lleva todo lo necesario dentro: **no tienes que instalar nada más** (ni Node.js, ni Python, ni otras librerías). Descarga desde la página de [Releases](https://github.com/Lessteps/NoteVault/releases).
+NoteVault ships with everything it needs: **you do not have to install anything else** (no Node.js, no Python, no extra libraries). Download from the [Releases](https://github.com/Lessteps/NoteVault/releases) page.
 
 ## Windows
 
-**Instalador (recomendado)**
+**Installer (recommended)**
 
-1. Descarga `NoteVault-Setup-<versión>.exe`.
-2. Ejecútalo y sigue el asistente. Puedes elegir la carpeta.
-3. Abre NoteVault desde el menú Inicio.
+1. Download `NoteVault-Setup-<version>.exe`.
+2. Run it and follow the wizard. You can choose the folder.
+3. Open NoteVault from the Start menu.
 
-**Versión portátil (sin instalar)**
+**Portable version (no install)**
 
-1. Descarga `NoteVault-Portable-<versión>.exe`.
-2. Haz doble clic. No instala nada y puedes llevarla en una memoria USB. Tarda unos segundos más en abrir.
+1. Download `NoteVault-Portable-<version>.exe`.
+2. Double-click it. It installs nothing and you can carry it on a USB stick. It takes a few seconds longer to open.
 
-!!! note "Instalador sin firmar"
-    Mientras el instalador no esté firmado, Windows puede mostrar «Windows protegió su PC». Pulsa **Más información → Ejecutar de todas formas**. Comprueba siempre que lo descargaste del repositorio oficial.
+!!! note "Unsigned installer"
+    While the installer is unsigned, Windows may show “Windows protected your PC”. Click **More info → Run anyway**. Always check that you downloaded it from the official repository.
 
 ## Linux
 
-- **Paquete `.deb` (Ubuntu, Debian y derivadas):** descarga `NoteVault-<versión>-amd64.deb` e instálalo con doble clic o con `sudo apt install ./NoteVault-<versión>-amd64.deb`. Aparece en el menú de aplicaciones.
-- **AppImage:** descarga `NoteVault-<versión>-x86_64.AppImage`, hazlo ejecutable y ábrelo. Necesita FUSE 2 (`sudo apt install libfuse2t64`); sin ella, ábrelo con `--appimage-extract-and-run`.
+- **`.deb` package (Ubuntu, Debian and derivatives):** download `NoteVault-<version>-amd64.deb` and install it by double-clicking or with `sudo apt install ./NoteVault-<version>-amd64.deb`. It shows up in the applications menu.
+- **AppImage:** download `NoteVault-<version>-x86_64.AppImage`, make it executable and open it. It needs FUSE 2 (`sudo apt install libfuse2t64`); without it, open it with `--appimage-extract-and-run`.
 
-## macOS y desarrollo (desde el código fuente)
+## macOS and development (from source)
 
-Todavía no hay paquete para macOS. Requisitos: **Node.js 20 o superior** y **npm 10 o superior**.
+There is no macOS package yet. Requirements: **Node.js 20 or later** and **npm 10 or later**.
 
 ```bash
 git clone https://github.com/Lessteps/NoteVault.git
@@ -34,16 +34,16 @@ npm install
 npm run electron:dev
 ```
 
-## Compilar tu propio instalador
+## Build your own installer
 
 ```bash
 cd frontend
 npm run electron:build
 ```
 
-Genera el instalador en `frontend/release/`. El objetivo configurado hoy es Windows (NSIS).
+It produces the installer in `frontend/release/`. The configured target today is Windows (NSIS).
 
-## Comprobar que todo funciona
+## Check that everything works
 
 ```bash
 cd frontend
@@ -51,11 +51,11 @@ npm run typecheck
 npx vitest run
 ```
 
-## Dónde guarda NoteVault tus datos
+## Where NoteVault stores your data
 
-| Qué | Dónde |
+| What | Where |
 | :--- | :--- |
-| Tu contenido (la bóveda) | Una carpeta que eliges; por defecto `~/NoteVault`. |
-| Ajustes de la app | `~/.notevault/settings.json`, fuera de la bóveda. |
+| Your content (the vault) | A folder you choose; `~/NoteVault` by default. |
+| App settings | `~/.notevault/settings.json`, outside the vault. |
 
-Desinstalar la app no borra tu bóveda.
+Uninstalling the app does not delete your vault.

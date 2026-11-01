@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
 {% block announce %}
-  {% if config.theme.language == "en" %}
-    We are students with no funding or financial backing. Any help lets us keep building NoteVault —
-    <a href="{{ 'proyecto/apoyar.html' | url }}"><strong>support the project</strong></a>
-  {% else %}
+  {% if config.theme.language == "es" %}
     Somos estudiantes y no tenemos apoyo ni sustento económico. Cualquier ayuda nos permite seguir desarrollando NoteVault —
     <a href="{{ 'proyecto/apoyar.html' | url }}"><strong>apoya el proyecto</strong></a>
+  {% else %}
+    We are students with no funding or financial backing. Any help lets us keep building NoteVault —
+    <a href="{{ 'proyecto/apoyar.html' | url }}"><strong>support the project</strong></a>
   {% endif %}
 {% endblock %}

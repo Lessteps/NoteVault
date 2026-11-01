@@ -1,28 +1,30 @@
-# Código de conducta
+# Code of conduct
 
-## Nuestro compromiso
+*[Leer en español](translations/es/CODE_OF_CONDUCT.md)*
 
-Queremos que participar en NoteVault sea una experiencia respetuosa y libre de acoso para todas las personas, sin importar su edad, origen, identidad, nivel de experiencia o forma de pensar.
+## Our commitment
 
-## Lo que esperamos
+We want taking part in NoteVault to be a respectful, harassment-free experience for everyone, regardless of age, background, identity, experience level or way of thinking.
 
-- Trato respetuoso y críticas dirigidas al trabajo, no a las personas.
-- Aceptar con calma la retroalimentación y darla con claridad.
-- Ayudar a quien empieza.
+## What we expect
 
-## Lo que no se tolera
+- Respectful treatment, and criticism aimed at the work, not at people.
+- Receiving feedback calmly and giving it clearly.
+- Helping those who are just starting.
 
-- Insultos, burlas, acoso o ataques personales.
-- Publicar información privada de otras personas sin su permiso.
-- Atención sexual no deseada o comentarios discriminatorios.
-- Cualquier conducta que razonablemente se considere inapropiada en un entorno profesional.
+## What is not tolerated
 
-## Aplicación
+- Insults, mockery, harassment or personal attacks.
+- Publishing other people's private information without their permission.
+- Unwanted sexual attention or discriminatory comments.
+- Any conduct that could reasonably be considered inappropriate in a professional setting.
 
-Quienes mantienen el proyecto pueden editar o eliminar comentarios, issues y aportes que incumplan este código, y pueden limitar la participación de quien lo incumpla de forma reiterada.
+## Enforcement
 
-## Cómo reportar
+The maintainers may edit or remove comments, issues and contributions that violate this code, and may limit the participation of anyone who repeatedly violates it.
 
-Escribe de forma privada a quienes mantienen el proyecto mediante el reporte privado de GitHub: <https://github.com/Lessteps/NoteVault/security/advisories/new>. Todas las denuncias se tratan con confidencialidad.
+## How to report
 
-Este código se inspira en el [Contributor Covenant](https://www.contributor-covenant.org/es/version/2/1/code_of_conduct/).
+Write privately to the maintainers through GitHub's private reporting: <https://github.com/Lessteps/NoteVault/security/advisories/new>, or email [lesstepscompany@gmail.com](mailto:lesstepscompany@gmail.com). All reports are treated confidentially.
+
+This code is inspired by the [Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).

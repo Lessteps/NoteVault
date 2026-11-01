@@ -1,0 +1,5 @@
+# Old English URLs (before English became the default) keep working.
+/en        /       301
+/en/       /       301
+/docs/en   /docs/  301
+/docs/en/* /docs/:splat 301

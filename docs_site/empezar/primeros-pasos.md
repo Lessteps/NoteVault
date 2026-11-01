@@ -1,26 +1,26 @@
-# Primeros pasos
+# Getting started
 
-## 1. Elige tu bóveda
+## 1. Choose your vault
 
-Al abrir NoteVault por primera vez eliges la carpeta que será tu **bóveda**. Puede ser una carpeta nueva o una que ya uses con Obsidian: NoteVault no asume que la creó él y no toca tus notas existentes. Más detalles en [La bóveda](../guia/boveda.md).
+The first time you open NoteVault you choose the folder that will be your **vault**. It can be a new folder or one you already use with Obsidian: NoteVault does not assume it created it and does not touch your existing notes. More details in [The vault](../guia/boveda.md).
 
-## 2. Recorre la barra lateral
+## 2. Walk through the sidebar
 
-La barra de la izquierda tiene los módulos: Vista General, Calendario, Hábitos, Ejercicio, Alimentación, Proyectos, Metas, Finanzas, Notas, Tareas y Navegador Web. El **Mentor** y las **Skills** aparecen en la barra de la derecha. Cada módulo está explicado en [Módulos](../guia/modulos.md).
+The left bar has the modules: Overview, Calendar, Habits, Exercise, Nutrition, Projects, Goals, Finances, Notes, Tasks and Web Browser. The **Mentor** and **Skills** appear in the right bar. Each module is explained in [Modules](../guia/modulos.md).
 
-## 3. Crea tu primera nota
+## 3. Create your first note
 
-En **Notas**, crea una nota nueva. Escribe en Markdown; la vista previa se actualiza mientras escribes. Enlaza otras notas con `[[nombre]]`.
+In **Notes**, create a new note. Write in Markdown; the preview updates as you type. Link other notes with `[[name]]`.
 
-## 4. Decide si quieres IA
+## 4. Decide whether you want AI
 
-NoteVault funciona sin IA. Si quieres usarla, abre **Ajustes** y elige un proveedor. Todo el detalle está en [IA](../guia/ia.md).
+NoteVault works without AI. If you want to use it, open **Settings** and choose a provider. The full detail is in [AI](../guia/ia.md).
 
-## 5. (Opcional) Arma un plan de estudio
+## 5. (Optional) Build a study plan
 
-Abre el **Mentor**, crea un plan con fecha de inicio y de fin, y deja que reparta los temas. La app te dirá el ritmo que necesitas por asignatura para llegar a la fecha. Ver [Mentor](../guia/mentor.md).
+Open the **Mentor**, create a plan with a start and an end date, and let it spread the topics. The app tells you the pace you need per subject to reach the end date. See [Mentor](../guia/mentor.md).
 
-## Atajos para no perder datos
+## Tips to avoid losing data
 
-- Cada entidad es un archivo: haz copia de la carpeta de la bóveda como harías con cualquier carpeta.
-- Para sincronizar entre equipos, usa la herramienta que prefieras sobre la carpeta (Syncthing, Git, un servicio en la nube). NoteVault no necesita un servidor.
+- Every entity is a file: back up the vault folder like any other folder.
+- To sync between computers, use the tool you prefer on the folder (Syncthing, Git, a cloud service). NoteVault does not need a server.

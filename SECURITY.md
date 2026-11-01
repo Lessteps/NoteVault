@@ -1,30 +1,32 @@
-# Política de seguridad
+# Security policy
 
-## Versiones con soporte
+*[Leer en español](translations/es/SECURITY.md)*
 
-Se corrigen vulnerabilidades en la última versión publicada.
+## Supported versions
 
-## Cómo reportar una vulnerabilidad
+Vulnerabilities are fixed in the latest published version.
 
-**No abras un issue público.** Usa el reporte privado de GitHub:
+## How to report a vulnerability
+
+**Do not open a public issue.** Use GitHub's private reporting:
 <https://github.com/Lessteps/NoteVault/security/advisories/new>
 
-Incluye:
+Include:
 
-- qué ocurre y qué impacto tiene;
-- pasos para reproducirlo;
-- la versión de NoteVault y tu sistema operativo.
+- what happens and what impact it has;
+- steps to reproduce it;
+- your NoteVault version and operating system.
 
-Respondemos para confirmar la recepción lo antes posible y te mantenemos al tanto de la corrección. Con tu permiso, te mencionamos en las notas de la versión que la corrige.
+We reply to confirm receipt as soon as possible and keep you informed about the fix. With your permission, we credit you in the release notes of the version that fixes it.
 
-## Qué consideramos vulnerabilidad
+## What we consider a vulnerability
 
-- Salir de la bóveda: leer o escribir fuera de la carpeta elegida.
-- Ejecución de código a partir de contenido de una nota o de una bóveda ajena.
-- Fuga de claves de API o de datos de la bóveda.
-- Fallos del proceso principal de Electron o del puente IPC.
+- Escaping the vault: reading or writing outside the chosen folder.
+- Code execution from the content of a note or of someone else's vault.
+- Leaking API keys or vault data.
+- Failures in Electron's main process or the IPC bridge.
 
-## Buenas prácticas para usuarios
+## Good practices for users
 
-- Las claves de API se guardan en texto plano en `~/.notevault/settings.json`, fuera de la bóveda. No subas esa carpeta a ningún repositorio.
-- Abre solo bóvedas de las que te fíes.
+- API keys are stored in plain text in `~/.notevault/settings.json`, outside the vault. Do not push that folder to any repository.
+- Only open vaults you trust.

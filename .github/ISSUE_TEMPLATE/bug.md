@@ -1,17 +1,17 @@
 ---
 name: Bug
-about: Algo no funciona como debería
+about: Something does not work as it should
 labels: bug
 ---
 
-**Qué pasó**
+**What happened**
 
-**Qué esperabas que pasara**
+**What you expected to happen**
 
-**Pasos para reproducirlo**
+**Steps to reproduce**
 1.
 2.
 
-**Versión de NoteVault y sistema operativo**
+**NoteVault version and operating system**
 
-**Capturas o texto del error** (sin claves de API ni datos privados)
+**Screenshots or error text** (no API keys or private data)

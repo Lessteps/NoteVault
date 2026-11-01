@@ -1,23 +1,23 @@
-# IA
+# AI
 
-NoteVault funciona sin IA. Si la activas, tú eliges de dónde viene. Se configura en **Ajustes**.
+NoteVault works without AI. If you turn it on, you choose where it comes from. It is configured in **Settings**.
 
-## Proveedores
+## Providers
 
-| Tipo | Opciones | Necesita |
+| Type | Options | Needs |
 | :--- | :--- | :--- |
-| API | DeepSeek, OpenAI, Google Gemini, Claude | Tu propia clave de API. |
-| Local | LM Studio, Ollama, otro servidor compatible con el formato OpenAI (jan.ai, llama.cpp, vLLM, LiteLLM…) | Un servidor corriendo en tu equipo. Sin clave. |
-| Sin API | Claude Code (tu suscripción), Claude web, ChatGPT web, Antigravity | Nada en la app: NoteVault te prepara un **prompt** que pegas tú. |
+| API | DeepSeek, OpenAI, Google Gemini, Claude | Your own API key. |
+| Local | LM Studio, Ollama, any other OpenAI-format server (jan.ai, llama.cpp, vLLM, LiteLLM…) | A server running on your computer. No key. |
+| No API | Claude Code (your subscription), Claude web, ChatGPT web, Antigravity | Nothing in the app: NoteVault prepares a **prompt** that you paste yourself. |
 
-El modo «sin API» sirve para usar la IA que ya pagas sin dar claves a NoteVault: la app genera el prompt y guarda lo que devuelves.
+The “no API” mode lets you use the AI you already pay for without giving keys to NoteVault: the app generates the prompt and stores what you bring back.
 
-## Modos del asistente
+## Assistant modes
 
-El asistente puede trabajar en modo Socrático (guía con preguntas), Examinador, Evaluador, Generador de ejercicios y Depurador.
+The assistant can work in Socratic mode (guides with questions), Examiner, Evaluator, Exercise generator and Debugger.
 
-## Privacidad
+## Privacy
 
-- NoteVault **no tiene servidores propios** ni envía telemetría.
-- Solo se envía texto a un proveedor cuando tú lo pides, y solo al proveedor que elegiste. Con un modelo local, nada sale de tu equipo.
-- Las claves de API se guardan en `~/.notevault/settings.json`, **fuera de la bóveda**, en texto plano. Protege esa carpeta como protegerías cualquier archivo con credenciales y no la subas a un repositorio.
+- NoteVault has **no servers of its own** and sends no telemetry.
+- Text is only sent to a provider when you ask for it, and only to the provider you chose. With a local model, nothing leaves your computer.
+- API keys are stored in `~/.notevault/settings.json`, **outside the vault**, in plain text. Protect that folder like any file with credentials and do not upload it to a repository.

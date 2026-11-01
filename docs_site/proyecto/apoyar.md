@@ -1,33 +1,33 @@
-# Apoyar el proyecto
+# Support the project
 
-!!! info "Somos estudiantes"
-    NoteVault lo desarrolla **Lessteps**, un equipo de estudiantes **sin apoyo ni sustento económico**. La app es gratis y de código abierto, y seguirá siéndolo. Necesitamos dinero para poder continuar: **cualquier ayuda, por pequeña que sea, sirve.**
+!!! info "We are students"
+    NoteVault is built by **Lessteps**, a team of students **with no funding or financial backing**. The app is free and open source, and it will stay that way. We need money to keep going: **any help, however small, makes a difference.**
 
-## Dónde apoyar
+## Where to support
 
-| Medio | Datos |
+| Method | Details |
 | :--- | :--- |
 | 💳 **PayPal** | <https://paypal.me/lessteps> |
-| 💜 **Nequi / Bre-B** (Colombia) | Llave `0093524288` |
-| 📱 **Código QR** (PayPal y Nequi) | [Verlo aquí](https://drive.google.com/file/d/1ea34-aOhxh8nAmhpLI0lX2B1oQqEDQG6/view?usp=sharing) |
+| 💜 **Nequi / Bre-B** (Colombia) | Key `0093524288` |
+| 📱 **QR code** (PayPal and Nequi) | [View it here](https://drive.google.com/file/d/1ea34-aOhxh8nAmhpLI0lX2B1oQqEDQG6/view?usp=sharing) |
 
-También puedes verlos en [lessteps.com](https://lessteps.com/#apoyar).
+You can also find them at [lessteps.com](https://lessteps.com/en/#apoyar).
 
-## En qué se usa
+## What it is used for
 
-- **Tiempo de desarrollo:** mantener la app, corregir errores y publicar versiones nuevas.
-- **Nuevas plataformas:** versión móvil (Android), macOS y web.
-- **Infraestructura:** el dominio `lessteps.com`, el alojamiento del sitio y los servicios de compilación.
-- **Pruebas:** equipos y cuentas para probar en sistemas distintos, y créditos de IA para generar y revisar contenido de estudio.
+- **Development time:** maintaining the app, fixing bugs and shipping new versions.
+- **New platforms:** a mobile version (Android), macOS and web.
+- **Infrastructure:** the `lessteps.com` domain, site hosting and build services.
+- **Testing:** devices and accounts to test on different systems, and AI credits to generate and review study content.
 
-No hay objetivos ocultos ni contrapartidas escondidas: lo que se recauda se invierte en el proyecto.
+There are no hidden goals or strings attached: what is raised goes into the project.
 
-## Otras formas de ayudar, sin dinero
+## Other ways to help, at no cost
 
-- Reportar errores y proponer mejoras en [GitHub](https://github.com/Lessteps/NoteVault/issues).
-- Mejorar la documentación o traducirla.
-- Contárselo a alguien a quien le pueda servir.
+- Report bugs and propose improvements on [GitHub](https://github.com/Lessteps/NoteVault/issues).
+- Improve the documentation or translate it.
+- Tell someone who might find it useful.
 
-## Sobre el nombre
+## About the name
 
-«NoteVault» es un **nombre provisional**. La empresa que representa el proyecto es **Lessteps**.
+“NoteVault” is a **provisional name**. The company behind the project is **Lessteps**.

@@ -1,3 +1,8 @@
+# Engineering — architecture portal
+
+!!! note "Spanish only"
+    This section (architecture, design decisions and development guide) is written in Spanish for now. The user guide is fully available in English.
+
 # Ingeniería — portal de arquitectura de NoteVault
 
 **Proyecto:** NoteVault (Ecosistema de Productividad, Estudio y Toma de Notas Local-First)  

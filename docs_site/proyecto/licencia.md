@@ -1,33 +1,33 @@
-# Licencia
+# License
 
-## El código: GPL-3.0
+## The code: GPL-3.0
 
-El código de NoteVault se publica bajo la **GNU General Public License v3.0 o posterior** (ver [`LICENSE`](https://github.com/Lessteps/NoteVault/blob/main/LICENSE)).
+NoteVault's code is published under the **GNU General Public License v3.0 or later** (see [`LICENSE`](https://github.com/Lessteps/NoteVault/blob/main/LICENSE)).
 
-En palabras sencillas:
+In plain words:
 
-- Puedes usarlo, estudiarlo, modificarlo y compartirlo, también con fines comerciales.
-- Si distribuyes una versión modificada, debes publicar su código fuente bajo la misma licencia.
-- El software se ofrece sin garantía.
+- You can use it, study it, modify it and share it, including for commercial purposes.
+- If you distribute a modified version, you must publish its source code under the same license.
+- The software is provided without warranty.
 
-Esta página es un resumen informativo, no asesoría legal. Manda el texto de la licencia.
+This page is an informational summary, not legal advice. The license text governs.
 
-## La documentación
+## The documentation
 
-La documentación (esta web y la carpeta `docs/`) se publica bajo **CC BY-SA 4.0**.
+The documentation (this site and the `docs/` folder) is published under **CC BY-SA 4.0**.
 
-## El nombre y el logo
+## The name and logo
 
-«NoteVault» y su logo no se licencian con el código. Puedes bifurcar el proyecto, pero una versión modificada debe usar otro nombre. Ver [`TRADEMARK.md`](https://github.com/Lessteps/NoteVault/blob/main/TRADEMARK.md).
+“NoteVault” and its logo are not licensed with the code. You may fork the project, but a modified version must use another name. See [`TRADEMARK.md`](https://github.com/Lessteps/NoteVault/blob/main/TRADEMARK.md).
 
-## Contenido de pago
+## Paid content
 
-El código es libre. Los **paquetes de contenido** que se vendan por separado (rutas de estudio, notas, ejercicios) no forman parte de este repositorio y se distribuyen con su propia licencia de uso personal.
+The code is free. **Content packs** sold separately (study paths, notes, exercises) are not part of this repository and are distributed under their own personal-use license.
 
-## Créditos { #creditos }
+## Credits { #credits }
 
-- Ejercicios ilustrados: [`@bryllim/workout-guide`](https://github.com/bryllim/workout-guide) (código MIT). Ilustraciones de Bryl Lim, bajo [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), con poses base de [Everkinetic](https://github.com/everkinetic/data) (CC BY-SA 4.0).
-- Las instrucciones paso a paso de los ejercicios son redacción propia de NoteVault.
-- Tipografías Inter y JetBrains Mono (SIL OFL 1.1) y Lexend.
+- Illustrated exercises: [`@bryllim/workout-guide`](https://github.com/bryllim/workout-guide) (MIT code). Illustrations by Bryl Lim, under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), with base poses from [Everkinetic](https://github.com/everkinetic/data) (CC BY-SA 4.0).
+- The step-by-step exercise instructions are NoteVault's own writing.
+- Inter and JetBrains Mono typefaces (SIL OFL 1.1) and Lexend.
 
-El detalle está en [`CREDITS.md`](https://github.com/Lessteps/NoteVault/blob/main/CREDITS.md).
+The detail is in [`CREDITS.md`](https://github.com/Lessteps/NoteVault/blob/main/CREDITS.md).

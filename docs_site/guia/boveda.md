@@ -1,36 +1,36 @@
-# La bóveda
+# The vault
 
-La **bóveda** es una carpeta cualquiera de tu disco. NoteVault no necesita servidor ni base de datos: todo es texto que puedes leer y editar a mano.
+The **vault** is any folder on your disk. NoteVault needs no server or database: everything is text you can read and edit by hand.
 
-## Principios del formato
+## Format principles
 
-1. Una bóveda es una carpeta normal. Puede ser la misma que usas en Obsidian.
-2. Todo es texto legible: Markdown con frontmatter YAML, o JSON.
-3. Un archivo por día o por entidad. Dos equipos pueden escribir a la vez mientras toquen entidades distintas, y una sincronización por carpeta no genera conflictos.
-4. Fechas en ISO 8601 (`YYYY-MM-DD`), en hora local.
-5. Codificación UTF-8.
+1. A vault is an ordinary folder. It can be the same one you use in Obsidian.
+2. Everything is readable text: Markdown with YAML frontmatter, or JSON.
+3. One file per day or per entity. Two computers can write at the same time as long as they touch different entities, and folder-level sync produces no conflicts.
+4. Dates in ISO 8601 (`YYYY-MM-DD`), in local time.
+5. UTF-8 encoding.
 
-## Estructura
+## Structure
 
 ```text
 vault/
-├── .notevault/        datos de los módulos (hábitos, tareas, metas, finanzas…)
-├── tus-notas.md       tus notas .md y lienzos .canvas, donde prefieras
-└── Programación/      ejemplo de materia de estudio
-    ├── _skills/       instrucciones de generación de esa materia
-    └── …              temas, prácticas y mapas
+├── .notevault/        module data (habits, tasks, goals, finances…)
+├── your-notes.md      your .md notes and .canvas files, wherever you like
+└── Programación/      example of a study subject
+    ├── _skills/       generation instructions for that subject
+    └── …              topics, practice and maps
 ```
 
-Los archivos de `.notevault/` los gestiona la app; el resto es tuyo.
+The files in `.notevault/` are managed by the app; the rest is yours.
 
-## El contrato completo
+## The full contract
 
-El formato está especificado, versionado y protegido por tests: la versión actual es la **4**. El documento de referencia es [`docs/VAULT_FORMAT.md`](https://github.com/Lessteps/NoteVault/blob/main/docs/VAULT_FORMAT.md). Si cambias el formato, cambia ese documento y los tests que lo fijan.
+The format is specified, versioned and protected by tests: the current version is **4**. The reference document is [`docs/VAULT_FORMAT.md`](https://github.com/Lessteps/NoteVault/blob/main/docs/VAULT_FORMAT.md) (in Spanish). If you change the format, change that document and the tests that pin it.
 
-## Sincronizar entre equipos
+## Syncing between computers
 
-NoteVault no sincroniza por ti: usa lo que ya tengas sobre la carpeta (Syncthing, Git, iCloud Drive, Google Drive…). Los ajustes de la app (`~/.notevault/settings.json`) viven fuera de la bóveda y no se sincronizan con ella.
+NoteVault does not sync for you: use whatever you already have on the folder (Syncthing, Git, iCloud Drive, Google Drive…). The app settings (`~/.notevault/settings.json`) live outside the vault and are not synced with it.
 
-## Copias de seguridad
+## Backups
 
-Copia la carpeta. Eso es todo.
+Copy the folder. That is all.

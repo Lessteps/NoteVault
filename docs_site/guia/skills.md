@@ -1,34 +1,34 @@
 # Skills
 
-Una **skill** es el archivo de instrucciones con el que se genera una pieza de un tema. NoteVault trabaja con tres tipos por materia:
+A **skill** is the instruction file used to generate one piece of a topic. NoteVault works with three kinds per subject:
 
-| Skill | Genera |
+| Skill | Generates |
 | :--- | :--- |
-| Notas de teoría (md) | La nota `<tema>.md`. |
-| Mapa (canvas) | El mapa explicativo `<tema> — mapa.canvas`. |
-| Archivos de práctica | El archivo `<tema>.practica.md` y sus ejercicios. |
+| Theory notes (md) | The note `<topic>.md`. |
+| Map (canvas) | The explanatory map `<topic> — mapa.canvas`. |
+| Practice files | The file `<topic>.practica.md` and its exercises. |
 
-Viven en `<materia>/_skills/` dentro de tu bóveda, así que son archivos tuyos.
+They live in `<subject>/_skills/` inside your vault, so they are your own files.
 
-## El panel Skills
+## The Skills panel
 
-Está en la barra derecha, debajo del Mentor. Desde ahí puedes:
+It is in the right bar, below the Mentor. From there you can:
 
-- **Ver y editar** cada skill a mano.
-- **Ver las versiones anteriores** (se conservan las 3 últimas) y **restaurar** una.
-- **Pedir un cambio en lenguaje normal.** Tienes tres caminos:
-    - con la **IA de la app** (API o modelo local);
-    - copiando un **prompt** para pegarlo en Antigravity o en cualquier otra IA;
-    - escribiendo el texto tú mismo.
+- **View and edit** each skill by hand.
+- **See previous versions** (the last 3 are kept) and **restore** one.
+- **Ask for a change in plain language.** You have three paths:
+    - with the **app's AI** (API or local model);
+    - copying a **prompt** to paste into Antigravity or any other AI;
+    - typing the text yourself.
 
-Una petición nunca guarda por sí sola: te devuelve una propuesta y decides si la guardas.
+A request never saves by itself: it returns a proposal and you decide whether to save it.
 
-## Versionado
+## Versioning
 
-Cada skill tiene una versión de 8 caracteres calculada a partir de su contenido. Cada nota, mapa o práctica que se genera lleva en su frontmatter la versión con la que se hizo:
+Each skill has an 8-character version computed from its content. Every note, map or practice file that is generated carries in its frontmatter the version it was made with:
 
 ```yaml
 skill_version: "15f0185c"
 ```
 
-Con eso, la app detecta sola qué piezas se hicieron con una versión anterior de la skill y te las marca como desactualizadas, sin que tengas que revisarlas una a una.
+With that, the app detects on its own which pieces were made with an older version of the skill and marks them as outdated, so you do not have to review them one by one.

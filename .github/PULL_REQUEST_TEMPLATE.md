@@ -1,8 +1,8 @@
-## Qué cambia y por qué
+## What changes and why
 
-## Cómo lo probé
+## How I tested it
 
-- [ ] `npm run typecheck` pasa
-- [ ] `npx vitest run` pasa
-- [ ] Si toca el formato de la bóveda, actualicé `docs/VAULT_FORMAT.md` y sus tests
-- [ ] Mis commits están firmados (`git commit -s`)
+- [ ] `npm run typecheck` passes
+- [ ] `npx vitest run` passes
+- [ ] If it touches the vault format, I updated `docs/VAULT_FORMAT.md` and its tests
+- [ ] My commits are signed off (`git commit -s`)

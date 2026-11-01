@@ -1,29 +1,30 @@
-# Créditos
+# Credits
 
-## Biblioteca de ejercicios (módulo Ejercicio)
+*[Leer en español](translations/es/CREDITS.md)*
 
-- Ejercicio ilustrado: [`@bryllim/workout-guide`](https://github.com/bryllim/workout-guide)
-  (302 ejercicios, código MIT).
-- Ilustraciones: Bryl Lim, bajo
+## Exercise library (Exercise module)
+
+- Illustrated exercises: [`@bryllim/workout-guide`](https://github.com/bryllim/workout-guide)
+  (302 exercises, MIT code).
+- Illustrations: Bryl Lim, under
   [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/),
-  con poses base de [Everkinetic](https://github.com/everkinetic/data)
-  (CC BY-SA 4.0). Ver `ATTRIBUTION.md` del paquete en
+  with base poses from [Everkinetic](https://github.com/everkinetic/data)
+  (CC BY-SA 4.0). See the package's `ATTRIBUTION.md` at
   `frontend/node_modules/@bryllim/workout-guide/ATTRIBUTION.md`.
-- Uso en NoteVault: solo metadatos + búsqueda local (offline) en
-  `frontend/src/lib/exerciseLibrary.ts` y vista
-  `frontend/src/components/exercise/Library.tsx`. Sin redistribución de
-  medios.
+- Use in NoteVault: metadata and local (offline) search only, in
+  `frontend/src/lib/exerciseLibrary.ts` and the view
+  `frontend/src/components/exercise/Library.tsx`. No media is redistributed.
 
-## Instrucciones de los ejercicios
+## Exercise instructions
 
-Las instrucciones paso a paso (`frontend/src/lib/exerciseInstructions.*.json`)
-son **redacción propia de NoteVault**: 302 ejercicios, 1797 pasos, escritos
-para este proyecto. No proceden de ningún dataset de terceros.
+The step-by-step instructions (`frontend/src/lib/exerciseInstructions.*.json`)
+are **NoteVault's own writing**: 302 exercises, 1797 steps, written for this
+project. They do not come from any third-party dataset.
 
-Revisión: son correctas en técnica general, pero no están revisadas por un
-profesional de la salud. Si vas a entrenar peso fuerte con un ejercicio nuevo,
-comprueba la técnica con alguien cualificado antes de subir carga.
+Review: they are correct in general technique, but have not been reviewed by a
+health professional. If you are going to train with heavy weight on a new
+exercise, check the technique with someone qualified before adding load.
 
-## Otras dependencias
+## Other dependencies
 
-Las dependencias de producción usan licencias compatibles con GPL-3.0 (MIT, BSD, ISC, SIL OFL 1.1, MPL-2.0/Apache-2.0 para DOMPurify, PSF-2.0). Sus licencias se incluyen con cada paquete en `node_modules/`.
+Production dependencies use licenses compatible with GPL-3.0 (MIT, BSD, ISC, SIL OFL 1.1, MPL-2.0/Apache-2.0 for DOMPurify, PSF-2.0). Their licenses ship with each package in `node_modules/`.

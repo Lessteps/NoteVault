@@ -11,20 +11,20 @@ use_directory_urls: false
 theme:
   name: material
   custom_dir: overrides
-  language: es
+  language: en
   palette:
     - scheme: slate
       primary: indigo
       accent: deep purple
       toggle:
         icon: material/brightness-4
-        name: Cambiar a modo claro
+        name: Switch to light mode
     - scheme: default
       primary: indigo
       accent: deep purple
       toggle:
         icon: material/brightness-7
-        name: Cambiar a modo oscuro
+        name: Switch to dark mode
   features:
     - navigation.tracking
     - navigation.sections
@@ -43,32 +43,32 @@ plugins:
       reconfigure_material: true
       reconfigure_search: true
       languages:
-        - locale: es
-          default: true
-          name: Español
-          build: true
         - locale: en
+          default: true
           name: English
           build: true
+        - locale: es
+          name: Español
+          build: true
           nav_translations:
-            Inicio: Home
-            Empezar: Getting started
-            Instalación: Installation
-            Primeros pasos: First steps
-            Guía de uso: User guide
-            Módulos: Modules
-            La bóveda: The vault
+            Home: Inicio
+            Getting started: Empezar
+            Installation: Instalación
+            First steps: Primeros pasos
+            User guide: Guía de uso
+            Modules: Módulos
+            The vault: La bóveda
             Skills: Skills
-            IA: AI
-            Proyecto: Project
-            Licencia y créditos: License and credits
-            Contribuir: Contributing
-            Hoja de ruta: Roadmap
-            Apoyar el proyecto: Support the project
-            Contacto: Contact
-            Privacidad y términos: Privacy and terms
-            Ingeniería: Engineering
-            Portal de arquitectura: Architecture portal
+            AI: IA
+            Project: Proyecto
+            License and credits: Licencia y créditos
+            Contributing: Contribuir
+            Roadmap: Hoja de ruta
+            Support the project: Apoyar el proyecto
+            Contact: Contacto
+            Privacy and terms: Privacidad y términos
+            Engineering: Ingeniería
+            Architecture portal: Portal de arquitectura
 
 markdown_extensions:
   - admonition
@@ -93,25 +93,25 @@ extra_css:
   - stylesheets/custom.css
 
 nav:
-  - Inicio: index.md
-  - Empezar:
-      - Instalación: empezar/instalacion.md
-      - Primeros pasos: empezar/primeros-pasos.md
-  - Guía de uso:
-      - Módulos: guia/modulos.md
-      - La bóveda: guia/boveda.md
+  - Home: index.md
+  - Getting started:
+      - Installation: empezar/instalacion.md
+      - First steps: empezar/primeros-pasos.md
+  - User guide:
+      - Modules: guia/modulos.md
+      - The vault: guia/boveda.md
       - Mentor: guia/mentor.md
       - Skills: guia/skills.md
-      - IA: guia/ia.md
-  - Proyecto:
-      - Licencia y créditos: proyecto/licencia.md
-      - Contribuir: proyecto/contribuir.md
-      - Hoja de ruta: proyecto/hoja-de-ruta.md
-      - Apoyar el proyecto: proyecto/apoyar.md
-      - Contacto: proyecto/contacto.md
-      - Privacidad y términos: proyecto/privacidad.md
-  - Ingeniería:
-      - Portal de arquitectura: ingenieria.md
+      - AI: guia/ia.md
+  - Project:
+      - License and credits: proyecto/licencia.md
+      - Contributing: proyecto/contribuir.md
+      - Roadmap: proyecto/hoja-de-ruta.md
+      - Support the project: proyecto/apoyar.md
+      - Contact: proyecto/contacto.md
+      - Privacy and terms: proyecto/privacidad.md
+  - Engineering:
+      - Architecture portal: ingenieria.md
       - 00. Reconocimiento del Problema:
           - 01. Declaración del Problema: 00-reconocimiento-del-problema/01. Declaración del Problema.md
           - 02. Clasificación del Problema: 00-reconocimiento-del-problema/02. Clasificación del Problema.md

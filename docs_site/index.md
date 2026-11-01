@@ -1,47 +1,47 @@
 # NoteVault
 
-**Estudio, notas y gestión personal en una sola app de escritorio. Tus datos son archivos tuyos.**
+**Study, notes and personal management in one desktop app. Your data is plain files you own.**
 
-NoteVault reúne en una app lo que normalmente repartes entre varias: notas en Markdown, tareas, calendario, hábitos, metas, proyectos, finanzas, ejercicio, alimentación y un **Mentor** que arma y sigue tu plan de estudio. Todo vive en una carpeta de tu disco (la *bóveda*), en archivos que puedes abrir con cualquier editor.
+NoteVault brings together what you normally spread across several apps: Markdown notes, tasks, calendar, habits, goals, projects, finances, exercise, nutrition and a **Mentor** that builds and follows your study plan. Everything lives in a folder on your disk (the *vault*), in files you can open with any editor.
 
-[Instalar NoteVault](empezar/instalacion.md){ .md-button .md-button--primary }
-[Primeros pasos](empezar/primeros-pasos.md){ .md-button }
+[Install NoteVault](empezar/instalacion.md){ .md-button .md-button--primary }
+[Getting started](empezar/primeros-pasos.md){ .md-button }
 
-## Principios
+## Principles
 
-- **Local primero.** No hay cuenta, servidor ni base de datos propietaria. La app no envía telemetría.
-- **Archivos abiertos.** Markdown con frontmatter YAML y JSON. El formato está documentado y es el mismo que lee el cliente móvil. Puedes usar la misma carpeta con Obsidian. Ver [la bóveda](guia/boveda.md).
-- **La IA es opcional.** Funciona sin IA. Si la quieres, eliges proveedor: API, modelo local (Ollama, LM Studio) o un prompt que pegas tú en la herramienta que prefieras. Ver [IA](guia/ia.md).
-- **Código abierto.** Licencia GPL-3.0. Puedes leerlo, modificarlo y mejorarlo. Ver [licencia](proyecto/licencia.md).
+- **Local first.** No account, no server, no proprietary database. The app sends no telemetry.
+- **Open files.** Markdown with YAML frontmatter and JSON. The format is documented and is the same one the mobile client reads. You can use the same folder with Obsidian. See [the vault](guia/boveda.md).
+- **AI is optional.** It works without AI. If you want it, you choose the provider: an API, a local model (Ollama, LM Studio) or a prompt you paste into the tool you prefer. See [AI](guia/ia.md).
+- **Open source.** GPL-3.0 license. You can read it, modify it and improve it. See [license](proyecto/licencia.md).
 
-!!! success "Nuestra meta: superar a Obsidian y Notion"
-    Obsidian y Notion son excelentes y ponen el listón alto. NoteVault busca ir más lejos: **abierto** (GPL-3.0), **local** (tus datos son archivos tuyos), con **tu estudio y tu vida dentro** (Mentor, tareas, hábitos, metas, finanzas…) y con **actualizaciones constantes**. Hoy ellos van por delante en plugins, apps móviles, colaboración y pulido; esa es la distancia que estamos cerrando. Mira [la comparación completa](https://lessteps.com/#comparar).
+!!! success "Our goal: to surpass Obsidian and Notion"
+    Obsidian and Notion are great and set the bar. NoteVault aims to go further: **open** (GPL-3.0), **local** (your data is plain files you own), with **your study and your life inside** (Mentor, tasks, habits, goals, finances…) and **constant updates**. Today they are ahead in plugins, mobile apps, collaboration and polish; that is the gap we are closing. See [the full comparison](https://lessteps.com/en/#comparar).
 
-## Qué incluye
+## What is included
 
-| Módulo | Para qué sirve |
+| Module | What it is for |
 | :--- | :--- |
-| Vista General | El resumen de tu día. |
-| Notas | Editor Markdown con vista previa en vivo, enlaces, lienzos (canvas) y fórmulas. |
-| Tareas y Proyectos | Tareas con recurrencia y proyectos con estados y plazos. |
-| Calendario | Rutinas y eventos por día. |
-| Hábitos | Registro diario de tus hábitos. |
-| Metas | Metas con submetas y seguimiento. |
-| Finanzas | Ingresos, gastos, categorías y metas de ahorro. |
-| Ejercicio y Alimentación | Biblioteca de ejercicios, rutinas y registro de comidas. |
-| Mentor | Plan de estudio con fechas, repasos espaciados y práctica. Ver [Mentor](guia/mentor.md). |
-| Skills | Las instrucciones con las que se generan notas, mapas y práctica, editables y versionadas. Ver [Skills](guia/skills.md). |
+| Overview | The summary of your day. |
+| Notes | Markdown editor with live preview, links, canvases and formulas. |
+| Tasks and Projects | Tasks with recurrence and projects with states and deadlines. |
+| Calendar | Routines and events per day. |
+| Habits | Daily log of your habits. |
+| Goals | Goals with sub-goals and tracking. |
+| Finances | Income, expenses, categories and savings goals. |
+| Exercise and Nutrition | Exercise library, routines and meal log. |
+| Mentor | Study plan with dates, spaced reviews and practice. See [Mentor](guia/mentor.md). |
+| Skills | The instructions that generate notes, maps and practice, editable and versioned. See [Skills](guia/skills.md). |
 
-Todos los módulos están descritos en [Módulos](guia/modulos.md).
+All modules are described in [Modules](guia/modulos.md).
 
-## Estado del proyecto
+## Project status
 
-NoteVault está en desarrollo activo. La versión actual es de escritorio (Windows con instalador; Linux y macOS desde el código fuente). El cliente móvil y la versión web están en el plan, todavía no publicados. Ver [hoja de ruta](proyecto/hoja-de-ruta.md).
+NoteVault is under active development. The current version is a desktop app (Windows with an installer; Linux and macOS from source). The mobile client and the web version are planned but not yet released. See the [roadmap](proyecto/hoja-de-ruta.md).
 
-## Quiénes somos y cómo apoyar
+## Who we are and how to support us
 
-NoteVault lo desarrolla **Lessteps**, un equipo de estudiantes sin apoyo ni sustento económico. «NoteVault» es un **nombre provisional** del producto; la empresa que lo representa es Lessteps. Si el proyecto te sirve, cualquier ayuda nos permite seguir desarrollándolo: [cómo apoyar](proyecto/apoyar.md).
+NoteVault is built by **Lessteps**, a team of students with no funding or financial backing. “NoteVault” is a **provisional name** for the product; the company behind it is Lessteps. If the project is useful to you, any help lets us keep developing it: [how to support](proyecto/apoyar.md).
 
-## Para desarrolladores
+## For developers
 
-La arquitectura, los requisitos y las decisiones de diseño están en la sección [Ingeniería](ingenieria.md). Para colaborar, empieza por [Contribuir](proyecto/contribuir.md).
+Architecture, requirements and design decisions are in the [Engineering](ingenieria.md) section (in Spanish). To collaborate, start with [Contributing](proyecto/contribuir.md).

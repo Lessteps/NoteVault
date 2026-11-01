@@ -1,22 +1,24 @@
-# Cambios
+# Changelog
 
-Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Las versiones siguen [SemVer](https://semver.org/lang/es/).
+*[Leer en español](translations/es/CHANGELOG.md)*
 
-## [Sin publicar]
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follow [SemVer](https://semver.org/).
+
+## [Unreleased]
 
 ## [0.1.0] - 2026-11-01
 
-### Añadido
-- Primera versión pública del código bajo GPL-3.0-or-later.
-- Documentación pública con MkDocs, sitio web y archivos de comunidad.
-- Skills: panel para ver y editar las instrucciones de generación, con historial de 3 versiones y detección automática de piezas desactualizadas.
-- Mentor: el plan se ajusta siempre a las fechas de inicio y fin, y cada asignatura muestra el ritmo necesario.
-- Teoría de los temas organizada en tres módulos funcionales: qué es, cómo se organiza y cómo actúa en el mundo real.
+### Added
+- First public release of the code under GPL-3.0-or-later.
+- Public documentation with MkDocs, a website and community files.
+- Skills: panel to view and edit the generation instructions, with a 3-version history and automatic detection of outdated pieces.
+- Mentor: the plan always fits the start and end dates, and each subject shows the pace needed.
+- Topic theory organized into three functional modules: what it is, how it is organized and how it acts in the real world.
 
-### Cambiado
-- Licencia: de Apache-2.0 a GPL-3.0-or-later.
-- Vista General: la racha, el ahorro y las gráficas muestran datos reales (antes salían valores de ejemplo).
-- Instalador de Windows con icono y nombre `NoteVault-Setup-<versión>.exe`.
+### Changed
+- License: from Apache-2.0 to GPL-3.0-or-later.
+- Overview: the streak, savings and charts show real data (they used to show sample values).
+- Windows installer with an icon and the name `NoteVault-Setup-<version>.exe`.
 
-### Corregido
-- El paso a paso de JavaScript ya no agota el tiempo en programas largos.
+### Fixed
+- The JavaScript step-by-step debugger no longer times out on long programs.

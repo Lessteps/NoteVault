@@ -1,40 +1,40 @@
-# Módulos
+# Modules
 
-Cada módulo guarda su información en archivos dentro de la bóveda (ver [La bóveda](boveda.md)).
+Each module stores its information in files inside the vault (see [The vault](boveda.md)).
 
-## Vista General
-El resumen del día: lo que toca hoy de tus tareas, hábitos y calendario.
+## Overview
+The summary of your day: what is due today across your tasks, habits and calendar.
 
-## Notas
-Editor de Markdown con vista previa en vivo, enlaces entre notas, fórmulas (KaTeX), bloques de código con resaltado y lienzos (`.canvas`) para organizar ideas en mapas. Las notas son archivos `.md` normales.
+## Notes
+Markdown editor with live preview, links between notes, formulas (KaTeX), highlighted code blocks and canvases (`.canvas`) to organize ideas as maps. Notes are ordinary `.md` files.
 
-## Tareas y Proyectos
-- **Tareas:** un archivo por tarea, con recurrencia.
-- **Proyectos:** un archivo por proyecto, con estados y plazos.
+## Tasks and Projects
+- **Tasks:** one file per task, with recurrence.
+- **Projects:** one file per project, with states and deadlines.
 
-## Calendario
-Rutinas y eventos por día.
+## Calendar
+Routines and events per day.
 
-## Hábitos
-Un archivo por día con el registro de tus hábitos.
+## Habits
+One file per day with the log of your habits.
 
-## Metas
-Una carpeta por meta, con submetas y registro diario de avance.
+## Goals
+One folder per goal, with sub-goals and a daily progress log.
 
-## Finanzas
-Ingresos y gastos con categorías, gastos recurrentes y metas de ahorro.
+## Finances
+Income and expenses with categories, recurring expenses and savings goals.
 
-## Ejercicio
-Biblioteca de 302 ejercicios con instrucciones paso a paso, búsqueda local y registro diario. Las instrucciones son redacción propia del proyecto; no están revisadas por un profesional de la salud, así que comprueba la técnica antes de subir carga. Ver los [créditos](../proyecto/licencia.md#creditos).
+## Exercise
+A library of 302 exercises with step-by-step instructions, local search and a daily log. The instructions are the project's own writing; they have not been reviewed by a health professional, so check the technique before adding load. See the [credits](../proyecto/licencia.md#credits).
 
-## Alimentación
-Alimentos, recetas y registro de comidas, con un asistente de nutrición opcional que usa la IA que hayas configurado.
+## Nutrition
+Foods, recipes and a meal log, with an optional nutrition assistant that uses the AI you have configured.
 
-## Navegador Web
-Un navegador integrado con su propia sesión, aislada del resto de la app.
+## Web Browser
+A built-in browser with its own session, isolated from the rest of the app.
 
 ## Mentor
-Plan de estudio con fechas, repasos espaciados y práctica. Ver [Mentor](mentor.md).
+Study plan with dates, spaced reviews and practice. See [Mentor](mentor.md).
 
 ## Skills
-Las instrucciones con las que se generan notas, mapas y práctica. Ver [Skills](skills.md).
+The instructions that generate notes, maps and practice. See [Skills](skills.md).

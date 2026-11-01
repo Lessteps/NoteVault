@@ -1,44 +1,44 @@
 # Mentor
 
-El Mentor arma tu plan de estudio, lo reparte en el calendario y te acompaña día a día. La guía completa de cada pantalla está en [`docs/MENTOR_GUIA.md`](https://github.com/Lessteps/NoteVault/blob/main/docs/MENTOR_GUIA.md); aquí tienes lo esencial.
+The Mentor builds your study plan, spreads it across the calendar and follows you day by day. The complete guide to each screen is in [`docs/MENTOR_GUIA.md`](https://github.com/Lessteps/NoteVault/blob/main/docs/MENTOR_GUIA.md) (in Spanish); here is the essentials.
 
-## Cómo está organizado
+## How it is organized
 
 ```text
 Mentor
-├─ Plan                  resumen de planes y cada plan
-│   └─ <tu plan>
-│       ├─ Ejecución     el día a día: hoy, áreas, Pomodoro, progreso
-│       └─ Plan          armar y ajustar (resumen, temas, agenda, práctica…)
-├─ Cierre del día        qué pasó hoy y qué corregir
-├─ Metas
-├─ Proyectos
-└─ Notas y estudio       temas a medias, repasos, errores
+├─ Plan                  overview of plans and each plan
+│   └─ <your plan>
+│       ├─ Execution     day to day: today, areas, Pomodoro, progress
+│       └─ Plan          build and adjust (summary, topics, agenda, practice…)
+├─ Day close             what happened today and what to fix
+├─ Goals
+├─ Projects
+└─ Notes and study       half-finished topics, reviews, mistakes
 ```
 
-El chat con el Mentor vive en el panel del asistente, en la columna derecha.
+The chat with the Mentor lives in the assistant panel, in the right column.
 
-## El plan siempre cabe en tus fechas
+## The plan always fits your dates
 
-Defines una fecha de inicio y una de fin. El plan **se ajusta a ese rango**: reparte todos los temas pendientes entre las dos fechas. En cada asignatura, la app te dice el **ritmo necesario** (temas por día y minutos por día) para llegar a la fecha de fin.
+You set a start date and an end date. The plan **adjusts to that range**: it spreads every pending topic between the two dates. For each subject, the app tells you the **required pace** (topics per day and minutes per day) to reach the end date.
 
-## Ejecución
+## Execution
 
-- **Hoy:** las áreas programadas, con sus temas, minutos y estado.
-- **Repasos espaciados** a los 3, 7, 14, 30, 60 y 120 días.
-- **Pomodoro** global que no se pierde al cambiar de pestaña; cada bloque queda en el registro de horas.
-- **Ruta sólida:** si hay un día anterior sin terminar, los temas posteriores quedan bloqueados hasta cerrarlo.
-- **Empezar hoy / Replanificar desde hoy:** mueve el comienzo del plan a hoy, mantiene la fecha de fin, conserva lo ya completado y se puede deshacer.
+- **Today:** the scheduled areas, with their topics, minutes and status.
+- **Spaced reviews** at 3, 7, 14, 30, 60 and 120 days.
+- **Pomodoro:** one global timer that is not lost when you change tabs; each block goes into the hours log.
+- **Solid route:** if an earlier day is unfinished, later topics stay blocked until it is closed.
+- **Start today / Replan from today:** moves the plan start to today, keeps the end date, keeps what is already completed and can be undone.
 
-## Estados de un tema
+## Topic states
 
-| Estado | Significado |
+| State | Meaning |
 | :--- | :--- |
-| Programado | Aún no le toca. |
-| En su tiempo | Hoy cae dentro de su ventana de fechas. |
-| Pendiente | Su tiempo pasó y no está completo (automático). |
-| Hecho | Completado. |
+| Scheduled | Not due yet. |
+| On time | Today falls within its date window. |
+| Pending | Its time has passed and it is not complete (automatic). |
+| Done | Completed. |
 
-## Cada tema son tres piezas
+## Every topic is three pieces
 
-Una nota de **teoría** (`.md`), un **mapa** (`.canvas`) y un archivo de **práctica** (`.practica.md`) con ejercicios. Las tres se generan con las [Skills](skills.md), y la app sabe con qué versión de la skill se hizo cada una.
+A **theory** note (`.md`), a **map** (`.canvas`) and a **practice** file (`.practica.md`) with exercises. All three are generated with the [Skills](skills.md), and the app knows which skill version each one was made with.

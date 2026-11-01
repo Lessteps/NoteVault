@@ -1,15 +1,15 @@
-# Contacto
+# Contact
 
-¿Preguntas, ideas, propuestas de colaboración o prensa? Escríbenos o síguenos:
+Questions, ideas, collaboration proposals or press? Write to us or follow us:
 
-| Canal | Enlace |
+| Channel | Link |
 | :--- | :--- |
-| ✉️ **Correo** | [lesstepscompany@gmail.com](mailto:lesstepscompany@gmail.com) |
+| ✉️ **Email** | [lesstepscompany@gmail.com](mailto:lesstepscompany@gmail.com) |
 | 📸 **Instagram** | [@lesstepscompany](https://www.instagram.com/lesstepscompany/) |
-| 👍 **Facebook** | [Lessteps en Facebook](https://www.facebook.com/profile.php?id=61595351223179) |
-| ▶️ **YouTube** | [Canal de Lessteps](https://www.youtube.com/channel/UC9NXc30n_PoqyDWnndQE2iQ) |
+| 👍 **Facebook** | [Lessteps on Facebook](https://www.facebook.com/profile.php?id=61595351223179) |
+| ▶️ **YouTube** | [Lessteps channel](https://www.youtube.com/channel/UC9NXc30n_PoqyDWnndQE2iQ) |
 | 💻 **GitHub** | [Lessteps/NoteVault](https://github.com/Lessteps/NoteVault) |
 
-- **Errores y sugerencias sobre la app:** abre un [issue](https://github.com/Lessteps/NoteVault/issues); así queda público y otras personas pueden ayudar.
-- **Vulnerabilidades de seguridad:** sigue [`SECURITY.md`](https://github.com/Lessteps/NoteVault/blob/main/SECURITY.md), no las publiques en un issue.
-- **Apoyar el proyecto:** [cómo apoyar](apoyar.md).
+- **Bugs and suggestions about the app:** open an [issue](https://github.com/Lessteps/NoteVault/issues) so it is public and others can help.
+- **Security vulnerabilities:** follow [`SECURITY.md`](https://github.com/Lessteps/NoteVault/blob/main/SECURITY.md); do not post them in an issue.
+- **Support the project:** [how to support](apoyar.md).

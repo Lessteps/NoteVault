@@ -106,7 +106,7 @@ test("NV-C-004 eliminar evento lo saca de la agenda y del disco", async () => {
   await createEvent(title);
   await openEditor(title);
   await editor().getByTitle("Eliminar").click();
-  const confirm = win.getByRole("dialog", { name: "Eliminar" });
+  const confirm = win.getByRole("alertdialog", { name: "Eliminar" });
   await expect(confirm).toBeVisible();
   await confirm.getByRole("button", { name: "Eliminar" }).click();
   await expect(win.getByText(title)).toHaveCount(0, { timeout: 15_000 });

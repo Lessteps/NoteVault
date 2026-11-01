@@ -4,6 +4,8 @@
 
 NoteVault reúne notas en Markdown, tareas, calendario, hábitos, metas, proyectos, finanzas, ejercicio, alimentación y un Mentor que arma y sigue tu plan de estudio. Todo vive en una carpeta de tu disco, sin cuenta, sin servidor y sin telemetría. La IA es opcional y la eliges tú: API, modelo local o un prompt que pegas en la herramienta que prefieras.
 
+> **Somos estudiantes y no tenemos apoyo ni sustento económico.** NoteVault es gratis y seguirá siéndolo, pero necesitamos dinero para continuar: cualquier ayuda sirve. [PayPal](https://paypal.me/lessteps) · Nequi/Bre-B `0093524288` · [más formas de apoyar](#apoyar-el-proyecto)
+
 [![Licencia: GPL-3.0](https://img.shields.io/badge/licencia-GPL--3.0-blue.svg)](LICENSE)
 
 - **Documentación:** <https://lessteps.com/docs/>

@@ -97,7 +97,7 @@ test("NV-T-003 eliminar tarea va a papelera, no se pierde", async () => {
   await win.keyboard.press("Enter");
   const created = await expect.poll(() => fileWithText(taskFiles(), name)).not.toBeNull().then(() => fileWithText(taskFiles(), name)!);
   await drawer.getByTitle("Eliminar (a la papelera)").click();
-  const dialog = win.getByRole("dialog");
+  const dialog = win.getByRole("alertdialog");
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Eliminar" }).click();
   await expect(win.locator("div[class*='group/row']", { hasText: name })).toHaveCount(0, { timeout: 15_000 });

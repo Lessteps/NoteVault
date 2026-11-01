@@ -120,7 +120,7 @@ test("NV-H-005 eliminar hábito lo saca del config", async () => {
   const editor = win.locator("aside[class*='w-[380px]']");
   await expect(editor).toBeVisible();
   await editor.getByRole("button", { name: "Eliminar hábito" }).click();
-  const dialog = win.getByRole("dialog");
+  const dialog = win.getByRole("alertdialog");
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Eliminar" }).click();
 

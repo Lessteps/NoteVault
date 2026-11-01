@@ -11,6 +11,7 @@ import { RightPanel } from "./components/notes/RightPanel";
 import { ReviewCalendar, useReviewCalendar } from "./components/study/ReviewCalendar";
 import { renameEntry } from "./components/notes/FileTree";
 import { DialogHost, MenuHost } from "./components/ui";
+import { SupportNotice } from "./components/SupportNotice";
 import { VaultDialog } from "./components/VaultDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
 import { PomodoroTicker } from "./components/mentor/AreaSession";
@@ -344,6 +345,7 @@ export function App() {
       <DialogHost />
       <MenuHost />
       <Toasts />
+      <SupportNotice />
       <MiniPlayer />
     </div>
   );

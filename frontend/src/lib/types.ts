@@ -27,6 +27,8 @@ export interface AppInfo {
   vault_path: string;
   theme: "dark" | "light";
   rendering?: RenderingSettings;
+  /** HOME aislado (pruebas y capturas): la app no enseña avisos de apoyo. */
+  sandbox?: boolean;
 }
 
 export interface TreeEntry {

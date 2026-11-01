@@ -45,7 +45,7 @@ test("NV-F-001 registro rapido de gasto aparece en tabla y en disco", async () =
   await win.getByLabel("Importe rápido").fill("12500");
   await win.getByPlaceholder("Detalle").fill(what);
   await win.getByRole("button", { name: /Guardar/ }).click();
-  await expect(win.getByText(/^Guardado:/)).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByText(/registrado: /).first()).toBeVisible({ timeout: 15_000 });
   await expect(win.getByRole("button", { name: new RegExp(`Gasto.*${what}`) })).toBeVisible({ timeout: 15_000 });
   const file = todayFile();
   expect(existsSync(file)).toBe(true);
@@ -251,7 +251,7 @@ test("NV-F-010 historial busca en todo el historial", async () => {
   await win.getByLabel("Importe rápido").fill("7000");
   await win.getByPlaceholder("Detalle").fill(what);
   await win.getByRole("button", { name: /Guardar/ }).click();
-  await expect(win.getByText(/^Guardado:/)).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByText(/registrado: /).first()).toBeVisible({ timeout: 15_000 });
 
   await side().getByRole("button", { name: "Periodo" }).click();
   await expect(win.getByRole("heading", { name: "Periodo" })).toBeVisible({ timeout: 15_000 });

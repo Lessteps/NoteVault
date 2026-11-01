@@ -45,6 +45,7 @@ export function appApi(app: AppState) {
         vault_path: app.root,
         theme: AppConfig.get_theme(),
         rendering: AppConfig.get_rendering(),
+        sandbox: !!process.env.NV_E2E_HOME && !process.env.NV_E2E_SUPPORT,
       };
     },
 

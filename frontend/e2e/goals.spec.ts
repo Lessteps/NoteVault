@@ -96,10 +96,12 @@ test("NV-M-002 crear submeta y verificar items en disco", async () => {
   const name = `E2E Meta Submetas ${Date.now()}`;
   await createGoal(name);
   await openGoal(name);
-  await win.getByRole("button", { name: "Submeta", exact: true }).click();
+  await win.getByRole("button", { name: "Nueva submeta" }).click();
   // Crear abre el detalle de la submeta con su nombre en el editor.
   await expect(win.getByLabel("Nombre de la submeta")).toHaveValue("Nueva submeta", { timeout: 15_000 });
   await expect.poll(() => filesWithText("Nueva submeta")).not.toEqual([]);
+  // Deja el editor cerrado: las pruebas comparten la app.
+  await win.keyboard.press("Escape");
 });
 
 test("NV-M-003 pestañas Submetas Hoy Historial Notas cambian la vista", async () => {

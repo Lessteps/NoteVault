@@ -372,9 +372,46 @@ describe("PlanForm — precondiciones", () => {
   it("sin IA lo dice y sin metas ni materias sigue funcionando", async () => {
     vi.spyOn(api, "mentorPlanOptions").mockResolvedValue(options({ aiConfigured: false, goals: [], areas: [], topics: [] }));
     await mountForm();
-    expect(host.textContent).toContain("La IA no está configurada: se generará un plan automático");
+    expect(host.textContent).toContain("No hay IA configurada en la app: puedes crear el plan con otra IA");
     expect(host.textContent).toContain("No tienes metas activas con temas enlazados");
     expect(host.textContent).toContain("Aún no hay temas de estudio");
+  });
+
+  it("«Crear con otra IA»: genera el archivo y crea el plan desde el archivo o lo pegado, sin IA configurada", async () => {
+    vi.spyOn(api, "mentorPlanOptions").mockResolvedValue(options({ aiConfigured: false }));
+    const made = { loading: false as const, rel: "Programación/_handoff/planes/x_plan.md", abs: "/v/x_plan.md", answerRel: "Programación/_handoff/planes/x_plan_respuesta.json", answerAbs: "/v/r.json", shortPrompt: "NEW TASK short", chatPrompt: "FULL PROMPT", topics: 3 };
+    const prompt = vi.spyOn(api, "mentorPlanExternalPrompt").mockResolvedValue(made);
+    const created = { loading: false as const, kind: "plan_created" as const, planId: "p9", source: "ai" as const, text: "x", chatId: "c1", id: "c1", title: "t", pending: null, turns: [], planDraft: {} as never };
+    const accept = vi.spyOn(api, "mentorPlanExternalAccept").mockResolvedValue(created as never);
+    await mountForm();
+    expect(host.querySelector("[data-testid=plan-external-ai]")).toBeNull();
+    await click(host.querySelector("[data-testid=plan-external-toggle]")!);
+    expect(host.querySelector("[data-testid=plan-external-ai]")!.textContent).toContain("No necesita clave de API ni modelo local");
+    await click(host.querySelector("[data-testid=external-make]")!);
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(prompt.mock.calls[0]![0]).toMatchObject({ goalIds: ["g1"], minutesPerDay: 120 });
+    expect(host.querySelector("[data-testid=external-made]")!.textContent).toContain("x_plan_respuesta.json");
+    await click(host.querySelector("[data-testid=external-read-file]")!);
+    expect(accept).toHaveBeenCalledWith(expect.objectContaining({ goalIds: ["g1"] }), { answerRel: made.answerRel });
+    expect(useNavState.getState().values["mentor.view"]).toBe("plan:p9");
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("«Crear con otra IA»: pegar la respuesta manda el texto y un error de la API se muestra sin cerrar el formulario", async () => {
+    const accept = vi.spyOn(api, "mentorPlanExternalAccept").mockRejectedValue(new Error("No pude usar esa respuesta: x"));
+    const toast = vi.fn();
+    useApp.setState({ toast } as never);
+    await mountForm();
+    await click(host.querySelector("[data-testid=plan-external-toggle]")!);
+    const ta = host.querySelector<HTMLTextAreaElement>("[data-testid=external-paste]")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(ta, '{"type":"plan_draft"}');
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(host.querySelector("[data-testid=external-accept-paste]")!);
+    expect(accept).toHaveBeenCalledWith(expect.anything(), { reply: '{"type":"plan_draft"}' });
+    expect(toast).toHaveBeenCalledWith("error", "No pude usar esa respuesta: x");
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("Cancelar y cerrar", async () => {

@@ -4,6 +4,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 
 ## [Sin publicar]
 
+### Añadido
+- Mentor: crear un plan con otra IA (Antigravity o un chat) sin clave de API ni modelo local. NoteVault escribe el pedido en la bóveda y valida la respuesta antes de crear el plan.
+
 ## [0.1.0] - 2026-11-01
 
 ### Añadido

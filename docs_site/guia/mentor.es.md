@@ -22,6 +22,14 @@ El chat con el Mentor vive en el panel del asistente, en la columna derecha.
 
 Defines una fecha de inicio y una de fin. El plan **se ajusta a ese rango**: reparte todos los temas pendientes entre las dos fechas. En cada asignatura, la app te dice el **ritmo necesario** (temas por día y minutos por día) para llegar a la fecha de fin.
 
+## Crear un plan con otra IA (sin clave de API ni modelo local)
+
+En **Crear plan**, el botón **Crear con otra IA (Antigravity, un chat)** funciona sin ninguna IA configurada en NoteVault:
+
+1. NoteVault escribe en tu bóveda (`_handoff/planes/`) un archivo con tus precondiciones fijas (fechas, tiempo diario, días de estudio, ritmo), las reglas del Mentor y el catálogo real de temas.
+2. Copias una instrucción corta en Antigravity (o el pedido completo en un chat web). La IA diseña el plan y lo escribe al lado.
+3. De vuelta en NoteVault, pulsas **Crear el plan desde su archivo** (o pegas la respuesta). La app lo valida con las mismas comprobaciones que su propia IA: los temas que no existen se descartan y tus fechas y tiempos nunca cambian. El plan se crea como *propuesto*: lo mantienes o lo borras.
+
 ## Ejecución
 
 - **Hoy:** las áreas programadas, con sus temas, minutos y estado.

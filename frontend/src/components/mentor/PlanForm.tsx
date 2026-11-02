@@ -6,7 +6,7 @@
 // «Generar plan» deja un BORRADOR (la IA elige y ordena temas; sin IA, un plan automático): no escribe nada
 // hasta «Aceptar plan».
 
-import { CalendarRange, ListChecks, Loader2, Sparkles, X } from "lucide-react";
+import { CalendarRange, ClipboardList, ListChecks, Loader2, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
@@ -52,6 +52,7 @@ import { Panel } from "../common/StatTile";
 import { cn } from "../ui";
 import { PRESETS } from "./MentorToday";
 import { ChipToggle, ThinkingStatus, useAiStatus } from "./parts";
+import { PlanExternalAi } from "./PlanExternalAi";
 
 type Loaded = Extract<MentorPlanOptions, { loading: false }>;
 
@@ -140,6 +141,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   const loadBuilds = useMentor((s) => s.loadBuilds);
   const generating = useMentor((s) => s.generatingPlan);
   const [startingBuild, setStartingBuild] = useState<string | null>(null);
+  const [externalOpen, setExternalOpen] = useState(false);
   const mem = useMemo(remembered, []);
   const t0 = today();
 
@@ -810,11 +812,27 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
         <GhostButton onClick={() => void startGuided()} className={generating || !!startingBuild || !!problem || nothingChosen ? "opacity-50" : ""} title="El Mentor va armando el plan por etapas y te pregunta lo que haga falta">
           {startingBuild ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />} Armar paso a paso (con preguntas)
         </GhostButton>
+        <GhostButton onClick={() => setExternalOpen((v) => !v)} className={problem || nothingChosen ? "opacity-50" : ""} aria-expanded={externalOpen} data-testid="plan-external-toggle" title="Sin clave de API ni modelo local: Antigravity o un chat diseñan el plan y la app lo valida">
+          <ClipboardList size={14} /> Crear con otra IA (Antigravity, un chat)
+        </GhostButton>
         <GhostButton onClick={onClose}>Cancelar</GhostButton>
         <span className="text-[13px] text-faint">
-          {options && !options.aiConfigured ? "La IA no está configurada: se generará un plan automático con lo que elegiste." : "Se crea el plan completo, propuesto: lo mantienes o lo borras, y puedes pedirle cambios con comentarios."}
+          {options && !options.aiConfigured ? "No hay IA configurada en la app: puedes crear el plan con otra IA (Antigravity o un chat) sin clave ni modelo local, o generar uno automático." : "Se crea el plan completo, propuesto: lo mantienes o lo borras, y puedes pedirle cambios con comentarios."}
         </span>
       </div>
+      {externalOpen && (
+        <PlanExternalAi
+          pre={pre}
+          disabled={!!problem || nothingChosen}
+          onCreated={(planId) => {
+            remember();
+            if (alive.current) {
+              useNavState.getState().set("mentor.view", planViewId(planId));
+              onClose();
+            }
+          }}
+        />
+      )}
       {generating && <ThinkingStatus label={gen.label || "Generando el plan completo…"} elapsed={gen.elapsed} onCancel={() => void api.mentorAiCancel("generate", "abort")} onAuto={() => void api.mentorAiCancel("generate", "auto")} autoLabel="Generar con plan automático (sin IA)" />}
       {startingBuild && <ThinkingStatus label={guided.label || "Preparando el alcance de tu plan…"} elapsed={guided.elapsed} onCancel={() => void api.mentorAiCancel(`build:${startingBuild}`, "abort")} onAuto={() => void api.mentorAiCancel(`build:${startingBuild}`, "auto")} />}
     </section>

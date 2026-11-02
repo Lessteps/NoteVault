@@ -6,6 +6,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versio
 
 ## [Unreleased]
 
+### Added
+- Mentor: create a plan with another AI (Antigravity or a chat) with no API key or local model. NoteVault writes the request into the vault and validates the answer before creating the plan.
+
 ## [0.1.0] - 2026-11-01
 
 ### Added

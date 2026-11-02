@@ -157,6 +157,7 @@ import { mentorPlanFoldersApi } from "./mentorPlanFolders.js";
 import { mentorAreaTimesApi } from "./mentorAreaTimes.js";
 import { mentorProjectLinksApi } from "./mentorProjectLinks.js";
 import { mentorPlanDossierApi } from "./mentorPlanDossier.js";
+import { buildExternalPlanDoc, externalPlanChatPrompt, externalPlanShortPrompt } from "../../lib/planExternal.js";
 import { mentorPlanDepthApi } from "./mentorPlanDepth.js";
 import { mentorDayCloseApi } from "./mentorDayClose.js";
 import { DayCloseStore } from "../../core/mentor/dayClose.js";
@@ -315,6 +316,27 @@ function toHistory(turns: readonly ChatTurnRecord[]): ChatTurn[] {
 }
 
 /** Metas y proyectos reales que la IA puede referenciar en un plan del mes. */
+/** El alcance de un plan a partir de las precondiciones (el mismo cálculo que «Generar plan»): ramas, temas elegidos y catálogo real. */
+function externalPlanScope(app: AppState, pre0: PlanPreconditions, today: string) {
+  const all = buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 });
+  const goals = goalScopes(app);
+  const pre = resolveBranches(pre0, all, goals.filter((g) => pre0.goalIds.includes(g.id)).map((g) => g.name));
+  const scope = resolveScope(pre, all, goals);
+  const catalog = planCatalog(scope, dynamicCatalogMax(pre, scope, today), `${pre.freeObjective ?? ""} ${pre.notes ?? ""}`);
+  if (!catalog.length) throw new ApiError("No hay temas pendientes en lo que elegiste. Elige metas con temas enlazados o materias con temas sin completar.");
+  return { pre, scope, catalog, goals };
+}
+
+/** La carpeta de primer nivel donde viven la mayoría de los temas (ahí va `_handoff`). */
+function mostCommonSpace(folders: readonly string[]): string {
+  const count = new Map<string, number>();
+  for (const f of folders) {
+    const top = f.split("/")[0] ?? "";
+    if (top) count.set(top, (count.get(top) ?? 0) + 1);
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Programación";
+}
+
 function planContext(app: AppState, today: string): PlanContext {
   const m = app.mgrs();
   return {
@@ -1489,6 +1511,73 @@ export function mentorApi(app: AppState, send?: SendFn) {
         const next = chatLog.append({ role: "assistant", content: `Plan creado: ${planName_}. ${draft.rationale}`.trim(), createdPlan: created.id });
         return { loading: false as const, kind: "plan_created" as const, source, text, planId: created.id, planDraft: draft, turns: next, pending: pendingDraft(next)?.id ?? null, chatId: chatLog.record().id };
       });
+    },
+
+    /**
+     * «Crear el plan con otra IA» (Antigravity, un chat…): escribe en la vault el MISMO pedido que la app le haría a su IA (reglas, precondiciones fijas
+     * y catálogo real) y devuelve la frase corta para pegar. No usa la IA de la app (no exige clave ni modelo local) ni crea ningún plan: eso ocurre en
+     * `mentor_plan_external_accept` cuando la otra IA ya respondió.
+     */
+    mentor_plan_external_prompt(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const today = localDate();
+      const pre0 = sanitizePreconditions(o.preconditions && typeof o.preconditions === "object" ? o.preconditions : o, today);
+      const problem = preconditionsProblem(pre0, today);
+      if (problem) throw new ApiError(problem);
+      if (studyIndexCold(app)) return { loading: true as const };
+      const { pre, scope, catalog } = externalPlanScope(app, pre0, today);
+      const brief = buildStudentBrief(briefContext(app, log()));
+      const areaNames = app.mgrs().areas.areas().filter((a) => !a.archived).map((a) => a.name);
+      const request = preconditionsRequest(pre, scope);
+      const messages = buildPlanMessages(pre, brief, catalog, [], { today, areas: areaNames, plan: planContext(app, today), scope }, request);
+      const space = mostCommonSpace(catalog.map((t) => t.folder));
+      const now = new Date();
+      const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+      const dir = path.join(app.root, space, "_handoff", "planes");
+      const file = path.join(dir, `${stamp}_plan.md`);
+      const answer = path.join(dir, `${stamp}_plan_respuesta.json`);
+      const doc = buildExternalPlanDoc({ system: messages[0]!.content, request, answerAbs: answer, today, topics: catalog.length });
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(file, doc, "utf-8");
+      const rel = (p: string): string => path.relative(app.root, p).split(path.sep).join("/");
+      return { loading: false as const, rel: rel(file), abs: file, answerRel: rel(answer), answerAbs: answer, shortPrompt: externalPlanShortPrompt(file, answer), chatPrompt: externalPlanChatPrompt(doc), topics: catalog.length };
+    },
+
+    /**
+     * Crea el plan «propuesto» con la respuesta de la otra IA: pegada (`reply`) o leída del archivo (`answerRel`). La valida el mismo analizador que la IA de la
+     * app: lo inventado se descarta, las precondiciones no se tocan y, si la respuesta no sirve, se explica por qué sin crear nada.
+     */
+    async mentor_plan_external_accept(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const today = localDate();
+      const pre0 = sanitizePreconditions(o.preconditions && typeof o.preconditions === "object" ? o.preconditions : o, today);
+      const problem = preconditionsProblem(pre0, today);
+      if (problem) throw new ApiError(problem);
+      let raw = typeof o.reply === "string" ? o.reply : "";
+      if (!raw.trim() && typeof o.answerRel === "string" && o.answerRel) {
+        const abs = path.resolve(app.root, ...o.answerRel.split("/"));
+        const inside = path.relative(path.join(app.root), abs).split(path.sep);
+        if (inside.includes("..") || !inside.includes("_handoff") || !inside.includes("planes")) throw new ApiError("Esa ruta no es una respuesta de plan.");
+        if (!fs.existsSync(abs)) throw new ApiError("La otra IA todavía no escribió su respuesta. Cuando termine, vuelve a pulsar este botón (o pega su respuesta).");
+        raw = fs.readFileSync(abs, "utf-8");
+      }
+      if (!raw.trim()) throw new ApiError("Pega la respuesta de la otra IA o espera a que escriba el archivo.");
+      if (studyIndexCold(app)) return { loading: true as const };
+      if (jobs.has("generate")) throw new ApiError("Ya se está generando un plan. Espera a que termine o cancélalo.");
+      const { pre, catalog, goals } = externalPlanScope(app, pre0, today);
+      const parsed = parsePreconditionReply(raw, catalog, planContext(app, today));
+      if (!parsed.ok) throw new ApiError(`No pude usar esa respuesta: ${parsed.reason}`);
+      const { seeds, why } = seedsFromReply(parsed.reply, catalog, pre, new Map(goals.map((g) => [g.id, g.name])), goals);
+      if (!seeds.length) throw new ApiError("La respuesta no trae ningún tema válido del catálogo. Pídele que use solo las carpetas (folder) que aparecen en el archivo.");
+      const draft = composeFromPreconditions(markDiagnostics(seeds, pre), pre, { today, auto: false, rationale: parsed.reply.rationale, discarded: parsed.reply.discarded, why, startFocus: practiceStartFocus(app), practiceSuggestions: parsed.reply.practice });
+      const created = acceptRef({ draft, proposed: true }) as { id: string };
+      const name = planName(new PlanStore(app.root).load(created.id)!);
+      const active = chats().peek();
+      const chatLog = active && active.load().length === 0 ? active : chats().create();
+      chatLog.append({ role: "user", content: "Plan creado con otra IA (Antigravity / chat)." });
+      const text = draft.rationale || `Plan del ${draft.start} al ${draft.end}: ${draft.subplans.length} subplanes`;
+      const next = chatLog.append({ role: "assistant", content: `Plan creado: ${name}. ${draft.rationale}`.trim(), createdPlan: created.id });
+      return { loading: false as const, kind: "plan_created" as const, source: "ai" as const, text, planId: created.id, planDraft: draft, turns: next, pending: pendingDraft(next)?.id ?? null, chatId: chatLog.record().id };
     },
 
     /**

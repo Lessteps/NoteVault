@@ -10,7 +10,7 @@ This page says where the project is, not when things will happen.
 
 ## Next
 
-- Mobile client (Android) that reads and writes the same vault. The format is already designed for it.
+- Mobile client (Android) that reads and writes the same vault: [already in early builds](../guia/movil.md); calendar editing, goals, projects and the Mentor are next.
 - macOS packaging.
 - Web version.
 - Signed installer.

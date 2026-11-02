@@ -60,6 +60,7 @@ plugins:
             The vault: La bóveda
             Skills: Skills
             AI: IA
+            Mobile app: App móvil
             Project: Proyecto
             License and credits: Licencia y créditos
             Contributing: Contribuir
@@ -103,6 +104,7 @@ nav:
       - Mentor: guia/mentor.md
       - Skills: guia/skills.md
       - AI: guia/ia.md
+      - Mobile app: guia/movil.md
   - Project:
       - License and credits: proyecto/licencia.md
       - Contributing: proyecto/contribuir.md

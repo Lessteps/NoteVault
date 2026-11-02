@@ -10,7 +10,7 @@ Esta página dice dónde está el proyecto, no promete fechas.
 
 ## Después
 
-- Cliente móvil (Android) que lee y escribe la misma bóveda. El formato ya está pensado para ello.
+- Cliente móvil (Android) que lee y escribe la misma bóveda: [ya en versiones iniciales](../guia/movil.md); la edición del calendario, las metas, los proyectos y el Mentor son lo siguiente.
 - Empaquetado para macOS.
 - Versión web.
 - Instalador firmado.

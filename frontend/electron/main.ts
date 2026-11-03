@@ -54,6 +54,7 @@ const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 import { FileWatcherService, type WatchEvent } from "../src/core/fileWatcher";
 import { createVaultChangeNotifier } from "../src/core/vaultChange";
 import { invalidateVaultCaches } from "../src/api/vaultInvalidate";
+import { isOwnWriteEcho } from "../src/core/ownWrites";
 
 let win: BrowserWindow | null = null;
 let fileWatcher: FileWatcherService | null = null;
@@ -74,6 +75,8 @@ export function restartFileWatcher(root?: string) {
       if (win && !win.isDestroyed()) {
         win.webContents.send("vault-watch-event", event);
       }
+      // el eco del autoguardado de una nota que se está editando no es un cambio de fuera: no invalida índices ni manda releer planes y temas
+      if (event.eventType === "change" && isOwnWriteEcho(event.fullPath)) return;
       notify(event.relPath);
     });
     fileWatcher.start();

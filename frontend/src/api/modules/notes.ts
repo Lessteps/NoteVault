@@ -2,6 +2,7 @@
 // of notevault_app/webapp/api.py.
 
 import * as fs from "node:fs";
+import { markOwnWrite } from "../../core/ownWrites.js";
 import * as path from "node:path";
 import { ApiError } from "../../core/errors.js";
 import { kindFor } from "../../core/fileKinds.js";
@@ -162,9 +163,12 @@ export function notesApi(app: AppState) {
           return { ok: false, conflict: true, modified: mtime };
         }
       }
+      const existed = fs.existsSync(p);
       fs.mkdirSync(path.dirname(p), { recursive: true });
       fs.writeFileSync(p, raw, "utf-8");
       app.service.noteWritten(p, raw);
+      // editar una nota que ya existía no cambia la estructura de la vault: su eco en el vigilante no debe disparar la relectura de planes y temas
+      if (existed) markOwnWrite(p);
       return { ok: true, conflict: false, modified: fs.statSync(p).mtimeMs / 1000 };
     },
 

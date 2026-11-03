@@ -47,15 +47,48 @@ function attemptsOf(entry: unknown): any[] {
   return Array.isArray(list) ? list : [];
 }
 
-export function snapshotTopics(input: TopicSnapInput): TopicSnap[] {
-  const out: TopicSnap[] = [];
-  const noteRels = (input.noteRels ?? []).map((r) => r.replace(/\\/g, "/"));
-  for (const { folder: rawFolder, manifest } of input.manifests) {
-    const folder = rawFolder.replace(/\\/g, "/");
-    const prefix = folder + "/";
-    const exercises = input.exercises.filter((ex) => (ex.rel || ex.path).replace(/\\/g, "/").startsWith(prefix));
-    const progress = computeTopicProgress(manifest, exercises, input.attempts, input.examFor(manifest), 0);
+/** Las carpetas ancestro de una ruta POSIX (`a/b/c.md` → `a`, `a/b`), de la más corta a la más larga. */
+function ancestorsOf(rel: string): string[] {
+  const out: string[] = [];
+  for (let i = rel.indexOf("/"); i >= 0; i = rel.indexOf("/", i + 1)) out.push(rel.slice(0, i));
+  return out;
+}
 
+/**
+ * La foto de cada tema: progreso, ejercicios, teoría e intentos. Se reparte cada ejercicio y cada nota entre los temas que la contienen UNA sola vez
+ * (por carpeta ancestro), en vez de recorrer todos los ejercicios y todas las notas por cada tema: con ~1000 temas, ~8000 ejercicios y ~10000 notas eso
+ * eran decenas de millones de comparaciones (2–3 s con el proceso principal bloqueado y la escritura congelada). El resultado es idéntico al de recorrerlos.
+ */
+export function snapshotTopics(input: TopicSnapInput): TopicSnap[] {
+  const topics = input.manifests.map(({ folder, manifest }) => ({ folder: folder.replace(/\\/g, "/"), manifest }));
+  const byFolder = new Map<string, number[]>();
+  topics.forEach((t, i) => byFolder.set(t.folder, [...(byFolder.get(t.folder) ?? []), i]));
+
+  const exercisesOf: ExerciseRef[][] = topics.map(() => []);
+  const exerciseRelsOf: Array<Set<string>> = topics.map(() => new Set<string>());
+  for (const ex of input.exercises) {
+    const rel = (ex.rel || ex.path).replace(/\\/g, "/");
+    for (const dir of ancestorsOf(rel)) {
+      for (const i of byFolder.get(dir) ?? []) {
+        exercisesOf[i]!.push(ex);
+        exerciseRelsOf[i]!.add(rel);
+      }
+    }
+  }
+
+  const theoryOf: number[] = topics.map(() => 0);
+  for (const raw of input.noteRels ?? []) {
+    const r = raw.replace(/\\/g, "/");
+    const base = r.slice(r.lastIndexOf("/") + 1);
+    if (base.startsWith("_") || base.startsWith(".") || base.toLowerCase().endsWith(".practica.md")) continue;
+    for (const dir of ancestorsOf(r)) {
+      for (const i of byFolder.get(dir) ?? []) if (!exerciseRelsOf[i]!.has(r)) theoryOf[i]! += 1;
+    }
+  }
+
+  return topics.map(({ folder, manifest }, i): TopicSnap => {
+    const exercises = exercisesOf[i]!;
+    const progress = computeTopicProgress(manifest, exercises, input.attempts, input.examFor(manifest), 0);
     let attemptCount = 0;
     let last: string | null = null;
     for (const ex of exercises) {
@@ -65,28 +98,19 @@ export function snapshotTopics(input: TopicSnapInput): TopicSnap[] {
         if (at && (last === null || at > last)) last = at;
       }
     }
-
-    const exerciseRels = new Set(exercises.map((e) => (e.rel || e.path).replace(/\\/g, "/")));
-    const theoryNotes = noteRels.filter((r) => {
-      if (!r.startsWith(prefix) || exerciseRels.has(r)) return false;
-      const base = r.slice(r.lastIndexOf("/") + 1);
-      return !base.startsWith("_") && !base.startsWith(".") && !base.toLowerCase().endsWith(".practica.md");
-    }).length;
-
     const planExercises = manifest.plan
       ? Object.values(manifest.plan).reduce((n, row) => n + (Array.isArray(row) ? row.reduce((a, b) => a + (Number(b) || 0), 0) : 0), 0)
       : 0;
-    out.push({
+    return {
       folder,
       subject: manifest.subject,
       title: manifest.title,
       progress,
       exerciseCount: exercises.length,
-      theoryNotes,
+      theoryNotes: theoryOf[i]!,
       attemptCount,
       lastAttemptAt: last,
       ...(planExercises > 0 ? { planExercises } : {}),
-    });
-  }
-  return out;
+    };
+  });
 }

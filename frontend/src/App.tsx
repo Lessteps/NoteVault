@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { api } from "./lib/bridge";
 import { listenForCaptures } from "./lib/screenCapture";
 import { flushAll, useApp, wasJustWritten } from "./store/app";
+import { shouldRefreshTree } from "./lib/watchFlush";
 import { MiniPlayer } from "./components/english/MiniPlayer";
 import { ComingSoon, IconRail, MODULES as MODULE_LABELS, StatusBar, Toasts, TopBar, TAB_MIME } from "./components/Shell";
 import { ModuleHost } from "./components/ModuleHost";
@@ -216,7 +217,8 @@ function useFileWatcherListener() {
       const rels = [...changed];
       changed.clear();
       const s = useApp.getState();
-      s.refreshTree();
+      // un autoguardado propio no cambia el árbol: sin esto cada guardado recontaba todas las notas de la vault
+      if (shouldRefreshTree(rels, (rel) => !!s.notes[rel] && wasJustWritten(rel))) s.refreshTree();
       for (const rel of rels) {
         // Our own save comes back as a file event: re-reading it would rebuild the
         // editor with what it already shows.

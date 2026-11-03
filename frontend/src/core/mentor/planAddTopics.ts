@@ -10,6 +10,7 @@
  */
 
 import { areaDef, CORE_GROUP_ID, type AreaGroup } from "../../lib/planAreas.js";
+import { compareKeys, numberKey } from "../../lib/planOrganize.js";
 import { classifyBranch, weekRangesOf } from "../../lib/planTime.js";
 import { branchOfFolder } from "../../lib/planTopicCatalog.js";
 import type { PlannedTopic, Plan, Subplan, WeekSlice } from "./plan.js";
@@ -73,12 +74,40 @@ export function findAreaSubplan(plan: Pick<Plan, "subplans">, target: PlanAreaTa
   );
 }
 
+/**
+ * Dónde entra un tema nuevo cuyo ÁREA (`Programación/2.1 Python/…`) ya está en el plan: en el MISMO subplan y el MISMO grupo que sus hermanos. Es la regla que
+ * cubre lo que no es de una rama de conocimiento (los lenguajes `2.1 Python`, `2.2 JavaScript`, `2.3 TypeScript`, los fundamentos…): sus piezas nuevas
+ * (`2.1.4.2`) cuelgan de su capítulo (`2.1.4`) y heredan su grupo; si el capítulo no está, el de cualquier tema de la misma carpeta de área.
+ * Puro: devuelve undefined si el plan no tiene nada de esa área (lo que el estudiante quitó antes no vuelve).
+ */
+export function siblingPlacement(plan: Pick<Plan, "subplans">, folder: string): { subplanId: string; groupId?: string } | undefined {
+  const parts = folder.replace(/\\/g, "/").split("/").filter(Boolean);
+  if (parts.length < 3) return undefined;
+  const areaPrefix = `${parts.slice(0, 2).join("/")}/`;
+  const mine = numberKey(folder);
+  let best: { subplanId: string; groupId?: string; rank: number } | undefined;
+  for (const s of plan.subplans) {
+    for (const t of s.topics) {
+      if (!t.folder.replace(/\\/g, "/").startsWith(areaPrefix)) continue;
+      const theirs = numberKey(t.folder);
+      // el capítulo del que cuelga la pieza (su número es prefijo del de la pieza) gana; después, el tema más cercano por número; después, cualquiera del área
+      const parent = !!(mine && theirs && theirs.length < mine.length && theirs.every((n, i) => mine[i] === n));
+      const near = mine && theirs ? 1 / (1 + Math.abs(compareKeys(mine, theirs))) : 0;
+      const rank = (parent ? 2 : 0) + near;
+      if (!best || rank > best.rank) best = { subplanId: s.id, ...(t.group ? { groupId: t.group } : {}), rank };
+    }
+  }
+  return best ? { subplanId: best.subplanId, ...(best.groupId ? { groupId: best.groupId } : {}) } : undefined;
+}
+
 export interface AddTopicItem {
   folder: string;
   title: string;
   estMinutes: number;
   /** destino: el subplan elegido a mano (id) o el área por defecto del mapa */
   subplanId?: string;
+  /** grupo del subplan donde entra (si existe en él); sin él, el grupo por defecto del área */
+  groupId?: string;
   target?: PlanAreaTarget;
 }
 
@@ -108,7 +137,9 @@ function weeksOf(plan: Pick<Plan, "start" | "end">, sub: Pick<Subplan, "topics" 
   });
 }
 
-function groupForItem(it: AddTopicItem, subAreaId?: string): { id: string; title: string; order: number } | undefined {
+function groupForItem(it: AddTopicItem, subAreaId?: string, existing: readonly AreaGroup[] = []): { id: string; title: string; order: number } | undefined {
+  const wanted = it.groupId ? existing.find((g) => g.id === it.groupId) : undefined;
+  if (wanted) return { id: wanted.id, title: wanted.title, order: wanted.order };
   if (!subAreaId) return undefined;
   const f = it.folder.replace(/\\/g, "/");
   if (f.includes("/5 Frontend/HTML/") || f.includes("/11 HTML/")) return { id: "html", title: "HTML", order: 110 };
@@ -171,7 +202,7 @@ export function addTopicsToPlan(plan: Plan, items: readonly AddTopicItem[]): Add
     const lastWeek = Math.min(weeks, Math.max(1, ...sub.topics.map((t) => t.targetWeek)));
     let groupsOf = sub.groups ? [...sub.groups] : [];
     const fresh: PlannedTopic[] = g.items.map((it, i) => {
-      const gDef = groupForItem(it, sub.areaId);
+      const gDef = groupForItem(it, sub.areaId, groupsOf);
       if (gDef && !groupsOf.some((x) => x.id === gDef.id)) {
         groupsOf.push({ id: gDef.id, title: gDef.title, kind: "knowledge", order: gDef.order });
       }

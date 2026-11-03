@@ -6,6 +6,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versio
 
 ## [Unreleased]
 
+### Fixed
+- Mentor: the plan sync now detects the new pieces of **language** areas (`2.1 Python`, `2.2 JavaScript`, `2.3 TypeScript`) and of any area already in the plan, and adds them next to their siblings (same subplan and group as their chapter). Before, the “coarse chapters” notice never went away after breaking a language into pieces.
+- Mentor: the sync no longer marks as “offered” the topics that did not fit in its 400-per-pass cap, so the rest are added on the next pass instead of being lost.
+
 ### Added
 - Mentor: create a plan with another AI (Antigravity or a chat) with no API key or local model. NoteVault writes the request into the vault and validates the answer before creating the plan.
 

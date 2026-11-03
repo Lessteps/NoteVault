@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildPlan, PlanStore, type Plan } from "../../core/mentor/plan.js";
 import { addDays } from "../../lib/planTime.js";
+import { depthGaps } from "../../lib/areaDepth.js";
 import { AppState } from "../appState.js";
 import { mentorProjectLinksApi, projectDescription } from "./mentorProjectLinks.js";
 
@@ -231,6 +232,78 @@ describe("mentor_plan_sync_reference: lo nuevo de la vault entra solo al plan", 
     expect(r.added.map((f: string) => f.split("/").pop())).toEqual(["6.4.1 SELECT"]);
     expect(store.load(plan.id)!.subplans.find((s) => s.areaId === "databases")!.topics.map((t) => t.folder.split("/").pop())).toEqual(["6.4.1 SELECT"]);
   });
+
+  // Un plan real: el lenguaje Python vive en el subplan Backend, en su propio grupo (`lang-python`), con sus capítulos de 150 min y sin piezas.
+  const planWithPython = (chapters = 3): Plan => {
+    const plan = savePlan();
+    const be = plan.subplans.find((s) => s.areaId === "backend")!;
+    const py = Array.from({ length: chapters }, (_, i) => ({ folder: `Programación/2.1 Python/2.1.${i + 1} Capítulo ${i + 1}`, title: `Capítulo ${i + 1}`, estMinutes: 150, targetWeek: 1, group: "lang-python" }));
+    const next: Plan = {
+      ...plan,
+      createdAt: "2000-01-01T00:00:00.000Z",
+      subplans: plan.subplans.map((s) => (s.id === be.id ? { ...s, groups: [...(s.groups ?? []), { id: "lang-python", title: "Lenguaje: Python", kind: "language" as const, order: 20 }], topics: [...s.topics, ...py] } : s)),
+    };
+    new PlanStore(dir).save(next);
+    return next;
+  };
+  const piece = (ch: number, n: number) => `Programación/2.1 Python/2.1.${ch}.${n} Pieza ${ch}.${n}`;
+  const pythonOf = (id: string) => new PlanStore(dir).load(id)!.subplans.find((s) => s.areaId === "backend")!.topics.filter((t) => t.folder.includes("/2.1 Python/"));
+
+  it("las piezas nuevas de un LENGUAJE (2.1 Python) entran solas, en el mismo subplan y grupo que sus capítulos, y el aviso de capítulos gruesos se apaga", async () => {
+    const plan = planWithPython();
+    expect(depthGaps(new PlanStore(dir).load(plan.id)!.subplans).find((g) => g.groupId === "lang-python")?.coarse).toHaveLength(3);
+    setWarmApp(app);
+    for (const ch of [1, 2, 3]) for (const n of [1, 2, 3]) make(piece(ch, n));
+    await warmStudyIndex();
+    const m = mentorApi(app, vi.fn());
+    const r: any = m.mentor_plan_sync_reference({ planId: plan.id });
+    expect(r.added).toHaveLength(9);
+    const py = pythonOf(plan.id);
+    expect(py.filter((t) => /\/2\.1\.\d+\.\d+ /.test(t.folder)).every((t) => t.group === "lang-python")).toBe(true);
+    expect(py).toHaveLength(12);
+    // ya no hay capítulos gruesos en ese grupo: la app deja de avisar
+    expect(depthGaps(new PlanStore(dir).load(plan.id)!.subplans).filter((g) => g.groupId === "lang-python")).toEqual([]);
+    // idempotente
+    expect((m.mentor_plan_sync_reference({ planId: plan.id }) as { added: string[] }).added).toEqual([]);
+  });
+
+  it("no mete un lenguaje que el plan no tiene (lo que la persona quitó antes del plan no vuelve)", async () => {
+    const plan = planWithPython();
+    setWarmApp(app);
+    make("Programación/2.2 JavaScript/2.2.1.1 Pieza"); // el plan no tiene nada de 2.2 JavaScript
+    await warmStudyIndex();
+    const r: any = mentorApi(app, vi.fn()).mentor_plan_sync_reference({ planId: plan.id });
+    expect(r.added).toEqual([]);
+  });
+
+  it("una pieza cuelga del grupo de SU capítulo aunque el área tenga varios grupos", async () => {
+    const plan = planWithPython(2);
+    const store = new PlanStore(dir);
+    const cur = store.load(plan.id)!;
+    store.save({
+      ...cur,
+      subplans: cur.subplans.map((s) => ({ ...s, topics: s.topics.map((t) => (t.folder.endsWith("2.1.2 Capítulo 2") ? { ...t, group: "otro" } : t)), ...(s.areaId === "backend" ? { groups: [...(s.groups ?? []), { id: "otro", title: "Otro grupo", kind: "knowledge" as const, order: 25 }] } : {}) })),
+    });
+    setWarmApp(app);
+    make(piece(2, 1));
+    make(piece(1, 1));
+    await warmStudyIndex();
+    mentorApi(app, vi.fn()).mentor_plan_sync_reference({ planId: plan.id });
+    const py = pythonOf(plan.id);
+    expect(py.find((t) => t.folder.endsWith("2.1.2.1 Pieza 2.1"))!.group).toBe("otro");
+    expect(py.find((t) => t.folder.endsWith("2.1.1.1 Pieza 1.1"))!.group).toBe("lang-python");
+  });
+
+  it("el tope de 400 por vuelta no pierde temas: lo que no cupo se añade en la siguiente", async () => {
+    const plan = planWithPython(1);
+    setWarmApp(app);
+    for (let n = 1; n <= 405; n++) make(piece(1, n));
+    await warmStudyIndex();
+    const m = mentorApi(app, vi.fn());
+    expect((m.mentor_plan_sync_reference({ planId: plan.id }) as { added: string[] }).added).toHaveLength(400);
+    expect((m.mentor_plan_sync_reference({ planId: plan.id }) as { added: string[] }).added).toHaveLength(5);
+    expect(pythonOf(plan.id)).toHaveLength(406);
+  }, 60000);
 
   it("si el plan no tiene el área (Frontend) no mete nada; en planes archivados tampoco", async () => {
     const plan = savePlan();

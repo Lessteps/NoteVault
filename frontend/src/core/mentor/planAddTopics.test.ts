@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { buildPlan, sanitizePlan, type Plan } from "./plan.js";
-import { addTopicsToPlan, byTopicNumber, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, findAreaSubplan, type AddTopicItem } from "./planAddTopics.js";
+import { addTopicsToPlan, byTopicNumber, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, findAreaSubplan, siblingPlacement, type AddTopicItem } from "./planAddTopics.js";
 
 const START = "2026-10-06";
 const END = "2026-12-20";
@@ -118,5 +118,35 @@ describe("addTopicsToPlan", () => {
     const back = sanitizePlan(JSON.parse(JSON.stringify(r.plan)))!;
     const t = back.subplans.find((s) => s.areaId === "frontend")!.topics.at(-1)!;
     expect(t).toMatchObject({ title: "Tema 1", addedFrom: "curriculum", group: "css" });
+  });
+});
+
+describe("siblingPlacement: una pieza nueva entra donde están sus hermanas", () => {
+  const sub = (id: string, topics: Array<{ folder: string; group?: string }>) => ({ id, area: id, topics: topics.map((t) => ({ title: "t", estMinutes: 60, targetWeek: 1, ...t })) }) as never;
+  const plan = {
+    subplans: [
+      sub("s1", [{ folder: "Programación/1 Fundamentals/1.1 A", group: "bases" }, { folder: "Programación/2.1 Python/2.1.1 Cap", group: "lang-python" }, { folder: "Programación/2.1 Python/2.1.2 Cap", group: "otro" }]),
+      sub("s2", [{ folder: "Programación/2.2 JavaScript/2.2.1 Cap", group: "lang-js" }]),
+    ],
+  };
+  it("hereda el subplan y el grupo del capítulo del que cuelga", () => {
+    expect(siblingPlacement(plan, "Programación/2.1 Python/2.1.1.3 Pieza")).toEqual({ subplanId: "s1", groupId: "lang-python" });
+    expect(siblingPlacement(plan, "Programación/2.1 Python/2.1.2.1 Pieza")).toEqual({ subplanId: "s1", groupId: "otro" });
+    expect(siblingPlacement(plan, "Programación/2.2 JavaScript/2.2.1.1 Pieza")).toEqual({ subplanId: "s2", groupId: "lang-js" });
+  });
+  it("sin capítulo padre usa el tema más cercano de la misma área", () => {
+    expect(siblingPlacement(plan, "Programación/2.1 Python/2.1.9.1 Pieza")?.subplanId).toBe("s1");
+  });
+  it("undefined si el plan no tiene nada de esa área o la ruta no es de un tema", () => {
+    expect(siblingPlacement(plan, "Programación/2.3 TypeScript/2.3.1.1 Pieza")).toBeUndefined();
+    expect(siblingPlacement(plan, "Programación/2.1 Python")).toBeUndefined();
+  });
+  it("addTopicsToPlan respeta el grupo pedido si existe en el subplan", () => {
+    const base = basePlan();
+    const be = base.subplans.find((s) => s.areaId === "backend")!;
+    const withLang = { ...base, subplans: base.subplans.map((s) => (s.id === be.id ? { ...s, groups: [...(s.groups ?? []), { id: "lang-python", title: "Lenguaje: Python", kind: "language" as const, order: 20 }] } : s)) };
+    const r = addTopicsToPlan(withLang, [{ folder: "Programación/2.1 Python/2.1.1.1 Pieza", title: "Pieza", estMinutes: 45, subplanId: be.id, groupId: "lang-python" }, { folder: "Programación/2.1 Python/2.1.1.2 Otra", title: "Otra", estMinutes: 45, subplanId: be.id, groupId: "no-existe" }]);
+    const added = r.plan.subplans.find((s) => s.id === be.id)!.topics.slice(-2);
+    expect(added.map((t) => t.group)).toEqual(["lang-python", "core"]); // un grupo desconocido cae al grupo por defecto del área
   });
 });

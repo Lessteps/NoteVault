@@ -166,7 +166,7 @@ import { studyIndexCold } from "./study.js";
 import { curriculumAreas } from "../../core/curriculum/catalog.js";
 import { areaFolderOf, regroupByUnits } from "../../core/mentor/planRegroup.js";
 import { planHealth, type HealthIssue } from "../../lib/planHealth.js";
-import { addTopicsToPlan, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, findAreaSubplan, knowledgeTargetOfFolder, type AddTopicItem } from "../../core/mentor/planAddTopics.js";
+import { addTopicsToPlan, CURRICULUM_PLAN_TARGET, curriculumAreaOfFolder, findAreaSubplan, knowledgeTargetOfFolder, siblingPlacement, type AddTopicItem } from "../../core/mentor/planAddTopics.js";
 
 const DEFAULT_BRIEF_CHARS = 6000;
 
@@ -2394,6 +2394,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
       if (!wanted.length) throw new ApiError("Elige al menos un tema.");
       const forced = String(o.subplanId ?? "").trim();
       if (forced && !plan.subplans.some((s) => s.id === forced)) throw new ApiError("Ese área ya no existe en el plan.");
+      // destino por tema (subplan y grupo): lo usa la sincronización para que una pieza nueva entre donde están sus hermanas
+      const placements = (o.placements && typeof o.placements === "object" ? o.placements : {}) as Record<string, { subplanId?: unknown; groupId?: unknown }>;
       const snaps = new Map(topicSnaps(app).map((t) => [t.folder, t] as const));
       const est = new Map(buildTopicCatalog([...snaps.values()], "", { max: 1_000_000 }).map((c) => [c.folder, c.estMinutes] as const));
       const areas = curriculumAreas();
@@ -2406,6 +2408,12 @@ export function mentorApi(app: AppState, send?: SendFn) {
           continue;
         }
         const minutes = est.get(folder) ?? 45;
+        const place = placements[folder];
+        const placeSub = place && typeof place.subplanId === "string" && plan.subplans.some((x) => x.id === place.subplanId) ? place.subplanId : "";
+        if (placeSub) {
+          items.push({ folder, title: snap.title, estMinutes: minutes, subplanId: placeSub, ...(typeof place!.groupId === "string" && place!.groupId ? { groupId: place!.groupId } : {}) });
+          continue;
+        }
         if (forced) {
           items.push({ folder, title: snap.title, estMinutes: minutes, subplanId: forced });
           continue;
@@ -2500,7 +2508,10 @@ export function mentorApi(app: AppState, send?: SendFn) {
           if (reference) return !!findAreaSubplan(plan, reference);
           // un tema de conocimiento (`6 Databases/6.4.1 SELECT`) nuevo desde que existe el plan: solo si su área ya está en él (lo que el estudiante quitó antes del plan no vuelve)
           const knowledge = knowledgeTargetOfFolder(f);
-          return !!knowledge && !!findAreaSubplan(plan, knowledge) && newerThanPlan(f);
+          if (knowledge && findAreaSubplan(plan, knowledge)) return newerThanPlan(f);
+          // lo que no es de una rama de conocimiento (los lenguajes 2.1 Python · 2.2 JavaScript · 2.3 TypeScript, los fundamentos…): entra si su ÁREA ya está en el plan,
+          // junto a sus hermanos (mismo subplan y mismo grupo). Sin esto, las piezas nuevas de un lenguaje no entraban nunca y el aviso de «capítulos gruesos» no se iba.
+          return !!siblingPlacement(plan, f) && newerThanPlan(f);
         });
       const fresh = candidates.filter((f) => !offered.has(f)).slice(0, 400);
       if (!fresh.length) {
@@ -2510,8 +2521,17 @@ export function mentorApi(app: AppState, send?: SendFn) {
         const saved = new PlanStore(app.root).save(t.plan);
         return { loading: false as const, added: [] as string[], message: "", tidied: true as const, plan: saved, health: healthOf(saved, offered) };
       }
-      const res = api.mentor_plan_add_topics({ planId: id, folders: fresh }) as { added?: string[]; message?: string };
-      for (const f of candidates) offered.add(f);
+      const placements: Record<string, { subplanId: string; groupId?: string }> = {};
+      for (const f of fresh) {
+        // solo lo que NO tiene destino propio (área de referencia o rama de conocimiento): esos siguen su camino de siempre (HTML → su grupo, 6 Databases → su área…)
+        const aid = curriculumAreaOfFolder(f, areas);
+        if ((aid && CURRICULUM_PLAN_TARGET[aid]) || knowledgeTargetOfFolder(f)) continue;
+        const place = siblingPlacement(plan, f);
+        if (place) placements[f] = place;
+      }
+      const res = api.mentor_plan_add_topics({ planId: id, folders: fresh, placements }) as { added?: string[]; message?: string };
+      // solo se da por OFRECIDO lo que se intentó (el tope de 400 por vuelta deja el resto para la siguiente; antes se marcaban todos y los que no cabían se perdían)
+      for (const f of fresh) offered.add(f);
       fs.mkdirSync(path.dirname(file), { recursive: true });
       store.writeJson(file, { offered: [...offered] });
       return { loading: false as const, ...res, added: res.added ?? [] };

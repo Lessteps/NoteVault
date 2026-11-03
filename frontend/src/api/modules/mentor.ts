@@ -159,6 +159,7 @@ import { mentorProjectLinksApi } from "./mentorProjectLinks.js";
 import { mentorPlanDossierApi } from "./mentorPlanDossier.js";
 import { buildExternalPlanDoc, externalPlanChatPrompt, externalPlanShortPrompt } from "../../lib/planExternal.js";
 import { mentorPlanDepthApi } from "./mentorPlanDepth.js";
+import { masterSyllabusApi, writeMasterSyllabus } from "./masterSyllabus.js";
 import { mentorDayCloseApi } from "./mentorDayClose.js";
 import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
@@ -2513,12 +2514,24 @@ export function mentorApi(app: AppState, send?: SendFn) {
           // junto a sus hermanos (mismo subplan y mismo grupo). Sin esto, las piezas nuevas de un lenguaje no entraban nunca y el aviso de «capítulos gruesos» no se iba.
           return !!siblingPlacement(plan, f) && newerThanPlan(f);
         });
+      // el temario general (Markdown + JSON) se mantiene solo: cada sincronización lo deja al día con lo que hay en la vault y en el plan
+      const refreshMaster = (p: Plan): void => {
+        try {
+          writeMasterSyllabus(app, { spaces: [...new Set(p.subplans.flatMap((s) => s.topics.map((t) => t.folder.split("/")[0] ?? "")).filter(Boolean))] });
+        } catch {
+          /* el temario general es una ayuda: si falla, la sincronización sigue */
+        }
+      };
       const fresh = candidates.filter((f) => !offered.has(f)).slice(0, 400);
       if (!fresh.length) {
         // nada nuevo que añadir, pero lo que ya está puede estar sin asignatura o sin orden (temas que entraron antes de esta regla): se ordena solo
         const t = tidyPlan(plan);
-        if (!t.changed) return { loading: false as const, added: [] as string[], message: "", health: healthOf(plan, offered) };
+        if (!t.changed) {
+          refreshMaster(plan);
+          return { loading: false as const, added: [] as string[], message: "", health: healthOf(plan, offered) };
+        }
         const saved = new PlanStore(app.root).save(t.plan);
+        refreshMaster(saved);
         return { loading: false as const, added: [] as string[], message: "", tidied: true as const, plan: saved, health: healthOf(saved, offered) };
       }
       const placements: Record<string, { subplanId: string; groupId?: string }> = {};
@@ -2534,6 +2547,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       for (const f of fresh) offered.add(f);
       fs.mkdirSync(path.dirname(file), { recursive: true });
       store.writeJson(file, { offered: [...offered] });
+      refreshMaster(new PlanStore(app.root).load(id) ?? plan);
       return { loading: false as const, ...res, added: res.added ?? [] };
     },
 
@@ -3390,6 +3404,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
     // «Preguntar con otra IA»: el dosier del plan para que Antigravity responda sin la app abierta (ver `mentorPlanDossier.ts`)
     ...mentorPlanDossierApi(app),
     ...mentorPlanDepthApi(app),
+    ...masterSyllabusApi(app),
     ...mentorPlanFoldersApi(app, { allTopics: () => buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 }), today: () => localDate() }),
     /** Compatibilidad: el flujo anterior (un BORRADOR en el chat que se acepta aparte); el camino principal crea el plan propuesto. */
     mentor_plan_generate_draft: (opts: unknown) => api.mentor_plan_generate({ ...((opts && typeof opts === "object" ? opts : {}) as object), asDraft: true }),

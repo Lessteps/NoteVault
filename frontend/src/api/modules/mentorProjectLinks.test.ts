@@ -267,6 +267,47 @@ describe("mentor_plan_sync_reference: lo nuevo de la vault entra solo al plan", 
     expect((m.mentor_plan_sync_reference({ planId: plan.id }) as { added: string[] }).added).toEqual([]);
   });
 
+  it("el temario general (Markdown + JSON) se escribe solo al sincronizar, refleja el plan y la vault, y no se reescribe si no cambió nada", async () => {
+    const plan = planWithPython(2);
+    setWarmApp(app);
+    make(piece(1, 1));
+    make(piece(1, 2));
+    make("Programación/3 Desktop Apps (Electron)/3.1 Algo"); // en la vault pero no en el plan: va a la biblioteca
+    await warmStudyIndex();
+    const m = mentorApi(app, vi.fn());
+    m.mentor_plan_sync_reference({ planId: plan.id });
+    const mdPath = path.join(dir, "Programación", "00 Master syllabus.md");
+    const jsonPath = path.join(dir, "Programación", "00 Master syllabus.json");
+    const md = fs.readFileSync(mdPath, "utf-8");
+    const json = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
+    expect(md).toContain("# Master syllabus — Programación");
+    expect(md).toContain("#### Subject: Lenguaje: Python (language)");
+    expect(md).toContain("[[2.1.1.1 Pieza 1.1]]");
+    expect(md).toContain("## Library: in the vault but not in any route");
+    expect(md).toContain("[[3.1 Algo]]");
+    const lang = json.routes[0].areas.find((a: { area: string }) => a.area === "Backend").subjects.find((g: { id: string }) => g.id === "lang-python");
+    expect(lang.topics.map((t: { number: string }) => t.number)).toEqual(["2.1.1", "2.1.1.1", "2.1.1.2", "2.1.2"]);
+    expect(lang.topics.find((t: { number: string }) => t.number === "2.1.1.1")).toMatchObject({ parent: "Programación/2.1 Python/2.1.1 Capítulo 1", theory: true, practice: true });
+    expect(json.summary.notInAnyPlan).toBeGreaterThanOrEqual(1);
+
+    // sin cambios no se reescribe (mismo contenido, mismo mtime)
+    const before = fs.statSync(mdPath).mtimeMs;
+    await new Promise((r) => setTimeout(r, 20));
+    m.mentor_plan_sync_reference({ planId: plan.id });
+    expect(fs.statSync(mdPath).mtimeMs).toBe(before);
+
+    // un tema nuevo cambia el archivo; la API manual también lo regenera
+    make(piece(2, 1));
+    clearStudySnapshotCache();
+    await warmStudyIndex();
+    m.mentor_plan_sync_reference({ planId: plan.id });
+    expect(fs.readFileSync(mdPath, "utf-8")).toContain("[[2.1.2.1 Pieza 2.1]]");
+    fs.rmSync(mdPath);
+    const r: any = (m as any).mentor_master_syllabus();
+    expect(r.spaces[0]).toMatchObject({ space: "Programación", changed: true, md: "Programación/00 Master syllabus.md" });
+    expect(fs.existsSync(mdPath)).toBe(true);
+  });
+
   it("no mete un lenguaje que el plan no tiene (lo que la persona quitó antes del plan no vuelve)", async () => {
     const plan = planWithPython();
     setWarmApp(app);

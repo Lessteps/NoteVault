@@ -4,6 +4,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). L
 
 ## [Sin publicar]
 
+### Añadido
+- Mentor: un **temario general** siempre al día para IAs y personas — `00 Master syllabus.md` y su gemelo JSON en cada espacio de estudio. Un solo archivo con cada ruta (plan) → área → asignatura → tema → pieza, con número, tiempo, semana del plan y estado (teoría, mapa, práctica, ejercicios, hecho), más la biblioteca de temas que no están en ningún plan. La app lo reescribe cada vez que se sincroniza el plan (solo si cambió) y se puede regenerar con `mentor_master_syllabus`.
+
 ### Corregido
 - Mentor: la sincronización del plan ahora detecta las piezas nuevas de las áreas de **lenguaje** (`2.1 Python`, `2.2 JavaScript`, `2.3 TypeScript`) y de cualquier área que ya esté en el plan, y las añade junto a sus hermanas (mismo subplan y grupo que su capítulo). Antes el aviso de «capítulos gruesos» no se iba nunca tras desglosar un lenguaje.
 - Mentor: la sincronización ya no marca como «ofrecidos» los temas que no cupieron en su tope de 400 por vuelta; el resto se añade en la siguiente en vez de perderse.

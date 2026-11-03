@@ -6,6 +6,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versio
 
 ## [Unreleased]
 
+### Added
+- Mentor: an always-current **master syllabus** for AIs and people — `00 Master syllabus.md` and its JSON twin in each study space. One file with every route (plan) → area → subject → topic → piece, with number, time, plan week and state (theory, map, practice, exercises, done), plus the library of topics not in any plan. It is rewritten by the app every time the plan syncs (only when its content changed) and can be regenerated with `mentor_master_syllabus`.
+
 ### Fixed
 - Mentor: the plan sync now detects the new pieces of **language** areas (`2.1 Python`, `2.2 JavaScript`, `2.3 TypeScript`) and of any area already in the plan, and adds them next to their siblings (same subplan and group as their chapter). Before, the “coarse chapters” notice never went away after breaking a language into pieces.
 - Mentor: the sync no longer marks as “offered” the topics that did not fit in its 400-per-pass cap, so the rest are added on the next pass instead of being lost.
